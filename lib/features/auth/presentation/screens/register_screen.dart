@@ -41,6 +41,35 @@ class _RegisterScreenState extends ConsumerState<RegisterScreen> {
   String get _roleName =>
       _selectedRole == 0 ? AppConstants.roleDriver : AppConstants.roleTechnician;
 
+  Future<void> _loginWithGoogle() async {
+    final notifier = ref.read(authNotifierProvider.notifier);
+    final success = await notifier.loginWithGoogle();
+    if (!mounted) return;
+    if (success) {
+      _navigateByRole();
+    } else {
+      final error = ref.read(authNotifierProvider).error;
+      AppHelpers.showSnackBar(
+        context,
+        error?.toString() ?? 'Error al iniciar sesión con Google',
+        isError: true,
+      );
+    }
+  }
+
+  void _navigateByRole() {
+    final user = ref.read(authNotifierProvider).value;
+    if (user == null) return;
+    switch (user.role) {
+      case AppConstants.roleDriver:
+        context.go(AppRoutes.driverHome);
+      case AppConstants.roleTechnician:
+        context.go(AppRoutes.technicianHome);
+      case AppConstants.roleAdmin:
+        context.go(AppRoutes.adminDashboard);
+    }
+  }
+
   Future<void> _register() async {
     if (!_formKey.currentState!.validate()) return;
 
@@ -62,16 +91,7 @@ class _RegisterScreenState extends ConsumerState<RegisterScreen> {
     if (!mounted) return;
 
     if (success) {
-      final user = ref.read(authNotifierProvider).value;
-      if (user == null) return;
-      switch (user.role) {
-        case AppConstants.roleDriver:
-          context.go(AppRoutes.driverHome);
-        case AppConstants.roleTechnician:
-          context.go(AppRoutes.technicianHome);
-        case AppConstants.roleAdmin:
-          context.go(AppRoutes.adminDashboard);
-      }
+      _navigateByRole();
     } else {
       final error = ref.read(authNotifierProvider).error;
       AppHelpers.showSnackBar(
@@ -231,6 +251,30 @@ class _RegisterScreenState extends ConsumerState<RegisterScreen> {
                       isLoading: isLoading,
                       suffixIcon: const Icon(Icons.arrow_forward, color: Colors.white, size: 20),
                     ),
+                    const SizedBox(height: 20),
+
+                    // Divider con "o"
+                    Row(
+                      children: [
+                        Expanded(child: Divider(color: AppColors.outline.withOpacity(0.4))),
+                        Padding(
+                          padding: const EdgeInsets.symmetric(horizontal: 12),
+                          child: Text(
+                            'o',
+                            style: TextStyle(
+                              fontSize: 13,
+                              fontWeight: FontWeight.w500,
+                              color: AppColors.secondary.withOpacity(0.6),
+                            ),
+                          ),
+                        ),
+                        Expanded(child: Divider(color: AppColors.outline.withOpacity(0.4))),
+                      ],
+                    ),
+                    const SizedBox(height: 20),
+
+                    // Botón Google
+                    _GoogleRegisterButton(onPressed: isLoading ? null : _loginWithGoogle),
                     const SizedBox(height: 24),
 
                     // Login link
@@ -318,4 +362,98 @@ class _RegisterScreenState extends ConsumerState<RegisterScreen> {
       ),
     );
   }
+}
+
+class _GoogleRegisterButton extends StatelessWidget {
+  final VoidCallback? onPressed;
+
+  const _GoogleRegisterButton({this.onPressed});
+
+  @override
+  Widget build(BuildContext context) {
+    return GestureDetector(
+      onTap: onPressed,
+      child: AnimatedOpacity(
+        opacity: onPressed == null ? 0.5 : 1.0,
+        duration: const Duration(milliseconds: 200),
+        child: Container(
+          height: 56,
+          decoration: BoxDecoration(
+            color: Colors.white,
+            borderRadius: BorderRadius.circular(9999),
+            border: Border.all(color: AppColors.outline.withOpacity(0.3)),
+            boxShadow: [
+              BoxShadow(
+                color: AppColors.onSurface.withOpacity(0.04),
+                blurRadius: 8,
+                offset: const Offset(0, 2),
+              ),
+            ],
+          ),
+          child: Row(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              SizedBox(
+                width: 22,
+                height: 22,
+                child: CustomPaint(painter: _GoogleLogoPainter()),
+              ),
+              const SizedBox(width: 12),
+              const Text(
+                'Registrarse con Google',
+                style: TextStyle(
+                  fontSize: 15,
+                  fontWeight: FontWeight.w600,
+                  color: Color(0xFF3C4043),
+                  letterSpacing: -0.2,
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+class _GoogleLogoPainter extends CustomPainter {
+  @override
+  void paint(Canvas canvas, Size size) {
+    final center = Offset(size.width / 2, size.height / 2);
+    final radius = size.width / 2;
+    const strokeWidth = 3.5;
+
+    final arcPaint = Paint()
+      ..style = PaintingStyle.stroke
+      ..strokeWidth = strokeWidth
+      ..strokeCap = StrokeCap.round;
+
+    final rect = Rect.fromCircle(center: Offset.zero, radius: radius - strokeWidth / 2);
+
+    canvas.save();
+    canvas.translate(center.dx, center.dy);
+
+    arcPaint.color = const Color(0xFFEA4335);
+    canvas.drawArc(rect, -0.52, -1.57, false, arcPaint);
+
+    arcPaint.color = const Color(0xFFFBBC05);
+    canvas.drawArc(rect, -2.09, -1.57, false, arcPaint);
+
+    arcPaint.color = const Color(0xFF34A853);
+    canvas.drawArc(rect, 2.62, 1.57, false, arcPaint);
+
+    arcPaint.color = const Color(0xFF4285F4);
+    canvas.drawArc(rect, -0.52, 1.57, false, arcPaint);
+
+    final linePaint = Paint()
+      ..color = const Color(0xFF4285F4)
+      ..strokeWidth = strokeWidth
+      ..strokeCap = StrokeCap.round;
+    canvas.drawLine(Offset.zero, Offset(radius - strokeWidth / 2, 0), linePaint);
+
+    canvas.restore();
+  }
+
+  @override
+  bool shouldRepaint(covariant CustomPainter oldDelegate) => false;
 }

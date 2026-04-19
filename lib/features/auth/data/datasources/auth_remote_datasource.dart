@@ -1,3 +1,5 @@
+import 'package:firebase_auth/firebase_auth.dart' as firebase_auth;
+import 'package:google_sign_in/google_sign_in.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import '../../../../core/constants/app_constants.dart';
 import '../../../../core/errors/exceptions.dart' as core_exceptions;
@@ -5,6 +7,7 @@ import '../models/user_model.dart';
 
 abstract class AuthRemoteDataSource {
   Future<UserModel> login({required String email, required String password});
+  Future<UserModel> loginWithGoogle();
   Future<UserModel> register({
     required String email,
     required String password,
@@ -119,7 +122,80 @@ class AuthRemoteDataSourceImpl implements AuthRemoteDataSource {
   }
 
   @override
+  Future<UserModel> loginWithGoogle() async {
+    try {
+      final googleSignIn = GoogleSignIn();
+      final googleUser = await googleSignIn.signIn();
+      if (googleUser == null) {
+        throw const core_exceptions.AuthException(message: 'Inicio de sesión cancelado');
+      }
+
+      final googleAuth = await googleUser.authentication;
+      if (googleAuth.idToken == null) {
+        throw const core_exceptions.AuthException(message: 'No se pudo obtener el token de Google');
+      }
+
+      // Autenticar en Firebase
+      final firebaseCredential = firebase_auth.GoogleAuthProvider.credential(
+        accessToken: googleAuth.accessToken,
+        idToken: googleAuth.idToken,
+      );
+      await firebase_auth.FirebaseAuth.instance.signInWithCredential(firebaseCredential);
+
+      // Autenticar en Supabase con el idToken de Google
+      final response = await _client.auth.signInWithIdToken(
+        provider: OAuthProvider.google,
+        idToken: googleAuth.idToken!,
+        accessToken: googleAuth.accessToken,
+      );
+
+      if (response.user == null) {
+        throw const core_exceptions.AuthException(message: 'Error al autenticar con Google');
+      }
+
+      // Obtener perfil existente o crear uno nuevo
+      try {
+        return await _fetchProfile(response.user!.id);
+      } catch (_) {
+        final name = googleUser.displayName ?? googleUser.email.split('@')[0];
+        await _client.from(AppConstants.tableProfiles).upsert({
+          'id': response.user!.id,
+          'email': googleUser.email,
+          'nombre': name,
+          'telefono': '',
+          'rol': AppConstants.roleDriver,
+          'activo': true,
+          'creado_en': DateTime.now().toIso8601String(),
+        });
+        return UserModel(
+          id: response.user!.id,
+          email: googleUser.email,
+          name: name,
+          phone: '',
+          role: AppConstants.roleDriver,
+          rating: 0.0,
+          totalServices: 0,
+          isAvailable: false,
+          isApproved: true,
+          createdAt: DateTime.now(),
+        );
+      }
+    } on core_exceptions.AuthException {
+      rethrow;
+    } on firebase_auth.FirebaseAuthException catch (e) {
+      throw core_exceptions.AuthException(message: e.message ?? 'Error con Google');
+    } on AuthException catch (e) {
+      throw core_exceptions.AuthException(message: e.message);
+    } on PostgrestException catch (e) {
+      throw core_exceptions.ServerException(message: e.message);
+    } catch (e) {
+      throw core_exceptions.ServerException(message: e.toString());
+    }
+  }
+
+  @override
   Future<void> logout() async {
+    await firebase_auth.FirebaseAuth.instance.signOut();
     await _client.auth.signOut();
   }
 

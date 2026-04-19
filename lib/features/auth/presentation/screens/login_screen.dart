@@ -31,6 +31,35 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
     super.dispose();
   }
 
+  Future<void> _loginWithGoogle() async {
+    final notifier = ref.read(authNotifierProvider.notifier);
+    final success = await notifier.loginWithGoogle();
+    if (!mounted) return;
+    if (success) {
+      _navigateByRole();
+    } else {
+      final error = ref.read(authNotifierProvider).error;
+      AppHelpers.showSnackBar(
+        context,
+        error?.toString() ?? 'Error al iniciar sesión con Google',
+        isError: true,
+      );
+    }
+  }
+
+  void _navigateByRole() {
+    final user = ref.read(authNotifierProvider).value;
+    if (user == null) return;
+    switch (user.role) {
+      case AppConstants.roleDriver:
+        context.go(AppRoutes.driverHome);
+      case AppConstants.roleTechnician:
+        context.go(AppRoutes.technicianHome);
+      case AppConstants.roleAdmin:
+        context.go(AppRoutes.adminDashboard);
+    }
+  }
+
   Future<void> _login() async {
     if (!_formKey.currentState!.validate()) return;
 
@@ -43,16 +72,7 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
     if (!mounted) return;
 
     if (success) {
-      final user = ref.read(authNotifierProvider).value;
-      if (user == null) return;
-      switch (user.role) {
-        case AppConstants.roleDriver:
-          context.go(AppRoutes.driverHome);
-        case AppConstants.roleTechnician:
-          context.go(AppRoutes.technicianHome);
-        case AppConstants.roleAdmin:
-          context.go(AppRoutes.adminDashboard);
-      }
+      _navigateByRole();
     } else {
       final error = ref.read(authNotifierProvider).error;
       AppHelpers.showSnackBar(
@@ -377,6 +397,30 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
               isLoading: isLoading,
               suffixIcon: const Icon(Icons.arrow_forward, color: Colors.white, size: 20),
             ),
+            const SizedBox(height: 20),
+
+            // Divider con "o"
+            Row(
+              children: [
+                Expanded(child: Divider(color: AppColors.outline.withOpacity(0.4))),
+                Padding(
+                  padding: const EdgeInsets.symmetric(horizontal: 12),
+                  child: Text(
+                    'o',
+                    style: TextStyle(
+                      fontSize: 13,
+                      fontWeight: FontWeight.w500,
+                      color: AppColors.secondary.withOpacity(0.6),
+                    ),
+                  ),
+                ),
+                Expanded(child: Divider(color: AppColors.outline.withOpacity(0.4))),
+              ],
+            ),
+            const SizedBox(height: 20),
+
+            // Botón Google
+            _GoogleSignInButton(onPressed: isLoading ? null : _loginWithGoogle),
           ],
         ),
       ),
@@ -384,6 +428,7 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
   }
 
   Widget _buildInfoCards() {
+
     return Row(
       children: [
         Expanded(
@@ -458,4 +503,124 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
       ],
     );
   }
+}
+
+class _GoogleSignInButton extends StatelessWidget {
+  final VoidCallback? onPressed;
+
+  const _GoogleSignInButton({this.onPressed});
+
+  @override
+  Widget build(BuildContext context) {
+    return GestureDetector(
+      onTap: onPressed,
+      child: AnimatedOpacity(
+        opacity: onPressed == null ? 0.5 : 1.0,
+        duration: const Duration(milliseconds: 200),
+        child: Container(
+          height: 56,
+          decoration: BoxDecoration(
+            color: Colors.white,
+            borderRadius: BorderRadius.circular(9999),
+            border: Border.all(color: AppColors.outline.withOpacity(0.3)),
+            boxShadow: [
+              BoxShadow(
+                color: AppColors.onSurface.withOpacity(0.04),
+                blurRadius: 8,
+                offset: const Offset(0, 2),
+              ),
+            ],
+          ),
+          child: Row(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              _GoogleLogo(),
+              const SizedBox(width: 12),
+              const Text(
+                'Continuar con Google',
+                style: TextStyle(
+                  fontSize: 15,
+                  fontWeight: FontWeight.w600,
+                  color: Color(0xFF3C4043),
+                  letterSpacing: -0.2,
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+class _GoogleLogo extends StatelessWidget {
+  @override
+  Widget build(BuildContext context) {
+    return SizedBox(
+      width: 22,
+      height: 22,
+      child: CustomPaint(painter: _GoogleLogoPainter()),
+    );
+  }
+}
+
+class _GoogleLogoPainter extends CustomPainter {
+  @override
+  void paint(Canvas canvas, Size size) {
+    final center = Offset(size.width / 2, size.height / 2);
+    final radius = size.width / 2;
+
+    // Rojo
+    final redPaint = Paint()..color = const Color(0xFFEA4335);
+    // Azul
+    final bluePaint = Paint()..color = const Color(0xFF4285F4);
+    // Amarillo
+    final yellowPaint = Paint()..color = const Color(0xFFFBBC05);
+    // Verde
+    final greenPaint = Paint()..color = const Color(0xFF34A853);
+
+    canvas.save();
+    canvas.translate(center.dx, center.dy);
+
+    // Dibujamos la "G" de Google con cuatro arcos de colores
+    const strokeWidth = 3.5;
+    final arcPaint = Paint()
+      ..style = PaintingStyle.stroke
+      ..strokeWidth = strokeWidth
+      ..strokeCap = StrokeCap.round;
+
+    final rect = Rect.fromCircle(center: Offset.zero, radius: radius - strokeWidth / 2);
+
+    // Rojo (top-right a top-left por arriba)
+    arcPaint.color = redPaint.color;
+    canvas.drawArc(rect, -0.52, -1.57, false, arcPaint);
+
+    // Amarillo (top-left a bottom-left)
+    arcPaint.color = yellowPaint.color;
+    canvas.drawArc(rect, -2.09, -1.57, false, arcPaint);
+
+    // Verde (bottom)
+    arcPaint.color = greenPaint.color;
+    canvas.drawArc(rect, 2.62, 1.57, false, arcPaint);
+
+    // Azul (right)
+    arcPaint.color = bluePaint.color;
+    canvas.drawArc(rect, -0.52, 1.57, false, arcPaint);
+
+    // Línea horizontal del brazo derecho de la "G"
+    final linePaint = Paint()
+      ..color = bluePaint.color
+      ..strokeWidth = strokeWidth
+      ..strokeCap = StrokeCap.round;
+    canvas.drawLine(
+      Offset(0, 0),
+      Offset(radius - strokeWidth / 2, 0),
+      linePaint,
+    );
+
+    canvas.restore();
+  }
+
+  @override
+  bool shouldRepaint(covariant CustomPainter oldDelegate) => false;
 }
