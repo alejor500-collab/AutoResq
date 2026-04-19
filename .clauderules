@@ -1,0 +1,20 @@
+# Reglas y Contexto del Proyecto: AutoResQ
+
+## Contexto del Proyecto
+[cite_start]AutoResQ es una plataforma de interoperabilidad (ESPOCH, 2026) diseñada para conectar conductores en situaciones de emergencia con técnicos automotrices cercanos[cite: 2]. [cite_start]El objetivo es priorizar la rapidez y simplicidad en situaciones de alto estrés[cite: 10].
+
+## [cite_start]Stack Tecnológico [cite: 176]
+- **Frontend:** Flutter (Dart) para Android 8.0+ e iOS 13+.
+- **Backend:** Supabase (Auth + PostgreSQL Realtime).
+- **IA:** OpenAI API (GPT) para análisis de fallas.
+- **Mapas:** OpenStreetMap + Nominatim (Geocodificación inversa).
+
+## Reglas de Implementación
+- [cite_start]**Roles:** El sistema debe manejar tres roles: Conductor, Técnico y Administrador[cite: 6].
+- [cite_start]**Prioridad MVP:** Centrarse en el registro, obtención de ubicación GPS, creación de solicitudes de emergencia, chat en tiempo real y análisis por IA[cite: 152, 163].
+- [cite_start]**Seguridad:** Toda autenticación debe pasar por Supabase Auth y el acceso a funciones debe estar restringido por roles[cite: 150].
+- [cite_start]**UI/UX:** Diseño minimalista y profesional, optimizado para uso bajo estrés[cite: 150].
+
+## Flujo de Trabajo
+1. Antes de realizar cualquier cambio, consulta el archivo `cambios_pendientes.md`.
+2. Al finalizar una tarea, actualiza `cambios_pendientes.md` marcando lo completado y detallando los nuevos pasos.

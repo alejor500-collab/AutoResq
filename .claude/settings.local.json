@@ -1,0 +1,13 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(wc -l /c/src/Proyect/AutoResQ/lib/features/emergency/presentation/screens/*.dart /c/src/Proyect/AutoResQ/lib/features/auth/presentation/screens/*.dart)",
+      "Bash(claude mcp *)",
+      "mcp__supabase__list_tables",
+      "mcp__supabase__execute_sql",
+      "mcp__supabase__apply_migration",
+      "mcp__supabase__get_project_url",
+      "Bash(flutter analyze *)"
+    ]
+  }
+}
