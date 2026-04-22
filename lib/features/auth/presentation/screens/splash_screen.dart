@@ -5,6 +5,7 @@ import '../../../../core/constants/app_colors.dart';
 import '../../../../core/constants/app_constants.dart';
 import '../../../../core/router/app_router.dart';
 import '../../../../shared/providers/auth_provider.dart';
+import '../../../../features/auth/domain/entities/user_entity.dart';
 
 class SplashScreen extends ConsumerStatefulWidget {
   const SplashScreen({super.key});
@@ -41,25 +42,48 @@ class _SplashScreenState extends ConsumerState<SplashScreen>
   }
 
   Future<void> _navigate() async {
+    // Wait for splash animation
     await Future.delayed(AppConstants.splashDuration);
     if (!mounted) return;
 
-    final authState = ref.read(authNotifierProvider);
-    final user = authState.value;
+    // Resolve the current user, waiting up to 5 s for OAuth-redirect sessions
+    // to be established (the page reloads after the redirect so Supabase needs
+    // a moment to process the URL hash and fire onAuthStateChange).
+    AppUser? user = _currentUser();
+    if (user == null) {
+      final deadline = DateTime.now().add(const Duration(seconds: 5));
+      while (user == null && DateTime.now().isBefore(deadline)) {
+        await Future.delayed(const Duration(milliseconds: 250));
+        if (!mounted) return;
+        user = _currentUser();
+      }
+    }
 
+    if (!mounted) return;
+    _go(user);
+  }
+
+  /// Reads the user from whichever provider already has it.
+  AppUser? _currentUser() {
+    final fromNotifier = ref.read(authNotifierProvider).value;
+    if (fromNotifier != null) return fromNotifier;
+    return ref.read(authStateProvider).valueOrNull;
+  }
+
+  void _go(AppUser? user) {
     if (user == null) {
       context.go(AppRoutes.login);
-    } else {
-      switch (user.role) {
-        case AppConstants.roleDriver:
-          context.go(AppRoutes.driverHome);
-        case AppConstants.roleTechnician:
-          context.go(AppRoutes.technicianHome);
-        case AppConstants.roleAdmin:
-          context.go(AppRoutes.adminDashboard);
-        default:
-          context.go(AppRoutes.login);
-      }
+      return;
+    }
+    switch (user.role) {
+      case AppConstants.roleDriver:
+        context.go(AppRoutes.driverHome);
+      case AppConstants.roleTechnician:
+        context.go(AppRoutes.technicianHome);
+      case AppConstants.roleAdmin:
+        context.go(AppRoutes.adminDashboard);
+      default:
+        context.go(AppRoutes.login);
     }
   }
 

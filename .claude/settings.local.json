@@ -8,7 +8,9 @@
       "mcp__supabase__apply_migration",
       "mcp__supabase__get_project_url",
       "Bash(flutter analyze *)",
-      "Bash(flutter pub *)"
+      "Bash(flutter pub *)",
+      "Bash(flutter build *)",
+      "Bash(flutter clean *)"
     ]
   }
 }
