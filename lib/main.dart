@@ -27,7 +27,6 @@ Future<void> main() async {
     anonKey: AppConstants.supabaseAnonKey,
     authOptions: const FlutterAuthClientOptions(
       authFlowType: AuthFlowType.pkce,
-      authCallbackUrlHostname: 'login-callback',
     ),
   );
 

@@ -213,7 +213,7 @@ class AuthRemoteDataSourceImpl implements AuthRemoteDataSource {
 
       final launched = await _client.auth.signInWithOAuth(
         OAuthProvider.google,
-        redirectTo: 'com.example.autoresq://login-callback',
+        redirectTo: 'com.autoresq.app://login-callback',
       );
 
       if (!launched) {
