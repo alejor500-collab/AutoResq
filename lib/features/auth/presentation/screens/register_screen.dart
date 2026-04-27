@@ -1,6 +1,9 @@
+import 'dart:typed_data';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
+import 'package:image_picker/image_picker.dart';
+import 'package:supabase_flutter/supabase_flutter.dart';
 import '../../../../core/constants/app_colors.dart';
 import '../../../../core/constants/app_constants.dart';
 import '../../../../core/router/app_router.dart';
@@ -11,7 +14,8 @@ import '../../../../shared/widgets/app_button.dart';
 import '../../../../shared/widgets/app_text_field.dart';
 
 class RegisterScreen extends ConsumerStatefulWidget {
-  const RegisterScreen({super.key});
+  final int? initialRole;
+  const RegisterScreen({super.key, this.initialRole});
 
   @override
   ConsumerState<RegisterScreen> createState() => _RegisterScreenState();
@@ -25,7 +29,15 @@ class _RegisterScreenState extends ConsumerState<RegisterScreen> {
   final _passwordCtrl = TextEditingController();
   final _confirmPassCtrl = TextEditingController();
   final _specialtyCtrl = TextEditingController();
-  int _selectedRole = 0;
+  late int _selectedRole;
+  Uint8List? _cedulaBytes;
+  String _cedulaExt = 'jpg';
+
+  @override
+  void initState() {
+    super.initState();
+    _selectedRole = widget.initialRole ?? 0;
+  }
 
   @override
   void dispose() {
@@ -40,6 +52,21 @@ class _RegisterScreenState extends ConsumerState<RegisterScreen> {
 
   String get _roleName =>
       _selectedRole == 0 ? AppConstants.roleDriver : AppConstants.roleTechnician;
+
+  Future<void> _pickCedula() async {
+    final picker = ImagePicker();
+    final xFile = await picker.pickImage(
+      source: ImageSource.camera,
+      imageQuality: 85,
+      maxWidth: 1024,
+    );
+    if (xFile == null) return;
+    final bytes = await xFile.readAsBytes();
+    setState(() {
+      _cedulaBytes = bytes;
+      _cedulaExt = xFile.path.split('.').last.toLowerCase();
+    });
+  }
 
   Future<void> _loginWithGoogle() async {
     final notifier = ref.read(authNotifierProvider.notifier);
@@ -78,6 +105,15 @@ class _RegisterScreenState extends ConsumerState<RegisterScreen> {
       return;
     }
 
+    if (_selectedRole == 1 && _cedulaBytes == null) {
+      AppHelpers.showSnackBar(
+        context,
+        'La foto de cédula es obligatoria para técnicos',
+        isError: true,
+      );
+      return;
+    }
+
     final notifier = ref.read(authNotifierProvider.notifier);
     final success = await notifier.register(
       email: _emailCtrl.text.trim(),
@@ -91,6 +127,28 @@ class _RegisterScreenState extends ConsumerState<RegisterScreen> {
     if (!mounted) return;
 
     if (success) {
+      // Upload cedula for technician
+      if (_selectedRole == 1 && _cedulaBytes != null) {
+        try {
+          final user = ref.read(authNotifierProvider).value;
+          if (user != null) {
+            final supabase = ref.read(supabaseClientProvider);
+            final path = '${user.id}/cedula.$_cedulaExt';
+            await supabase.storage
+                .from(AppConstants.bucketAvatars)
+                .uploadBinary(path, _cedulaBytes!,
+                    fileOptions: const FileOptions(upsert: true));
+            final url = supabase.storage
+                .from(AppConstants.bucketAvatars)
+                .getPublicUrl(path);
+            await supabase
+                .from(AppConstants.tableTecnicos)
+                .update({'url_credencial': url}).eq('usuario_id', user.id);
+          }
+        } catch (_) {
+          // Non-fatal: cedula upload failed, user can add it later
+        }
+      }
       _navigateByRole();
     } else {
       final error = ref.read(authNotifierProvider).error;
@@ -148,6 +206,36 @@ class _RegisterScreenState extends ConsumerState<RegisterScreen> {
                       ),
                     ),
                     const SizedBox(height: 24),
+
+                    // Hero role icon landing target (animates in from RoleSelectionScreen)
+                    if (widget.initialRole != null) ...[
+                      Hero(
+                        tag: widget.initialRole == 0
+                            ? 'hero_role_conductor'
+                            : 'hero_role_tecnico',
+                        child: Container(
+                          width: 56,
+                          height: 56,
+                          decoration: BoxDecoration(
+                            color: (widget.initialRole == 0
+                                    ? const Color(0xFFE53935)
+                                    : const Color(0xFF1E88E5))
+                                .withOpacity(0.12),
+                            borderRadius: BorderRadius.circular(16),
+                          ),
+                          child: Icon(
+                            widget.initialRole == 0
+                                ? Icons.directions_car_rounded
+                                : Icons.build_rounded,
+                            color: widget.initialRole == 0
+                                ? const Color(0xFFE53935)
+                                : const Color(0xFF1E88E5),
+                            size: 28,
+                          ),
+                        ),
+                      ),
+                      const SizedBox(height: 20),
+                    ],
 
                     // Header
                     const Text(
@@ -218,6 +306,84 @@ class _RegisterScreenState extends ConsumerState<RegisterScreen> {
                         validator: Validators.required,
                         textInputAction: TextInputAction.next,
                         prefixIcon: const Icon(Icons.build_outlined, size: 20, color: AppColors.secondary),
+                      ),
+                      const SizedBox(height: 16),
+                      // Cedula photo picker
+                      GestureDetector(
+                        onTap: _pickCedula,
+                        child: Container(
+                          width: double.infinity,
+                          padding: const EdgeInsets.all(20),
+                          decoration: BoxDecoration(
+                            color: _cedulaBytes != null
+                                ? const Color(0xFF1E88E5).withOpacity(0.08)
+                                : AppColors.surfaceContainerLow,
+                            borderRadius: BorderRadius.circular(16),
+                            border: Border.all(
+                              color: _cedulaBytes != null
+                                  ? const Color(0xFF1E88E5).withOpacity(0.3)
+                                  : AppColors.surfaceContainerHigh,
+                              width: 1.5,
+                            ),
+                          ),
+                          child: Row(
+                            children: [
+                              Container(
+                                width: 44,
+                                height: 44,
+                                decoration: BoxDecoration(
+                                  color: (_cedulaBytes != null
+                                          ? const Color(0xFF1E88E5)
+                                          : AppColors.secondary)
+                                      .withOpacity(0.1),
+                                  borderRadius: BorderRadius.circular(12),
+                                ),
+                                child: Icon(
+                                  _cedulaBytes != null
+                                      ? Icons.check_circle_outline
+                                      : Icons.badge_outlined,
+                                  color: _cedulaBytes != null
+                                      ? const Color(0xFF1E88E5)
+                                      : AppColors.secondary,
+                                  size: 22,
+                                ),
+                              ),
+                              const SizedBox(width: 14),
+                              Expanded(
+                                child: Column(
+                                  crossAxisAlignment: CrossAxisAlignment.start,
+                                  children: [
+                                    Text(
+                                      _cedulaBytes != null
+                                          ? 'Cédula capturada'
+                                          : 'Foto de cédula *',
+                                      style: TextStyle(
+                                        fontSize: 14,
+                                        fontWeight: FontWeight.w700,
+                                        color: _cedulaBytes != null
+                                            ? const Color(0xFF1E88E5)
+                                            : AppColors.onSurface,
+                                      ),
+                                    ),
+                                    const SizedBox(height: 2),
+                                    Text(
+                                      _cedulaBytes != null
+                                          ? 'Toca para cambiar'
+                                          : 'Requerida para verificación técnica',
+                                      style: const TextStyle(
+                                          fontSize: 12, color: AppColors.secondary),
+                                    ),
+                                  ],
+                                ),
+                              ),
+                              Icon(
+                                Icons.camera_alt_outlined,
+                                color: AppColors.secondary,
+                                size: 20,
+                              ),
+                            ],
+                          ),
+                        ),
                       ),
                       const SizedBox(height: 16),
                     ],

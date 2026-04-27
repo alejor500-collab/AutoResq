@@ -121,6 +121,45 @@ class DioClient {
     }
   }
 
+  // ─── Overpass API (nearby services) ──────────────────────────────────────
+  Future<List<Map<String, dynamic>>> queryNearbyServices(
+      double lat, double lng) async {
+    const overpassUrl = 'https://overpass-api.de/api/interpreter';
+    final query = '''
+[out:json][timeout:15];
+(
+  node["amenity"="fuel"](around:5000,$lat,$lng);
+  way["amenity"="fuel"](around:5000,$lat,$lng);
+  node["shop"="car_repair"](around:5000,$lat,$lng);
+  way["shop"="car_repair"](around:5000,$lat,$lng);
+  node["amenity"="car_repair"](around:5000,$lat,$lng);
+  node["shop"="tyres"](around:5000,$lat,$lng);
+  node["shop"="tire"](around:5000,$lat,$lng);
+  node["amenity"="car_wash"](around:5000,$lat,$lng);
+  way["amenity"="car_wash"](around:5000,$lat,$lng);
+  node["amenity"="charging_station"](around:5000,$lat,$lng);
+  way["amenity"="charging_station"](around:5000,$lat,$lng);
+);
+out center 30;
+''';
+    try {
+      final response = await _dio.get(
+        overpassUrl,
+        queryParameters: {'data': query},
+        options: Options(
+          receiveTimeout: const Duration(seconds: 15),
+          headers: {
+            'User-Agent': 'AutoResQ/1.0 (autoresq@espoch.edu.ec)',
+          },
+        ),
+      );
+      final elements = (response.data['elements'] as List?) ?? [];
+      return elements.cast<Map<String, dynamic>>();
+    } catch (_) {
+      return [];
+    }
+  }
+
   /// Minimal JSON parser for {"key": "value"} structures
   Map<String, dynamic> _parseSimpleJson(String json) {
     final result = <String, dynamic>{};

@@ -72,7 +72,7 @@ class _SplashScreenState extends ConsumerState<SplashScreen>
 
   void _go(AppUser? user) {
     if (user == null) {
-      context.go(AppRoutes.login);
+      context.go(AppRoutes.welcome);
       return;
     }
     switch (user.role) {
@@ -83,7 +83,7 @@ class _SplashScreenState extends ConsumerState<SplashScreen>
       case AppConstants.roleAdmin:
         context.go(AppRoutes.adminDashboard);
       default:
-        context.go(AppRoutes.login);
+        context.go(AppRoutes.welcome);
     }
   }
 

@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
@@ -5,11 +6,19 @@ import 'package:gap/gap.dart';
 import '../../../../core/constants/app_colors.dart';
 import '../../../../core/constants/app_constants.dart';
 import '../../../../core/router/app_router.dart';
-import '../../../../core/utils/helpers.dart';
+import '../../../../shared/providers/auth_provider.dart';
 import '../../../../shared/widgets/app_button.dart';
+import '../../../../shared/widgets/user_avatar.dart';
 import '../../../map/presentation/widgets/map_widget.dart';
 import '../providers/emergency_provider.dart';
 import '../../domain/entities/emergency_entity.dart';
+
+// ─── Substate local para esta pantalla ───────────────────────────────────────
+final _activeSubstateProvider = StateProvider.autoDispose<String>(
+  (ref) => AppConstants.assignEnRoute,
+);
+
+// ─── Entry point ─────────────────────────────────────────────────────────────
 
 class ActiveServiceScreen extends ConsumerWidget {
   final String emergencyId;
@@ -22,8 +31,8 @@ class ActiveServiceScreen extends ConsumerWidget {
 
     return stream.when(
       loading: () => const Scaffold(
-        body: Center(
-            child: CircularProgressIndicator(color: AppColors.primary)),
+        body:
+            Center(child: CircularProgressIndicator(color: AppColors.primary)),
       ),
       error: (e, _) => Scaffold(
         appBar: AppBar(),
@@ -34,331 +43,441 @@ class ActiveServiceScreen extends ConsumerWidget {
   }
 }
 
-class _ActiveServiceBody extends ConsumerWidget {
+// ─── Body con subestados ──────────────────────────────────────────────────────
+
+class _ActiveServiceBody extends ConsumerStatefulWidget {
   final Emergency emergency;
 
   const _ActiveServiceBody({required this.emergency});
 
   @override
-  Widget build(BuildContext context, WidgetRef ref) {
-    final emergencyState = ref.watch(emergencyNotifierProvider);
+  ConsumerState<_ActiveServiceBody> createState() => _ActiveServiceBodyState();
+}
+
+class _ActiveServiceBodyState extends ConsumerState<_ActiveServiceBody> {
+  Timer? _attendingTimer;
+  int _attendingSeconds = 0;
+
+  @override
+  void initState() {
+    super.initState();
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (widget.emergency.asignacionEstado == AppConstants.assignAttending) {
+        ref.read(_activeSubstateProvider.notifier).state =
+            AppConstants.assignAttending;
+        _startAttendingTimer();
+      }
+    });
+  }
+
+  void _startAttendingTimer() {
+    _attendingTimer?.cancel();
+    _attendingTimer = Timer.periodic(const Duration(seconds: 1), (_) {
+      if (mounted) setState(() => _attendingSeconds++);
+    });
+  }
+
+  String _formatElapsed() {
+    final m = _attendingSeconds ~/ 60;
+    final s = _attendingSeconds % 60;
+    return '${m.toString().padLeft(2, '0')}:${s.toString().padLeft(2, '0')}';
+  }
+
+  Future<void> _onHeLlegado() async {
+    final asignacionId = widget.emergency.asignacionId;
+    if (asignacionId != null && asignacionId.isNotEmpty) {
+      try {
+        await ref
+            .read(supabaseClientProvider)
+            .from(AppConstants.tableAsignaciones)
+            .update({'estado': AppConstants.assignAttending})
+            .eq('id', asignacionId);
+      } catch (_) {}
+    }
+    if (!mounted) return;
+    ref.read(_activeSubstateProvider.notifier).state =
+        AppConstants.assignAttending;
+    _startAttendingTimer();
+  }
+
+  @override
+  void dispose() {
+    _attendingTimer?.cancel();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final substate = ref.watch(_activeSubstateProvider);
+    final emergency = widget.emergency;
     final lat = emergency.lat ?? AppConstants.defaultLat;
     final lng = emergency.lng ?? AppConstants.defaultLng;
+    final isEnRoute = substate == AppConstants.assignEnRoute;
 
     return Scaffold(
-      backgroundColor: AppColors.background,
-      appBar: AppBar(
-        backgroundColor: AppColors.background,
-        elevation: 0,
-        leading: IconButton(
-          icon: const Icon(Icons.arrow_back_ios_new, size: 20),
-          onPressed: () => context.pop(),
-        ),
-        title: const Text(
-          'Servicio activo',
-          style: TextStyle(
-            fontSize: 18,
-            fontWeight: FontWeight.w700,
-            color: AppColors.textPrimary,
-          ),
-        ),
-        actions: [
-          IconButton(
-            icon: const Icon(Icons.chat_outlined, color: AppColors.secondary),
-            onPressed: () => context.push(
-              AppRoutes.technicianChat,
-              extra: emergency.id,
-            ),
-          ),
-        ],
-      ),
+      backgroundColor: Colors.white,
       body: Column(
         children: [
+          // ─── Mapa ────────────────────────────────────────────────────
           Expanded(
-            flex: 2,
-            child: AppMapWidget(
-              lat: lat,
-              lng: lng,
-              zoom: 15,
-              markers: [
-                emergencyMarker(lat, lng),
+            flex: isEnRoute ? 3 : 2,
+            child: Stack(
+              children: [
+                Positioned.fill(
+                  child: AppMapWidget(
+                    lat: lat,
+                    lng: lng,
+                    zoom: 15,
+                    markers: [emergencyMarker(lat, lng)],
+                  ),
+                ),
+                SafeArea(
+                  child: Padding(
+                    padding: const EdgeInsets.symmetric(
+                        horizontal: 12, vertical: 12),
+                    child: Row(
+                      children: [
+                        // Botón atrás
+                        Material(
+                          color: Colors.white,
+                          shape: const CircleBorder(),
+                          elevation: 2,
+                          shadowColor: Colors.black12,
+                          child: InkWell(
+                            customBorder: const CircleBorder(),
+                            onTap: () => context.pop(),
+                            child: const Padding(
+                              padding: EdgeInsets.all(10),
+                              child: Icon(Icons.arrow_back_ios_new,
+                                  size: 18, color: AppColors.onSurface),
+                            ),
+                          ),
+                        ),
+                        const Spacer(),
+                        // Chip de estado flotante centrado
+                        _StatusFloatingChip(
+                          label: isEnRoute ? 'EN RUTA' : 'ATENDIENDO',
+                          color: isEnRoute
+                              ? const Color(0xFF1E88E5)
+                              : const Color(0xFFF59E0B),
+                          icon: isEnRoute
+                              ? Icons.navigation_rounded
+                              : Icons.build_rounded,
+                        ),
+                        const Spacer(),
+                        const SizedBox(width: 44),
+                      ],
+                    ),
+                  ),
+                ),
               ],
             ),
           ),
+
+          // ─── Tarjeta inferior ─────────────────────────────────────────
           Expanded(
-            flex: 3,
+            flex: isEnRoute ? 2 : 3,
             child: Container(
-              color: Colors.white,
-              padding: const EdgeInsets.all(AppConstants.pagePadding),
-              child: SingleChildScrollView(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    // Driver info
-                    Row(
-                      children: [
-                        CircleAvatar(
-                          radius: 24,
-                          backgroundColor:
-                              AppColors.primary.withOpacity(0.1),
-                          child: Text(
-                            AppHelpers.getInitials(
-                                emergency.driverName ?? 'C'),
-                            style: const TextStyle(
-                              color: AppColors.primary,
-                              fontWeight: FontWeight.w700,
-                              fontSize: 16,
-                            ),
-                          ),
-                        ),
-                        const Gap(12),
-                        Expanded(
-                          child: Column(
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            children: [
-                              Text(
-                                emergency.driverName ?? 'Conductor',
-                                style: const TextStyle(
-                                  fontSize: 16,
-                                  fontWeight: FontWeight.w700,
-                                ),
-                              ),
-                              Text(
-                                emergency.descripcion,
-                                maxLines: 1,
-                                overflow: TextOverflow.ellipsis,
-                                style: const TextStyle(
-                                  fontSize: 12,
-                                  color: AppColors.textSecondary,
-                                ),
-                              ),
-                            ],
-                          ),
-                        ),
-                        IconButton(
-                          onPressed: () => context.push(
-                            AppRoutes.technicianChat,
-                            extra: emergency.id,
-                          ),
-                          icon: const Icon(Icons.chat_bubble_outline,
-                              color: AppColors.secondary),
-                        ),
-                      ],
-                    ),
-                    const Divider(height: 24),
-
-                    const Text(
-                      'Actualizar estado',
-                      style: TextStyle(
-                        fontSize: 14,
-                        fontWeight: FontWeight.w700,
-                      ),
-                    ),
-                    const Gap(12),
-                    ..._buildStatusButtons(context, ref, emergency,
-                        emergencyState.isLoading),
-
-                    const Gap(16),
-
-                    if (emergency.direccion != null) ...[
-                      Row(
-                        children: [
-                          const Icon(Icons.location_on_outlined,
-                              size: 16, color: AppColors.textSecondary),
-                          const Gap(6),
-                          Expanded(
-                            child: Text(
-                              emergency.direccion!,
-                              style: const TextStyle(
-                                fontSize: 12,
-                                color: AppColors.textSecondary,
-                              ),
-                            ),
-                          ),
-                        ],
-                      ),
-                    ],
-                  ],
-                ),
+              width: double.infinity,
+              decoration: const BoxDecoration(
+                color: Colors.white,
+                borderRadius:
+                    BorderRadius.vertical(top: Radius.circular(24)),
+                boxShadow: [
+                  BoxShadow(
+                    color: Colors.black12,
+                    blurRadius: 20,
+                    offset: Offset(0, -4),
+                  ),
+                ],
               ),
+              child: isEnRoute
+                  ? _EnRoutePanel(
+                      emergency: emergency,
+                      onHeLlegado: _onHeLlegado,
+                    )
+                  : _AttendingPanel(
+                      emergency: emergency,
+                      elapsed: _formatElapsed(),
+                    ),
             ),
           ),
         ],
       ),
     );
   }
+}
 
-  List<Widget> _buildStatusButtons(BuildContext context, WidgetRef ref,
-      Emergency emergency, bool isLoading) {
-    final assignStatus = emergency.asignacionEstado;
+// ─── Panel EN RUTA ────────────────────────────────────────────────────────────
 
-    final steps = [
-      _TechStep(
-        label: 'Aceptado',
-        sublabel: 'Confirme la emergencia',
-        icon: Icons.check_circle_outline,
-        assignStatus: AppConstants.assignAccepted,
-        emergencyStatus: AppConstants.statusInProgress,
-        active: true,
-      ),
-      _TechStep(
-        label: 'En ruta',
-        sublabel: 'Me dirijo al conductor',
-        icon: Icons.directions_car,
-        assignStatus: AppConstants.assignEnRoute,
-        emergencyStatus: AppConstants.statusInProgress,
-        active: assignStatus == AppConstants.assignAccepted ||
-            assignStatus == AppConstants.assignEnRoute ||
-            assignStatus == AppConstants.assignAttending,
-      ),
-      _TechStep(
-        label: 'Atendiendo',
-        sublabel: 'Estoy trabajando en el vehiculo',
-        icon: Icons.build,
-        assignStatus: AppConstants.assignAttending,
-        emergencyStatus: AppConstants.statusAttended,
-        active: assignStatus == AppConstants.assignEnRoute ||
-            assignStatus == AppConstants.assignAttending,
-      ),
-      _TechStep(
-        label: 'Finalizado',
-        sublabel: 'Servicio completado',
-        icon: Icons.done_all,
-        assignStatus: AppConstants.assignFinished,
-        emergencyStatus: AppConstants.statusCompleted,
-        active: assignStatus == AppConstants.assignAttending,
-      ),
-    ];
+class _EnRoutePanel extends StatelessWidget {
+  final Emergency emergency;
+  final VoidCallback onHeLlegado;
 
-    return steps.map((step) {
-      final isCurrent = assignStatus == step.assignStatus;
-      final isDone = _isDone(assignStatus, step.assignStatus);
+  const _EnRoutePanel({
+    required this.emergency,
+    required this.onHeLlegado,
+  });
 
-      return Opacity(
-        opacity: step.active || isDone ? 1 : 0.4,
-        child: GestureDetector(
-          onTap: step.active && !isDone && !isLoading
-              ? () => _updateStatus(
-                  context, ref, emergency, step.emergencyStatus,
-                  assignStatus: step.assignStatus)
-              : null,
-          child: Container(
-            margin: const EdgeInsets.only(bottom: 8),
-            padding: const EdgeInsets.all(14),
-            decoration: BoxDecoration(
-              color: isDone
-                  ? AppColors.success.withOpacity(0.06)
-                  : isCurrent
-                      ? AppColors.secondary.withOpacity(0.08)
-                      : AppColors.surface,
-              borderRadius: BorderRadius.circular(12),
-              border: Border.all(
-                color: isDone
-                    ? AppColors.success.withOpacity(0.3)
-                    : isCurrent
-                        ? AppColors.secondary.withOpacity(0.3)
-                        : AppColors.border,
+  @override
+  Widget build(BuildContext context) {
+    return SingleChildScrollView(
+      padding: const EdgeInsets.fromLTRB(24, 20, 24, 24),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          // ETA + dirección (si existe)
+          if (emergency.direccion != null) ...[
+            const Text(
+              'En camino',
+              style: TextStyle(
+                fontSize: 28,
+                fontWeight: FontWeight.w900,
+                color: AppColors.onSurface,
+                letterSpacing: -0.5,
               ),
             ),
-            child: Row(
+            const Gap(2),
+            Row(
               children: [
-                Icon(
-                  isDone ? Icons.check_circle : step.icon,
-                  color: isDone
-                      ? AppColors.success
-                      : isCurrent
-                          ? AppColors.secondary
-                          : AppColors.textHint,
-                  size: 22,
-                ),
-                const Gap(12),
+                const Icon(Icons.location_on_outlined,
+                    size: 14, color: AppColors.textSecondary),
+                const Gap(4),
                 Expanded(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text(
-                        step.label,
-                        style: TextStyle(
-                          fontSize: 14,
-                          fontWeight: FontWeight.w600,
-                          color: isDone
-                              ? AppColors.success
-                              : isCurrent
-                                  ? AppColors.secondary
-                                  : AppColors.textPrimary,
-                        ),
-                      ),
-                      Text(step.sublabel,
-                          style: const TextStyle(
-                              fontSize: 11,
-                              color: AppColors.textSecondary)),
-                    ],
+                  child: Text(
+                    emergency.direccion!,
+                    style: const TextStyle(
+                      fontSize: 13,
+                      color: AppColors.textSecondary,
+                    ),
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
                   ),
                 ),
-                if (!isDone && step.active)
-                  const Icon(Icons.arrow_forward_ios,
-                      size: 14, color: AppColors.textHint),
               ],
             ),
+            const Gap(16),
+            const Divider(height: 1, color: AppColors.border),
+            const Gap(16),
+          ],
+
+          // Conductor
+          Row(
+            children: [
+              UserAvatar(
+                name: emergency.driverName ?? 'C',
+                radius: 22,
+              ),
+              const Gap(12),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      emergency.driverName ?? 'Conductor',
+                      style: const TextStyle(
+                        fontSize: 15,
+                        fontWeight: FontWeight.w700,
+                        color: AppColors.onSurface,
+                      ),
+                    ),
+                    if (emergency.vehiculoId != null)
+                      const Text(
+                        'Vehículo registrado',
+                        style: TextStyle(
+                          fontSize: 12,
+                          color: AppColors.textSecondary,
+                        ),
+                      ),
+                  ],
+                ),
+              ),
+            ],
           ),
-        ),
-      );
-    }).toList();
-  }
+          const Gap(16),
 
-  bool _isDone(String? current, String step) {
-    final order = [
-      AppConstants.assignAccepted,
-      AppConstants.assignEnRoute,
-      AppConstants.assignAttending,
-      AppConstants.assignFinished,
-    ];
-    if (current == null) return false;
-    final ci = order.indexOf(current);
-    final si = order.indexOf(step);
-    return ci > si;
-  }
+          // Llamar + Chat
+          Row(
+            children: [
+              Expanded(
+                child: AppButton(
+                  label: 'Llamar',
+                  variant: AppButtonVariant.outline,
+                  prefixIcon: const Icon(Icons.phone_outlined, size: 18,
+                      color: AppColors.onSurface),
+                  onPressed: () {},
+                  height: 48,
+                ),
+              ),
+              const Gap(12),
+              Expanded(
+                child: AppButton(
+                  label: 'Chat',
+                  variant: AppButtonVariant.outline,
+                  prefixIcon: const Icon(Icons.chat_bubble_outline, size: 18,
+                      color: AppColors.onSurface),
+                  onPressed: () => context.push(
+                    AppRoutes.technicianChat,
+                    extra: emergency.id,
+                  ),
+                  height: 48,
+                ),
+              ),
+            ],
+          ),
+          const Gap(12),
 
-  Future<void> _updateStatus(
-    BuildContext context,
-    WidgetRef ref,
-    Emergency emergency,
-    String status, {
-    required String assignStatus,
-  }) async {
-    await ref
-        .read(emergencyNotifierProvider.notifier)
-        .updateStatus(emergency.id, status);
-
-    if (!context.mounted) return;
-
-    if (assignStatus == AppConstants.assignFinished) {
-      context.pushReplacement(
-        AppRoutes.rateDriver,
-        extra: {
-          'emergencyId': emergency.id,
-          'driverId': emergency.usuarioId,
-          'driverName': emergency.driverName ?? 'Conductor',
-        },
-      );
-    }
+          // He llegado
+          AppButton(
+            label: '📍 He llegado',
+            onPressed: onHeLlegado,
+          ),
+        ],
+      ),
+    );
   }
 }
 
-class _TechStep {
-  final String label;
-  final String sublabel;
-  final IconData icon;
-  final String assignStatus;
-  final String emergencyStatus;
-  final bool active;
+// ─── Panel ATENDIENDO ─────────────────────────────────────────────────────────
 
-  const _TechStep({
-    required this.label,
-    required this.sublabel,
-    required this.icon,
-    required this.assignStatus,
-    required this.emergencyStatus,
-    required this.active,
+class _AttendingPanel extends StatelessWidget {
+  final Emergency emergency;
+  final String elapsed;
+
+  const _AttendingPanel({
+    required this.emergency,
+    required this.elapsed,
   });
+
+  @override
+  Widget build(BuildContext context) {
+    return SingleChildScrollView(
+      padding: const EdgeInsets.fromLTRB(24, 20, 24, 24),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          const Text(
+            'Atendiendo al cliente',
+            style: TextStyle(
+              fontSize: 20,
+              fontWeight: FontWeight.w800,
+              color: AppColors.onSurface,
+            ),
+          ),
+          const Gap(4),
+          Text(
+            emergency.driverName ?? 'Conductor',
+            style: const TextStyle(
+              fontSize: 13,
+              color: AppColors.textSecondary,
+            ),
+          ),
+          const Gap(24),
+
+          // Contador
+          Center(
+            child: Container(
+              padding: const EdgeInsets.symmetric(horizontal: 32, vertical: 18),
+              decoration: BoxDecoration(
+                color: const Color(0xFFF59E0B).withOpacity(0.10),
+                borderRadius:
+                    BorderRadius.circular(AppConstants.borderRadiusCard),
+                border: Border.all(
+                  color: const Color(0xFFF59E0B).withOpacity(0.35),
+                ),
+              ),
+              child: Text(
+                elapsed,
+                style: const TextStyle(
+                  fontSize: 40,
+                  fontWeight: FontWeight.w900,
+                  color: Color(0xFFF59E0B),
+                  letterSpacing: 3,
+                ),
+              ),
+            ),
+          ),
+          const Gap(28),
+
+          // Chat
+          AppButton(
+            label: 'Chat',
+            variant: AppButtonVariant.outline,
+            prefixIcon: const Icon(Icons.chat_bubble_outline, size: 18,
+                color: AppColors.onSurface),
+            onPressed: () => context.push(
+              AppRoutes.technicianChat,
+              extra: emergency.id,
+            ),
+          ),
+          const Gap(12),
+
+          // Finalizar
+          AppButton(
+            label: '✅ Finalizar Servicio',
+            onPressed: () => context.pushReplacement(
+              AppRoutes.serviceClosure,
+              extra: {
+                'emergencyId': emergency.id,
+                'asignacionId': emergency.asignacionId,
+                'technicianId': emergency.tecnicoId,
+                'driverId': emergency.usuarioId,
+                'driverName': emergency.driverName ?? 'Conductor',
+                'clasificacionIa': emergency.clasificacionIa,
+                'duration': elapsed,
+              },
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+// ─── Chip de estado flotante ──────────────────────────────────────────────────
+
+class _StatusFloatingChip extends StatelessWidget {
+  final String label;
+  final Color color;
+  final IconData icon;
+
+  const _StatusFloatingChip({
+    required this.label,
+    required this.color,
+    required this.icon,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
+      decoration: BoxDecoration(
+        color: color,
+        borderRadius: BorderRadius.circular(9999),
+        boxShadow: [
+          BoxShadow(
+            color: color.withOpacity(0.40),
+            blurRadius: 12,
+            offset: const Offset(0, 4),
+          ),
+        ],
+      ),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Icon(icon, size: 14, color: Colors.white),
+          const Gap(6),
+          Text(
+            label,
+            style: const TextStyle(
+              fontSize: 13,
+              fontWeight: FontWeight.w700,
+              color: Colors.white,
+              letterSpacing: 0.5,
+            ),
+          ),
+        ],
+      ),
+    );
+  }
 }

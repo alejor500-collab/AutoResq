@@ -5,22 +5,32 @@ import '../../core/constants/app_colors.dart';
 class AppBottomNavBar extends StatelessWidget {
   final int currentIndex;
   final ValueChanged<int> onTap;
+  final bool isTechnician;
 
   const AppBottomNavBar({
     super.key,
     required this.currentIndex,
     required this.onTap,
+    this.isTechnician = false,
   });
 
-  static const _items = [
+  static const _driverItems = [
     _NavItem(icon: Icons.home_outlined, activeIcon: Icons.home, label: 'INICIO'),
     _NavItem(icon: Icons.assignment_outlined, activeIcon: Icons.assignment, label: 'SOLICITUDES'),
     _NavItem(icon: Icons.chat_bubble_outline, activeIcon: Icons.chat_bubble, label: 'CHAT'),
     _NavItem(icon: Icons.person_outline, activeIcon: Icons.person, label: 'PERFIL'),
   ];
 
+  static const _technicianItems = [
+    _NavItem(icon: Icons.home_outlined, activeIcon: Icons.home, label: 'INICIO'),
+    _NavItem(icon: Icons.history_outlined, activeIcon: Icons.history, label: 'HISTORIAL'),
+    _NavItem(icon: Icons.build_outlined, activeIcon: Icons.build_rounded, label: 'SERVICIOS'),
+    _NavItem(icon: Icons.person_outline, activeIcon: Icons.person, label: 'PERFIL'),
+  ];
+
   @override
   Widget build(BuildContext context) {
+    final items = isTechnician ? _technicianItems : _driverItems;
     return ClipRRect(
       borderRadius: const BorderRadius.vertical(top: Radius.circular(40)),
       child: BackdropFilter(
@@ -41,8 +51,8 @@ class AppBottomNavBar extends StatelessWidget {
           ),
           child: Row(
             mainAxisAlignment: MainAxisAlignment.spaceAround,
-            children: List.generate(_items.length, (i) {
-              final item = _items[i];
+            children: List.generate(items.length, (i) {
+              final item = items[i];
               final isActive = i == currentIndex;
               return _NavItemWidget(
                 item: item,

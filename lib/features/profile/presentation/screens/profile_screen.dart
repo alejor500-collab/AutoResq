@@ -10,6 +10,7 @@ import '../../../../core/utils/helpers.dart';
 import '../../../../shared/providers/auth_provider.dart';
 import '../../../../shared/providers/role_provider.dart';
 import '../../../../shared/widgets/bottom_nav_bar.dart';
+import '../providers/vehicle_provider.dart';
 
 class ProfileScreen extends ConsumerWidget {
   const ProfileScreen({super.key});
@@ -57,14 +58,26 @@ class ProfileScreen extends ConsumerWidget {
                     padding: const EdgeInsets.symmetric(horizontal: 24),
                     child: Row(
                       children: [
-                        GestureDetector(
-                          onTap: () {},
-                          child: Icon(Icons.menu,
-                              color: AppColors.primary),
+                        // Back button with tactile feedback
+                        Material(
+                          color: Colors.transparent,
+                          borderRadius: BorderRadius.circular(10),
+                          child: InkWell(
+                            borderRadius: BorderRadius.circular(10),
+                            splashColor: AppColors.primary.withOpacity(0.08),
+                            onTap: () => context.canPop()
+                                ? context.pop()
+                                : context.go(AppRoutes.driverHome),
+                            child: const Padding(
+                              padding: EdgeInsets.all(8),
+                              child: Icon(Icons.arrow_back_ios_new,
+                                  color: AppColors.secondary, size: 20),
+                            ),
+                          ),
                         ),
                         const Spacer(),
                         const Text(
-                          'AutoResQ',
+                          'Mi perfil',
                           style: TextStyle(
                             fontSize: 20,
                             fontWeight: FontWeight.w900,
@@ -432,9 +445,13 @@ class _StatsGrid extends StatelessWidget {
 
 // ─── Vehicle Section ──────────────────────────────────────────────────────────
 
-class _VehicleSection extends StatelessWidget {
+class _VehicleSection extends ConsumerWidget {
+  const _VehicleSection();
+
   @override
-  Widget build(BuildContext context) {
+  Widget build(BuildContext context, WidgetRef ref) {
+    final vehicle = ref.watch(vehicleProvider);
+
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
@@ -444,7 +461,7 @@ class _VehicleSection extends StatelessWidget {
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
               Text(
-                'MI VEHICULO',
+                'MI VEHÍCULO',
                 style: TextStyle(
                   fontSize: 12,
                   fontWeight: FontWeight.w700,
@@ -453,15 +470,18 @@ class _VehicleSection extends StatelessWidget {
                 ),
               ),
               GestureDetector(
-                onTap: () {},
+                onTap: () => context.push(AppRoutes.editVehicle),
                 child: Row(
                   children: [
-                    Icon(Icons.add_circle,
-                        size: 16, color: AppColors.primary),
+                    Icon(
+                      vehicle == null ? Icons.add_circle : Icons.edit,
+                      size: 16,
+                      color: AppColors.primary,
+                    ),
                     const Gap(4),
                     Text(
-                      'Anadir',
-                      style: TextStyle(
+                      vehicle == null ? 'Agregar' : 'Editar',
+                      style: const TextStyle(
                         fontSize: 13,
                         fontWeight: FontWeight.w700,
                         color: AppColors.primary,
@@ -474,66 +494,125 @@ class _VehicleSection extends StatelessWidget {
           ),
         ),
         const Gap(12),
-        Container(
-          padding: const EdgeInsets.all(20),
-          decoration: BoxDecoration(
-            color: AppColors.surfaceContainerLowest,
-            borderRadius: BorderRadius.circular(16),
-            border: Border.all(
-                color: AppColors.outlineVariant.withOpacity(0.1)),
-            boxShadow: [
-              BoxShadow(
-                color: AppColors.onSurface.withOpacity(0.04),
-                blurRadius: 40,
-                offset: const Offset(0, 20),
+
+        // ── Empty state ──────────────────────────────────────────────
+        if (vehicle == null)
+          GestureDetector(
+            onTap: () => context.push(AppRoutes.editVehicle),
+            child: Container(
+              padding: const EdgeInsets.all(24),
+              decoration: BoxDecoration(
+                color: AppColors.surfaceContainerLow,
+                borderRadius: BorderRadius.circular(16),
+                border: Border.all(
+                    color: AppColors.primary.withOpacity(0.15),
+                    style: BorderStyle.solid),
               ),
-            ],
-          ),
-          child: Row(
-            children: [
-              Container(
-                width: 64,
-                height: 64,
-                decoration: BoxDecoration(
-                  color: AppColors.surfaceContainerLow,
-                  borderRadius: BorderRadius.circular(16),
-                ),
-                child: const Icon(Icons.directions_car,
-                    size: 32, color: AppColors.primary),
-              ),
-              const Gap(16),
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: const [
-                    Text(
-                      'Toyota Hilux 2022',
-                      style: TextStyle(
-                        fontSize: 17,
-                        fontWeight: FontWeight.w700,
-                        color: AppColors.onSurface,
-                      ),
+              child: Row(
+                children: [
+                  Container(
+                    width: 52,
+                    height: 52,
+                    decoration: BoxDecoration(
+                      color: AppColors.primary.withOpacity(0.08),
+                      borderRadius: BorderRadius.circular(12),
                     ),
-                    Gap(2),
-                    Text(
-                      'ABC-1234 \u2022 Blanco',
-                      style: TextStyle(
-                        fontSize: 13,
-                        fontWeight: FontWeight.w500,
-                        color: AppColors.secondary,
-                      ),
+                    child: const Icon(Icons.add_rounded,
+                        size: 28, color: AppColors.primary),
+                  ),
+                  const Gap(14),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: const [
+                        Text(
+                          'Sin vehículo registrado',
+                          style: TextStyle(
+                            fontSize: 15,
+                            fontWeight: FontWeight.w700,
+                            color: AppColors.onSurface,
+                          ),
+                        ),
+                        Gap(3),
+                        Text(
+                          'Toca para agregar tu vehículo',
+                          style: TextStyle(
+                            fontSize: 12,
+                            color: AppColors.secondary,
+                          ),
+                        ),
+                      ],
                     ),
-                  ],
-                ),
+                  ),
+                  const Icon(Icons.chevron_right_rounded,
+                      color: AppColors.secondary, size: 20),
+                ],
               ),
-              IconButton(
-                onPressed: () {},
-                icon: const Icon(Icons.edit,
-                    color: AppColors.secondary, size: 20),
-              ),
-            ],
+            ),
           ),
-        ),
+
+        // ── Vehicle card ─────────────────────────────────────────────
+        if (vehicle != null)
+          GestureDetector(
+            onTap: () => context.push(AppRoutes.editVehicle),
+            child: Container(
+              padding: const EdgeInsets.all(20),
+              decoration: BoxDecoration(
+                color: AppColors.surfaceContainerLowest,
+                borderRadius: BorderRadius.circular(16),
+                border: Border.all(
+                    color: AppColors.outlineVariant.withOpacity(0.1)),
+                boxShadow: [
+                  BoxShadow(
+                    color: AppColors.onSurface.withOpacity(0.04),
+                    blurRadius: 40,
+                    offset: const Offset(0, 20),
+                  ),
+                ],
+              ),
+              child: Row(
+                children: [
+                  Container(
+                    width: 64,
+                    height: 64,
+                    decoration: BoxDecoration(
+                      gradient: AppColors.primaryGradient,
+                      borderRadius: BorderRadius.circular(16),
+                    ),
+                    child: const Icon(Icons.directions_car,
+                        size: 32, color: Colors.white),
+                  ),
+                  const Gap(16),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          vehicle.displayName,
+                          style: const TextStyle(
+                            fontSize: 17,
+                            fontWeight: FontWeight.w700,
+                            color: AppColors.onSurface,
+                          ),
+                        ),
+                        const Gap(2),
+                        Text(
+                          vehicle.displaySub,
+                          style: const TextStyle(
+                            fontSize: 13,
+                            fontWeight: FontWeight.w500,
+                            color: AppColors.secondary,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                  const Icon(Icons.edit_outlined,
+                      color: AppColors.secondary, size: 20),
+                ],
+              ),
+            ),
+          ),
       ],
     );
   }
@@ -583,6 +662,30 @@ class _AccountSettings extends StatelessWidget {
                   (activeRole ?? user.role) == AppConstants.roleDriver
                       ? AppConstants.roleTechnician
                       : AppConstants.roleDriver;
+              if (newRole == AppConstants.roleTechnician) {
+                final hasSpecialty =
+                    user.specialty != null && user.specialty!.isNotEmpty;
+                if (!hasSpecialty) {
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    const SnackBar(
+                      content: Text(
+                        'Completa tu perfil técnico antes de activar este modo.',
+                      ),
+                    ),
+                  );
+                  return;
+                }
+                if (user.isApproved != true) {
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    const SnackBar(
+                      content: Text(
+                        'Tu perfil técnico está pendiente de aprobación.',
+                      ),
+                    ),
+                  );
+                  return;
+                }
+              }
               ref.read(activeRoleProvider.notifier).switchTo(newRole);
               if (newRole == AppConstants.roleDriver) {
                 context.go(AppRoutes.driverHome);

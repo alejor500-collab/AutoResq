@@ -10,7 +10,11 @@
       "Bash(flutter analyze *)",
       "Bash(flutter pub *)",
       "Bash(flutter build *)",
-      "Bash(flutter clean *)"
+      "Bash(flutter clean *)",
+      "Bash(dart analyze *)",
+      "WebSearch",
+      "WebFetch(domain:stitch.withgoogle.com)",
+      "WebFetch(domain:github.com)"
     ]
   }
 }

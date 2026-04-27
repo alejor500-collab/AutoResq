@@ -687,7 +687,9 @@ class _DiagnosticStep extends StatelessWidget {
     final sugerencia = result['sugerencia']?.toString() ?? '';
     final desc = result['descripcion_breve']?.toString() ?? '';
 
-    return Container(
+    return SingleChildScrollView(
+      physics: const NeverScrollableScrollPhysics(),
+      child: Container(
       padding: const EdgeInsets.all(24),
       decoration: BoxDecoration(
         gradient: LinearGradient(
@@ -844,6 +846,7 @@ class _DiagnosticStep extends StatelessWidget {
             ],
           ),
         ],
+      ),
       ),
     );
   }

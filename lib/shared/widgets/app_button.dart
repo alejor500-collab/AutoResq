@@ -41,7 +41,7 @@ class AppButton extends StatelessWidget {
   Widget _buildButton() {
     switch (variant) {
       case AppButtonVariant.primary:
-        return _PrimaryPillButton(
+        return _AnimatedPillButton(
           label: label,
           onPressed: isLoading ? null : onPressed,
           isLoading: isLoading,
@@ -50,32 +50,35 @@ class AppButton extends StatelessWidget {
           fontSize: fontSize,
         );
       case AppButtonVariant.secondary:
-        return _SecondaryPillButton(
+        return _AnimatedPillButton(
           label: label,
           onPressed: isLoading ? null : onPressed,
           isLoading: isLoading,
           prefixIcon: prefixIcon,
           suffixIcon: suffixIcon,
           fontSize: fontSize,
+          style: _ButtonStyle.secondary,
         );
       case AppButtonVariant.outline:
-        return _OutlinePillButton(
+        return _AnimatedPillButton(
           label: label,
           onPressed: isLoading ? null : onPressed,
           isLoading: isLoading,
           prefixIcon: prefixIcon,
           fontSize: fontSize,
+          style: _ButtonStyle.outline,
         );
       case AppButtonVariant.ghost:
-        return _GhostButton(
+        return _AnimatedPillButton(
           label: label,
           onPressed: isLoading ? null : onPressed,
           isLoading: isLoading,
           prefixIcon: prefixIcon,
           fontSize: fontSize,
+          style: _ButtonStyle.ghost,
         );
       case AppButtonVariant.danger:
-        return _PrimaryPillButton(
+        return _AnimatedPillButton(
           label: label,
           onPressed: isLoading ? null : onPressed,
           isLoading: isLoading,
@@ -90,7 +93,9 @@ class AppButton extends StatelessWidget {
   }
 }
 
-class _PrimaryPillButton extends StatelessWidget {
+enum _ButtonStyle { primary, secondary, outline, ghost }
+
+class _AnimatedPillButton extends StatefulWidget {
   final String label;
   final VoidCallback? onPressed;
   final bool isLoading;
@@ -98,8 +103,9 @@ class _PrimaryPillButton extends StatelessWidget {
   final Widget? suffixIcon;
   final double? fontSize;
   final LinearGradient? gradient;
+  final _ButtonStyle style;
 
-  const _PrimaryPillButton({
+  const _AnimatedPillButton({
     required this.label,
     this.onPressed,
     required this.isLoading,
@@ -107,13 +113,62 @@ class _PrimaryPillButton extends StatelessWidget {
     this.suffixIcon,
     this.fontSize,
     this.gradient,
+    this.style = _ButtonStyle.primary,
   });
 
   @override
+  State<_AnimatedPillButton> createState() => _AnimatedPillButtonState();
+}
+
+class _AnimatedPillButtonState extends State<_AnimatedPillButton> {
+  bool _pressed = false;
+
+  void _handleTapDown(TapDownDetails _) {
+    if (widget.onPressed == null) return;
+    setState(() => _pressed = true);
+  }
+
+  void _handleTapUp(TapUpDetails _) {
+    setState(() => _pressed = false);
+    widget.onPressed?.call();
+  }
+
+  void _handleTapCancel() => setState(() => _pressed = false);
+
+  @override
   Widget build(BuildContext context) {
+    return GestureDetector(
+      onTapDown: _handleTapDown,
+      onTapUp: _handleTapUp,
+      onTapCancel: _handleTapCancel,
+      child: AnimatedScale(
+        scale: _pressed ? 0.96 : 1.0,
+        duration: _pressed
+            ? const Duration(milliseconds: 100)
+            : const Duration(milliseconds: 220),
+        curve: _pressed ? Curves.easeOutQuart : Curves.elasticOut,
+        child: _buildBody(),
+      ),
+    );
+  }
+
+  Widget _buildBody() {
+    switch (widget.style) {
+      case _ButtonStyle.primary:
+        return _primaryBody();
+      case _ButtonStyle.secondary:
+        return _secondaryBody();
+      case _ButtonStyle.outline:
+        return _outlineBody();
+      case _ButtonStyle.ghost:
+        return _ghostBody();
+    }
+  }
+
+  Widget _primaryBody() {
     return DecoratedBox(
       decoration: BoxDecoration(
-        gradient: gradient ?? AppColors.primaryGradient,
+        gradient: widget.gradient ?? AppColors.primaryGradient,
         borderRadius: BorderRadius.circular(9999),
         boxShadow: [
           BoxShadow(
@@ -123,222 +178,70 @@ class _PrimaryPillButton extends StatelessWidget {
           ),
         ],
       ),
-      child: Material(
-        color: Colors.transparent,
-        child: InkWell(
-          onTap: onPressed,
-          borderRadius: BorderRadius.circular(9999),
-          child: Center(
-            child: isLoading
-                ? const SizedBox(
-                    width: 22,
-                    height: 22,
-                    child: CircularProgressIndicator(
-                      strokeWidth: 2.5,
-                      color: Colors.white,
-                    ),
-                  )
-                : Row(
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
-                      if (prefixIcon != null) ...[
-                        prefixIcon!,
-                        const SizedBox(width: 10),
-                      ],
-                      Text(
-                        label,
-                        style: TextStyle(
-                          color: Colors.white,
-                          fontSize: fontSize ?? 16,
-                          fontWeight: FontWeight.w700,
-                          letterSpacing: 0.3,
-                        ),
-                      ),
-                      if (suffixIcon != null) ...[
-                        const SizedBox(width: 10),
-                        suffixIcon!,
-                      ],
-                    ],
-                  ),
-          ),
-        ),
-      ),
+      child: Center(child: _content(Colors.white)),
     );
   }
-}
 
-class _SecondaryPillButton extends StatelessWidget {
-  final String label;
-  final VoidCallback? onPressed;
-  final bool isLoading;
-  final Widget? prefixIcon;
-  final Widget? suffixIcon;
-  final double? fontSize;
-
-  const _SecondaryPillButton({
-    required this.label,
-    this.onPressed,
-    required this.isLoading,
-    this.prefixIcon,
-    this.suffixIcon,
-    this.fontSize,
-  });
-
-  @override
-  Widget build(BuildContext context) {
+  Widget _secondaryBody() {
     return Material(
       color: AppColors.surfaceContainerLow,
       borderRadius: BorderRadius.circular(9999),
-      child: InkWell(
-        onTap: onPressed,
-        borderRadius: BorderRadius.circular(9999),
-        child: Center(
-          child: isLoading
-              ? const SizedBox(
-                  width: 22,
-                  height: 22,
-                  child: CircularProgressIndicator(
-                    strokeWidth: 2.5,
-                    color: AppColors.onSurface,
-                  ),
-                )
-              : Row(
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    if (prefixIcon != null) ...[
-                      prefixIcon!,
-                      const SizedBox(width: 10),
-                    ],
-                    Text(
-                      label,
-                      style: TextStyle(
-                        color: AppColors.onSurface,
-                        fontSize: fontSize ?? 16,
-                        fontWeight: FontWeight.w700,
-                      ),
-                    ),
-                    if (suffixIcon != null) ...[
-                      const SizedBox(width: 10),
-                      suffixIcon!,
-                    ],
-                  ],
-                ),
-        ),
-      ),
+      child: Center(child: _content(AppColors.onSurface)),
     );
   }
-}
 
-class _OutlinePillButton extends StatelessWidget {
-  final String label;
-  final VoidCallback? onPressed;
-  final bool isLoading;
-  final Widget? prefixIcon;
-  final double? fontSize;
-
-  const _OutlinePillButton({
-    required this.label,
-    this.onPressed,
-    required this.isLoading,
-    this.prefixIcon,
-    this.fontSize,
-  });
-
-  @override
-  Widget build(BuildContext context) {
+  Widget _outlineBody() {
     return Material(
       color: AppColors.surfaceContainerLowest,
       borderRadius: BorderRadius.circular(9999),
-      child: InkWell(
-        onTap: onPressed,
-        borderRadius: BorderRadius.circular(9999),
-        child: Container(
-          decoration: BoxDecoration(
-            borderRadius: BorderRadius.circular(9999),
-            border: Border.all(color: AppColors.surfaceContainerHigh),
-          ),
-          child: Center(
-            child: isLoading
-                ? SizedBox(
-                    width: 22,
-                    height: 22,
-                    child: CircularProgressIndicator(
-                      strokeWidth: 2.5,
-                      color: AppColors.primary,
-                    ),
-                  )
-                : Row(
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
-                      if (prefixIcon != null) ...[
-                        prefixIcon!,
-                        const SizedBox(width: 10),
-                      ],
-                      Text(
-                        label,
-                        style: TextStyle(
-                          color: AppColors.onSurface,
-                          fontSize: fontSize ?? 15,
-                          fontWeight: FontWeight.w600,
-                        ),
-                      ),
-                    ],
-                  ),
-          ),
+      child: Container(
+        decoration: BoxDecoration(
+          borderRadius: BorderRadius.circular(9999),
+          border: Border.all(color: AppColors.surfaceContainerHigh),
         ),
+        child: Center(child: _content(AppColors.onSurface)),
       ),
     );
   }
-}
 
-class _GhostButton extends StatelessWidget {
-  final String label;
-  final VoidCallback? onPressed;
-  final bool isLoading;
-  final Widget? prefixIcon;
-  final double? fontSize;
+  Widget _ghostBody() {
+    return Center(
+      child: _content(AppColors.primary),
+    );
+  }
 
-  const _GhostButton({
-    required this.label,
-    this.onPressed,
-    required this.isLoading,
-    this.prefixIcon,
-    this.fontSize,
-  });
-
-  @override
-  Widget build(BuildContext context) {
-    return TextButton(
-      onPressed: onPressed,
-      style: TextButton.styleFrom(
-        foregroundColor: AppColors.primary,
-        shape: const StadiumBorder(),
-      ),
-      child: isLoading
-          ? const SizedBox(
-              width: 22,
-              height: 22,
-              child: CircularProgressIndicator(
-                strokeWidth: 2.5,
-                color: AppColors.primary,
-              ),
-            )
-          : Row(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                if (prefixIcon != null) ...[
-                  prefixIcon!,
-                  const SizedBox(width: 8),
-                ],
-                Text(
-                  label,
-                  style: TextStyle(
-                    fontSize: fontSize ?? 15,
-                    fontWeight: FontWeight.w700,
-                  ),
-                ),
-              ],
-            ),
+  Widget _content(Color textColor) {
+    if (widget.isLoading) {
+      return SizedBox(
+        width: 22,
+        height: 22,
+        child: CircularProgressIndicator(
+          strokeWidth: 2.5,
+          color: textColor,
+        ),
+      );
+    }
+    return Row(
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        if (widget.prefixIcon != null) ...[
+          widget.prefixIcon!,
+          const SizedBox(width: 10),
+        ],
+        Text(
+          widget.label,
+          style: TextStyle(
+            color: textColor,
+            fontSize: widget.fontSize ?? 16,
+            fontWeight: FontWeight.w700,
+            letterSpacing: 0.3,
+          ),
+        ),
+        if (widget.suffixIcon != null) ...[
+          const SizedBox(width: 10),
+          widget.suffixIcon!,
+        ],
+      ],
     );
   }
 }

@@ -2,14 +2,18 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import '../../features/auth/presentation/screens/splash_screen.dart';
+import '../../features/auth/presentation/screens/welcome_screen.dart';
 import '../../features/auth/presentation/screens/login_screen.dart';
 import '../../features/auth/presentation/screens/register_screen.dart';
+import '../../features/auth/presentation/screens/role_selection_screen.dart';
 import '../../features/auth/presentation/screens/forgot_password_screen.dart';
 import '../../features/emergency/presentation/screens/driver_home_screen.dart';
 import '../../features/emergency/presentation/screens/create_emergency_screen.dart';
 import '../../features/emergency/presentation/screens/emergency_status_screen.dart';
 import '../../features/emergency/presentation/screens/technician_home_screen.dart';
 import '../../features/emergency/presentation/screens/active_service_screen.dart';
+import '../../features/emergency/presentation/screens/service_closure_screen.dart';
+import '../../features/emergency/presentation/screens/service_completed_screen.dart';
 import '../../features/emergency/presentation/screens/emergency_history_screen.dart';
 import '../../features/chat/presentation/screens/driver_chat_screen.dart';
 import '../../features/chat/presentation/screens/technician_chat_screen.dart';
@@ -17,6 +21,7 @@ import '../../features/ratings/presentation/screens/rate_service_screen.dart';
 import '../../features/ratings/presentation/screens/rate_driver_screen.dart';
 import '../../features/profile/presentation/screens/profile_screen.dart';
 import '../../features/profile/presentation/screens/edit_profile_screen.dart';
+import '../../features/profile/presentation/screens/edit_vehicle_screen.dart';
 import '../../features/admin/presentation/screens/admin_dashboard_screen.dart';
 import '../../features/admin/presentation/screens/user_management_screen.dart';
 import '../../features/admin/presentation/screens/technician_validation_screen.dart';
@@ -26,9 +31,11 @@ import '../../core/constants/app_constants.dart';
 
 abstract class AppRoutes {
   static const String splash = '/';
+  static const String welcome = '/welcome';
   static const String login = '/login';
   static const String register = '/register';
   static const String forgotPassword = '/forgot-password';
+  static const String roleSelect = '/role-select';
 
   // Driver
   static const String driverHome = '/driver/home';
@@ -42,10 +49,13 @@ abstract class AppRoutes {
   static const String activeService = '/technician/active-service';
   static const String technicianChat = '/technician/chat';
   static const String rateDriver = '/technician/rate-driver';
+  static const String serviceClosure = '/technician/service-closure';
+  static const String serviceCompleted = '/technician/service-completed';
 
   // Shared
   static const String profile = '/profile';
   static const String editProfile = '/profile/edit';
+  static const String editVehicle = '/profile/vehicle/edit';
   static const String emergencyHistory = '/history';
 
   // Admin
@@ -64,13 +74,15 @@ final appRouterProvider = Provider<GoRouter>((ref) {
       final isLoggedIn = authState.value != null;
       final isSplash = state.matchedLocation == AppRoutes.splash;
       final isAuthRoute = [
+        AppRoutes.welcome,
         AppRoutes.login,
         AppRoutes.register,
         AppRoutes.forgotPassword,
+        AppRoutes.roleSelect,
       ].contains(state.matchedLocation);
 
       if (isSplash) return null;
-      if (!isLoggedIn && !isAuthRoute) return AppRoutes.login;
+      if (!isLoggedIn && !isAuthRoute) return AppRoutes.welcome;
 
       return null;
     },
@@ -80,12 +92,23 @@ final appRouterProvider = Provider<GoRouter>((ref) {
         builder: (context, state) => const SplashScreen(),
       ),
       GoRoute(
+        path: AppRoutes.welcome,
+        builder: (context, state) => const WelcomeScreen(),
+      ),
+      GoRoute(
         path: AppRoutes.login,
         builder: (context, state) => const LoginScreen(),
       ),
       GoRoute(
+        path: AppRoutes.roleSelect,
+        builder: (context, state) => const RoleSelectionScreen(),
+      ),
+      GoRoute(
         path: AppRoutes.register,
-        builder: (context, state) => const RegisterScreen(),
+        builder: (context, state) {
+          final initialRole = state.extra as int?;
+          return RegisterScreen(initialRole: initialRole);
+        },
       ),
       GoRoute(
         path: AppRoutes.forgotPassword,
@@ -149,13 +172,27 @@ final appRouterProvider = Provider<GoRouter>((ref) {
       GoRoute(
         path: AppRoutes.rateDriver,
         builder: (context, state) {
-          final args = state.extra as Map<String, String>? ?? {};
+          final args = state.extra as Map<String, dynamic>? ?? {};
           return RateDriverScreen(
-            emergencyId: args['emergencyId'] ?? '',
-            driverId: args['driverId'] ?? '',
-            driverName: args['driverName'] ?? 'Conductor',
+            emergencyId: args['emergencyId'] as String? ?? '',
+            asignacionId: args['asignacionId'] as String?,
+            technicianId: args['technicianId'] as String?,
+            driverId: args['driverId'] as String? ?? '',
+            driverName: args['driverName'] as String? ?? 'Conductor',
+            vehicleInfo: args['vehicleInfo'] as String?,
+            duration: args['duration'] as String?,
+            clasificacionIa: args['clasificacionIa'] as String?,
+            amount: args['amount'] as String?,
           );
         },
+      ),
+      GoRoute(
+        path: AppRoutes.serviceClosure,
+        builder: (context, state) => const ServiceClosureScreen(),
+      ),
+      GoRoute(
+        path: AppRoutes.serviceCompleted,
+        builder: (context, state) => const ServiceCompletedScreen(),
       ),
 
       // ─── Shared ────────────────────────────────────────────────────────
@@ -166,6 +203,10 @@ final appRouterProvider = Provider<GoRouter>((ref) {
       GoRoute(
         path: AppRoutes.editProfile,
         builder: (context, state) => const EditProfileScreen(),
+      ),
+      GoRoute(
+        path: AppRoutes.editVehicle,
+        builder: (context, state) => const EditVehicleScreen(),
       ),
       GoRoute(
         path: AppRoutes.emergencyHistory,
@@ -197,3 +238,4 @@ final appRouterProvider = Provider<GoRouter>((ref) {
     ),
   );
 });
+

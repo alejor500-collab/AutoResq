@@ -25,6 +25,10 @@ Future<void> main() async {
   await Supabase.initialize(
     url: AppConstants.supabaseUrl,
     anonKey: AppConstants.supabaseAnonKey,
+    authOptions: const FlutterAuthClientOptions(
+      authFlowType: AuthFlowType.pkce,
+      authCallbackUrlHostname: 'login-callback',
+    ),
   );
 
   runApp(

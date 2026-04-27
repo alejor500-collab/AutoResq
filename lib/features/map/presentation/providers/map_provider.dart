@@ -98,6 +98,10 @@ class MapNotifier extends StateNotifier<MapState> {
   }
 
   void setZoom(double zoom) => state = state.copyWith(zoom: zoom);
+
+  void setLocation(LocationEntity location) {
+    state = state.copyWith(currentLocation: location);
+  }
 }
 
 final mapNotifierProvider =

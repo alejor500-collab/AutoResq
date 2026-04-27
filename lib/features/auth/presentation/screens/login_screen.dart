@@ -8,7 +8,6 @@ import '../../../../core/utils/helpers.dart';
 import '../../../../core/utils/validators.dart';
 import '../../../../shared/providers/auth_provider.dart';
 import '../../../../shared/widgets/app_button.dart';
-import '../../../../shared/widgets/app_text_field.dart';
 
 class LoginScreen extends ConsumerStatefulWidget {
   const LoginScreen({super.key});
@@ -21,14 +20,27 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
   final _formKey = GlobalKey<FormState>();
   final _emailCtrl = TextEditingController();
   final _passwordCtrl = TextEditingController();
-  int _selectedRole = 0; // 0 = conductor, 1 = tecnico
-  bool _isLogin = true;
+  bool _showEmailForm = false;
+  bool _obscurePass = true;
 
   @override
   void dispose() {
     _emailCtrl.dispose();
     _passwordCtrl.dispose();
     super.dispose();
+  }
+
+  void _navigateByRole() {
+    final user = ref.read(authNotifierProvider).value;
+    if (user == null) return;
+    switch (user.role) {
+      case AppConstants.roleDriver:
+        context.go(AppRoutes.driverHome);
+      case AppConstants.roleTechnician:
+        context.go(AppRoutes.technicianHome);
+      case AppConstants.roleAdmin:
+        context.go(AppRoutes.adminDashboard);
+    }
   }
 
   Future<void> _loginWithGoogle() async {
@@ -44,19 +56,6 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
         error?.toString() ?? 'Error al iniciar sesión con Google',
         isError: true,
       );
-    }
-  }
-
-  void _navigateByRole() {
-    final user = ref.read(authNotifierProvider).value;
-    if (user == null) return;
-    switch (user.role) {
-      case AppConstants.roleDriver:
-        context.go(AppRoutes.driverHome);
-      case AppConstants.roleTechnician:
-        context.go(AppRoutes.technicianHome);
-      case AppConstants.roleAdmin:
-        context.go(AppRoutes.adminDashboard);
     }
   }
 
@@ -83,16 +82,107 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
     }
   }
 
+  Widget _buildEmailToggleButton(bool isLoading) {
+    return AppButton(
+      key: const ValueKey('email_toggle'),
+      label: 'Ingresar con Email',
+      onPressed: isLoading ? null : () => setState(() => _showEmailForm = true),
+      isLoading: false,
+      variant: AppButtonVariant.outline,
+      prefixIcon: const Icon(Icons.email_outlined, color: AppColors.onSurface, size: 20),
+    );
+  }
+
+  Widget _buildEmailForm(bool isLoading) {
+    return Column(
+      key: const ValueKey('email_form'),
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        _FieldLabel('EMAIL'),
+        const SizedBox(height: 8),
+        TextFormField(
+          controller: _emailCtrl,
+          keyboardType: TextInputType.emailAddress,
+          validator: Validators.email,
+          textInputAction: TextInputAction.next,
+          cursorColor: AppColors.primary,
+          style: const TextStyle(
+            fontSize: 15,
+            fontWeight: FontWeight.w500,
+            color: AppColors.onSurface,
+          ),
+          decoration: _inputDecoration('nombre@ejemplo.com'),
+        ),
+        const SizedBox(height: 24),
+        Row(
+          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+          children: [
+            _FieldLabel('CONTRASEÑA'),
+            GestureDetector(
+              onTap: () => context.push(AppRoutes.forgotPassword),
+              child: const Text(
+                '¿OLVIDASTE?',
+                style: TextStyle(
+                  fontSize: 10,
+                  fontWeight: FontWeight.w700,
+                  letterSpacing: 0.5,
+                  color: AppColors.primary,
+                ),
+              ),
+            ),
+          ],
+        ),
+        const SizedBox(height: 8),
+        TextFormField(
+          controller: _passwordCtrl,
+          obscureText: _obscurePass,
+          validator: Validators.password,
+          textInputAction: TextInputAction.done,
+          onFieldSubmitted: (_) => _login(),
+          cursorColor: AppColors.primary,
+          style: const TextStyle(
+            fontSize: 15,
+            fontWeight: FontWeight.w500,
+            color: AppColors.onSurface,
+          ),
+          decoration: _inputDecoration('••••••••').copyWith(
+            suffixIcon: IconButton(
+              icon: Icon(
+                _obscurePass ? Icons.visibility_off_outlined : Icons.visibility_outlined,
+                color: AppColors.secondary,
+                size: 20,
+              ),
+              onPressed: () => setState(() => _obscurePass = !_obscurePass),
+            ),
+          ),
+        ),
+        const SizedBox(height: 36),
+        AppButton(
+          label: 'Continuar',
+          onPressed: isLoading ? null : _login,
+          isLoading: isLoading,
+          suffixIcon: const Icon(Icons.arrow_forward, color: Colors.white, size: 20),
+        ),
+        const SizedBox(height: 16),
+        Center(
+          child: TextButton(
+            onPressed: () => setState(() => _showEmailForm = false),
+            style: TextButton.styleFrom(foregroundColor: AppColors.secondary),
+            child: const Text('← Usar otra opción'),
+          ),
+        ),
+      ],
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
-    final authState = ref.watch(authNotifierProvider);
-    final isLoading = authState.isLoading;
+    final isLoading = ref.watch(authNotifierProvider).isLoading;
 
     return Scaffold(
       backgroundColor: AppColors.background,
       body: Stack(
         children: [
-          // Background decorations
           Positioned(
             top: -100,
             right: -100,
@@ -118,389 +208,162 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
             ),
           ),
 
-          // Content
           SafeArea(
             child: SingleChildScrollView(
               padding: const EdgeInsets.symmetric(horizontal: 24),
-              child: Column(
-                children: [
-                  const SizedBox(height: 48),
-
-                  // Brand identity
-                  _buildBrandHeader(),
-                  const SizedBox(height: 32),
-
-                  // Role selector pill
-                  _buildRoleSelector(),
-                  const SizedBox(height: 32),
-
-                  // Form container (glass panel)
-                  _buildFormCard(isLoading),
-                  const SizedBox(height: 40),
-
-                  // Info cards
-                  _buildInfoCards(),
-                  const SizedBox(height: 48),
-                ],
-              ),
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-
-  Widget _buildBrandHeader() {
-    return Column(
-      children: [
-        Container(
-          padding: const EdgeInsets.all(16),
-          decoration: BoxDecoration(
-            color: AppColors.primary,
-            borderRadius: BorderRadius.circular(16),
-            boxShadow: [
-              BoxShadow(
-                color: AppColors.primary.withOpacity(0.2),
-                blurRadius: 20,
-                offset: const Offset(0, 8),
-              ),
-            ],
-          ),
-          child: const Icon(Icons.car_repair, size: 36, color: Colors.white),
-        ),
-        const SizedBox(height: 16),
-        const Text(
-          'AutoResQ',
-          style: TextStyle(
-            fontSize: 30,
-            fontWeight: FontWeight.w900,
-            color: AppColors.onSurface,
-            letterSpacing: -1,
-          ),
-        ),
-        const SizedBox(height: 4),
-        const Text(
-          'Asistencia de confianza en Riobamba',
-          style: TextStyle(
-            fontSize: 14,
-            fontWeight: FontWeight.w500,
-            color: AppColors.secondary,
-          ),
-        ),
-      ],
-    );
-  }
-
-  Widget _buildRoleSelector() {
-    return Container(
-      padding: const EdgeInsets.all(6),
-      decoration: BoxDecoration(
-        color: AppColors.surfaceContainerLow,
-        borderRadius: BorderRadius.circular(9999),
-      ),
-      child: Row(
-        children: [
-          _rolePill('Conductor', 0),
-          _rolePill('Técnico', 1),
-        ],
-      ),
-    );
-  }
-
-  Widget _rolePill(String label, int index) {
-    final isActive = _selectedRole == index;
-    return Expanded(
-      child: GestureDetector(
-        onTap: () => setState(() => _selectedRole = index),
-        child: AnimatedContainer(
-          duration: const Duration(milliseconds: 200),
-          padding: const EdgeInsets.symmetric(vertical: 12),
-          decoration: BoxDecoration(
-            color: isActive ? AppColors.surfaceContainerLowest : Colors.transparent,
-            borderRadius: BorderRadius.circular(9999),
-            boxShadow: isActive
-                ? [
-                    BoxShadow(
-                      color: AppColors.onSurface.withOpacity(0.05),
-                      blurRadius: 8,
-                      offset: const Offset(0, 2),
-                    ),
-                  ]
-                : null,
-          ),
-          child: Center(
-            child: Text(
-              label,
-              style: TextStyle(
-                fontSize: 14,
-                fontWeight: FontWeight.w700,
-                letterSpacing: -0.3,
-                color: isActive ? AppColors.primary : AppColors.secondary,
-              ),
-            ),
-          ),
-        ),
-      ),
-    );
-  }
-
-  Widget _buildFormCard(bool isLoading) {
-    return Container(
-      padding: const EdgeInsets.all(32),
-      decoration: BoxDecoration(
-        color: Colors.white.withOpacity(0.7),
-        borderRadius: BorderRadius.circular(16),
-        border: Border.all(color: Colors.white.withOpacity(0.2)),
-        boxShadow: [
-          BoxShadow(
-            color: AppColors.onSurface.withOpacity(0.05),
-            blurRadius: 40,
-            offset: const Offset(0, 20),
-          ),
-        ],
-      ),
-      child: Form(
-        key: _formKey,
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            // Header row
-            Row(
-              mainAxisAlignment: MainAxisAlignment.spaceBetween,
-              crossAxisAlignment: CrossAxisAlignment.end,
-              children: [
-                Column(
+              child: Form(
+                key: _formKey,
+                child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    Text(
-                      _isLogin ? 'Bienvenido' : 'Crear cuenta',
-                      style: const TextStyle(
-                        fontSize: 24,
-                        fontWeight: FontWeight.w700,
-                        letterSpacing: -0.5,
+                    const SizedBox(height: 16),
+
+                    // Back button
+                    GestureDetector(
+                      onTap: () => context.pop(),
+                      child: Container(
+                        width: 40,
+                        height: 40,
+                        decoration: BoxDecoration(
+                          color: AppColors.surfaceContainerLow,
+                          borderRadius: BorderRadius.circular(12),
+                        ),
+                        child: const Icon(
+                          Icons.arrow_back,
+                          size: 20,
+                          color: AppColors.secondary,
+                        ),
+                      ),
+                    ),
+                    const SizedBox(height: 32),
+
+                    // Header
+                    const Text(
+                      'Iniciar sesión',
+                      style: TextStyle(
+                        fontSize: 32,
+                        fontWeight: FontWeight.w800,
+                        letterSpacing: -1,
                         color: AppColors.onSurface,
                       ),
                     ),
-                    const SizedBox(height: 4),
-                    Text(
-                      _isLogin ? 'Inicia sesión para continuar' : 'Regístrate para empezar',
-                      style: const TextStyle(
-                        fontSize: 14,
+                    const SizedBox(height: 8),
+                    const Text(
+                      'Bienvenido de vuelta',
+                      style: TextStyle(
+                        fontSize: 16,
                         color: AppColors.secondary,
+                        height: 1.5,
                       ),
                     ),
+                    const SizedBox(height: 40),
+
+                    // Google button
+                    _GoogleSignInButton(onPressed: isLoading ? null : _loginWithGoogle),
+                    const SizedBox(height: 20),
+
+                    // Divider
+                    Row(
+                      children: [
+                        Expanded(child: Divider(color: AppColors.outline.withOpacity(0.4))),
+                        Padding(
+                          padding: const EdgeInsets.symmetric(horizontal: 12),
+                          child: Text(
+                            'o',
+                            style: TextStyle(
+                              fontSize: 13,
+                              fontWeight: FontWeight.w500,
+                              color: AppColors.secondary.withOpacity(0.6),
+                            ),
+                          ),
+                        ),
+                        Expanded(child: Divider(color: AppColors.outline.withOpacity(0.4))),
+                      ],
+                    ),
+                    const SizedBox(height: 20),
+
+                    // AnimatedSize + AnimatedSwitcher for email form reveal
+                    AnimatedSize(
+                      duration: const Duration(milliseconds: 400),
+                      curve: Curves.easeOutQuart,
+                      alignment: Alignment.topCenter,
+                      child: AnimatedSwitcher(
+                        duration: const Duration(milliseconds: 300),
+                        switchInCurve: Curves.easeOutQuart,
+                        switchOutCurve: Curves.easeInQuart,
+                        transitionBuilder: (child, animation) => FadeTransition(
+                          opacity: animation,
+                          child: SlideTransition(
+                            position: Tween(
+                              begin: const Offset(0, 0.04),
+                              end: Offset.zero,
+                            ).animate(CurvedAnimation(
+                              parent: animation,
+                              curve: Curves.easeOutQuart,
+                            )),
+                            child: child,
+                          ),
+                        ),
+                        child: _showEmailForm
+                            ? _buildEmailForm(isLoading)
+                            : _buildEmailToggleButton(isLoading),
+                      ),
+                    ),
+                    const SizedBox(height: 48),
                   ],
                 ),
-                GestureDetector(
-                  onTap: () {
-                    if (_isLogin) {
-                      context.push(AppRoutes.register);
-                    } else {
-                      setState(() => _isLogin = true);
-                    }
-                  },
-                  child: Text(
-                    _isLogin ? 'Registrarse' : 'Iniciar sesión',
-                    style: const TextStyle(
-                      fontSize: 14,
-                      fontWeight: FontWeight.w700,
-                      color: AppColors.primary,
-                    ),
-                  ),
-                ),
-              ],
-            ),
-            const SizedBox(height: 32),
-
-            // Email
-            AppTextField(
-              label: 'Email',
-              hint: 'nombre@ejemplo.com',
-              controller: _emailCtrl,
-              keyboardType: TextInputType.emailAddress,
-              validator: Validators.email,
-              textInputAction: TextInputAction.next,
-            ),
-            const SizedBox(height: 20),
-
-            // Password
-            Row(
-              mainAxisAlignment: MainAxisAlignment.spaceBetween,
-              children: [
-                Padding(
-                  padding: const EdgeInsets.only(left: 4, bottom: 8),
-                  child: Text(
-                    'CONTRASEÑA',
-                    style: TextStyle(
-                      fontSize: 10,
-                      fontWeight: FontWeight.w700,
-                      letterSpacing: 0.5,
-                      color: AppColors.secondary,
-                    ),
-                  ),
-                ),
-                GestureDetector(
-                  onTap: () => context.push(AppRoutes.forgotPassword),
-                  child: Padding(
-                    padding: const EdgeInsets.only(right: 4, bottom: 8),
-                    child: Text(
-                      '¿OLVIDASTE?',
-                      style: TextStyle(
-                        fontSize: 10,
-                        fontWeight: FontWeight.w700,
-                        letterSpacing: 0.5,
-                        color: AppColors.primary,
-                      ),
-                    ),
-                  ),
-                ),
-              ],
-            ),
-            TextFormField(
-              controller: _passwordCtrl,
-              obscureText: true,
-              validator: Validators.password,
-              textInputAction: TextInputAction.done,
-              cursorColor: AppColors.primary,
-              style: const TextStyle(
-                fontSize: 15,
-                fontWeight: FontWeight.w500,
-                color: AppColors.onSurface,
-              ),
-              decoration: InputDecoration(
-                hintText: '••••••••',
-                hintStyle: TextStyle(
-                  color: AppColors.secondary.withOpacity(0.5),
-                ),
-                filled: true,
-                fillColor: AppColors.surfaceContainerLow,
-                border: OutlineInputBorder(
-                  borderRadius: BorderRadius.circular(24),
-                  borderSide: BorderSide.none,
-                ),
-                focusedBorder: OutlineInputBorder(
-                  borderRadius: BorderRadius.circular(24),
-                  borderSide: BorderSide(
-                    color: AppColors.primary.withOpacity(0.2),
-                    width: 2,
-                  ),
-                ),
-                contentPadding: const EdgeInsets.symmetric(horizontal: 20, vertical: 18),
               ),
             ),
-            const SizedBox(height: 28),
-
-            // CTA Button
-            AppButton(
-              label: 'Continuar',
-              onPressed: _login,
-              isLoading: isLoading,
-              suffixIcon: const Icon(Icons.arrow_forward, color: Colors.white, size: 20),
-            ),
-            const SizedBox(height: 20),
-
-            // Divider con "o"
-            Row(
-              children: [
-                Expanded(child: Divider(color: AppColors.outline.withOpacity(0.4))),
-                Padding(
-                  padding: const EdgeInsets.symmetric(horizontal: 12),
-                  child: Text(
-                    'o',
-                    style: TextStyle(
-                      fontSize: 13,
-                      fontWeight: FontWeight.w500,
-                      color: AppColors.secondary.withOpacity(0.6),
-                    ),
-                  ),
-                ),
-                Expanded(child: Divider(color: AppColors.outline.withOpacity(0.4))),
-              ],
-            ),
-            const SizedBox(height: 20),
-
-            // Botón Google
-            _GoogleSignInButton(onPressed: isLoading ? null : _loginWithGoogle),
-          ],
-        ),
+          ),
+        ],
       ),
     );
   }
 
-  Widget _buildInfoCards() {
+  InputDecoration _inputDecoration(String hint) {
+    return InputDecoration(
+      hintText: hint,
+      hintStyle: TextStyle(color: AppColors.secondary.withOpacity(0.5)),
+      filled: true,
+      fillColor: AppColors.surfaceContainerLow,
+      border: OutlineInputBorder(
+        borderRadius: BorderRadius.circular(24),
+        borderSide: BorderSide.none,
+      ),
+      focusedBorder: OutlineInputBorder(
+        borderRadius: BorderRadius.circular(24),
+        borderSide: BorderSide(
+          color: AppColors.primary.withOpacity(0.2),
+          width: 2,
+        ),
+      ),
+      errorBorder: OutlineInputBorder(
+        borderRadius: BorderRadius.circular(24),
+        borderSide: const BorderSide(color: AppColors.error, width: 1),
+      ),
+      focusedErrorBorder: OutlineInputBorder(
+        borderRadius: BorderRadius.circular(24),
+        borderSide: const BorderSide(color: AppColors.error, width: 2),
+      ),
+      contentPadding: const EdgeInsets.symmetric(horizontal: 20, vertical: 18),
+    );
+  }
+}
 
-    return Row(
-      children: [
-        Expanded(
-          child: Container(
-            padding: const EdgeInsets.all(16),
-            decoration: BoxDecoration(
-              color: AppColors.surfaceContainerLow,
-              borderRadius: BorderRadius.circular(24),
-            ),
-            child: Column(
-              children: [
-                Icon(Icons.location_on, color: AppColors.tertiary, size: 24),
-                const SizedBox(height: 8),
-                Text(
-                  'COBERTURA',
-                  style: TextStyle(
-                    fontSize: 10,
-                    fontWeight: FontWeight.w700,
-                    letterSpacing: 1,
-                    color: AppColors.secondary,
-                  ),
-                ),
-                const SizedBox(height: 4),
-                const Text(
-                  'Riobamba & Chimborazo',
-                  style: TextStyle(
-                    fontSize: 12,
-                    fontWeight: FontWeight.w600,
-                    color: AppColors.onSurface,
-                  ),
-                  textAlign: TextAlign.center,
-                ),
-              ],
-            ),
-          ),
-        ),
-        const SizedBox(width: 16),
-        Expanded(
-          child: Container(
-            padding: const EdgeInsets.all(16),
-            decoration: BoxDecoration(
-              color: AppColors.surfaceContainerLow,
-              borderRadius: BorderRadius.circular(24),
-            ),
-            child: Column(
-              children: [
-                Icon(Icons.verified_user, color: AppColors.tertiary, size: 24),
-                const SizedBox(height: 8),
-                Text(
-                  'SEGURIDAD',
-                  style: TextStyle(
-                    fontSize: 10,
-                    fontWeight: FontWeight.w700,
-                    letterSpacing: 1,
-                    color: AppColors.secondary,
-                  ),
-                ),
-                const SizedBox(height: 4),
-                const Text(
-                  'Asistencia 24/7',
-                  style: TextStyle(
-                    fontSize: 12,
-                    fontWeight: FontWeight.w600,
-                    color: AppColors.onSurface,
-                  ),
-                  textAlign: TextAlign.center,
-                ),
-              ],
-            ),
-          ),
-        ),
-      ],
+class _FieldLabel extends StatelessWidget {
+  final String text;
+  const _FieldLabel(this.text);
+
+  @override
+  Widget build(BuildContext context) {
+    return Text(
+      text,
+      style: const TextStyle(
+        fontSize: 10,
+        fontWeight: FontWeight.w700,
+        letterSpacing: 0.5,
+        color: AppColors.secondary,
+      ),
     );
   }
 }
@@ -512,54 +375,50 @@ class _GoogleSignInButton extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return GestureDetector(
-      onTap: onPressed,
-      child: AnimatedOpacity(
-        opacity: onPressed == null ? 0.5 : 1.0,
-        duration: const Duration(milliseconds: 200),
-        child: Container(
-          height: 56,
-          decoration: BoxDecoration(
-            color: Colors.white,
-            borderRadius: BorderRadius.circular(9999),
-            border: Border.all(color: AppColors.outline.withOpacity(0.3)),
-            boxShadow: [
-              BoxShadow(
-                color: AppColors.onSurface.withOpacity(0.04),
-                blurRadius: 8,
-                offset: const Offset(0, 2),
-              ),
-            ],
-          ),
-          child: Row(
-            mainAxisAlignment: MainAxisAlignment.center,
-            children: [
-              _GoogleLogo(),
-              const SizedBox(width: 12),
-              const Text(
-                'Continuar con Google',
-                style: TextStyle(
-                  fontSize: 15,
-                  fontWeight: FontWeight.w600,
-                  color: Color(0xFF3C4043),
-                  letterSpacing: -0.2,
+    return SizedBox(
+      width: double.infinity,
+      height: 56,
+      child: GestureDetector(
+        onTap: onPressed,
+        child: AnimatedOpacity(
+          opacity: onPressed == null ? 0.5 : 1.0,
+          duration: const Duration(milliseconds: 200),
+          child: Container(
+            decoration: BoxDecoration(
+              color: Colors.white,
+              borderRadius: BorderRadius.circular(9999),
+              border: Border.all(color: AppColors.outline.withOpacity(0.3)),
+              boxShadow: [
+                BoxShadow(
+                  color: AppColors.onSurface.withOpacity(0.04),
+                  blurRadius: 8,
+                  offset: const Offset(0, 2),
                 ),
-              ),
-            ],
+              ],
+            ),
+            child: Row(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                SizedBox(
+                  width: 22,
+                  height: 22,
+                  child: CustomPaint(painter: _GoogleLogoPainter()),
+                ),
+                const SizedBox(width: 12),
+                const Text(
+                  'Continuar con Google',
+                  style: TextStyle(
+                    fontSize: 15,
+                    fontWeight: FontWeight.w600,
+                    color: Color(0xFF3C4043),
+                    letterSpacing: -0.2,
+                  ),
+                ),
+              ],
+            ),
           ),
         ),
       ),
-    );
-  }
-}
-
-class _GoogleLogo extends StatelessWidget {
-  @override
-  Widget build(BuildContext context) {
-    return SizedBox(
-      width: 22,
-      height: 22,
-      child: CustomPaint(painter: _GoogleLogoPainter()),
     );
   }
 }
@@ -569,21 +428,8 @@ class _GoogleLogoPainter extends CustomPainter {
   void paint(Canvas canvas, Size size) {
     final center = Offset(size.width / 2, size.height / 2);
     final radius = size.width / 2;
-
-    // Rojo
-    final redPaint = Paint()..color = const Color(0xFFEA4335);
-    // Azul
-    final bluePaint = Paint()..color = const Color(0xFF4285F4);
-    // Amarillo
-    final yellowPaint = Paint()..color = const Color(0xFFFBBC05);
-    // Verde
-    final greenPaint = Paint()..color = const Color(0xFF34A853);
-
-    canvas.save();
-    canvas.translate(center.dx, center.dy);
-
-    // Dibujamos la "G" de Google con cuatro arcos de colores
     const strokeWidth = 3.5;
+
     final arcPaint = Paint()
       ..style = PaintingStyle.stroke
       ..strokeWidth = strokeWidth
@@ -591,32 +437,26 @@ class _GoogleLogoPainter extends CustomPainter {
 
     final rect = Rect.fromCircle(center: Offset.zero, radius: radius - strokeWidth / 2);
 
-    // Rojo (top-right a top-left por arriba)
-    arcPaint.color = redPaint.color;
+    canvas.save();
+    canvas.translate(center.dx, center.dy);
+
+    arcPaint.color = const Color(0xFFEA4335);
     canvas.drawArc(rect, -0.52, -1.57, false, arcPaint);
 
-    // Amarillo (top-left a bottom-left)
-    arcPaint.color = yellowPaint.color;
+    arcPaint.color = const Color(0xFFFBBC05);
     canvas.drawArc(rect, -2.09, -1.57, false, arcPaint);
 
-    // Verde (bottom)
-    arcPaint.color = greenPaint.color;
+    arcPaint.color = const Color(0xFF34A853);
     canvas.drawArc(rect, 2.62, 1.57, false, arcPaint);
 
-    // Azul (right)
-    arcPaint.color = bluePaint.color;
+    arcPaint.color = const Color(0xFF4285F4);
     canvas.drawArc(rect, -0.52, 1.57, false, arcPaint);
 
-    // Línea horizontal del brazo derecho de la "G"
     final linePaint = Paint()
-      ..color = bluePaint.color
+      ..color = const Color(0xFF4285F4)
       ..strokeWidth = strokeWidth
       ..strokeCap = StrokeCap.round;
-    canvas.drawLine(
-      Offset(0, 0),
-      Offset(radius - strokeWidth / 2, 0),
-      linePaint,
-    );
+    canvas.drawLine(Offset.zero, Offset(radius - strokeWidth / 2, 0), linePaint);
 
     canvas.restore();
   }

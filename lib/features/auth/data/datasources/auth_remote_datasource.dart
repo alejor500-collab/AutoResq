@@ -1,6 +1,5 @@
 import 'dart:async';
 import 'package:flutter/foundation.dart' show kIsWeb;
-import 'package:google_sign_in/google_sign_in.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import '../../../../core/constants/app_constants.dart';
 import '../../../../core/errors/exceptions.dart' as core_exceptions;
@@ -187,46 +186,43 @@ class AuthRemoteDataSourceImpl implements AuthRemoteDataSource {
   Future<UserModel> loginWithGoogle() async {
     try {
       if (kIsWeb) {
-        // Supabase maneja el flujo OAuth con redirect. El navegador sale de esta
-        // página; cuando vuelve, onAuthStateChange + _ensureProfile toman el control.
         await _client.auth.signInWithOAuth(OAuthProvider.google);
         return Completer<UserModel>().future;
       }
 
-      // Plataformas nativas (Android / iOS)
-      final googleSignIn = GoogleSignIn(
-        serverClientId:
-            '362021637892-ta4rii3kafr7l8p2en8khst5f9ipeik4.apps.googleusercontent.com',
+      // Android / iOS: Chrome Custom Tab → deep link → Supabase PKCE callback
+      final completer = Completer<UserModel>();
+      late StreamSubscription<AuthState> sub;
+
+      sub = _client.auth.onAuthStateChange.listen((event) async {
+        if (event.event == AuthChangeEvent.signedIn &&
+            event.session != null &&
+            !completer.isCompleted) {
+          try {
+            final user = await _ensureProfile(event.session!.user);
+            completer.complete(user);
+          } catch (e) {
+            completer.completeError(
+              core_exceptions.AuthException(message: e.toString()),
+            );
+          } finally {
+            await sub.cancel();
+          }
+        }
+      });
+
+      final launched = await _client.auth.signInWithOAuth(
+        OAuthProvider.google,
+        redirectTo: 'com.example.autoresq://login-callback',
       );
 
-      final googleUser = await googleSignIn.signIn();
-      if (googleUser == null) {
+      if (!launched) {
+        await sub.cancel();
         throw const core_exceptions.AuthException(
-            message: 'Inicio de sesión cancelado');
+            message: 'No se pudo abrir el navegador para Google');
       }
 
-      final googleAuth = await googleUser.authentication;
-      final idToken = googleAuth.idToken;
-      final accessToken = googleAuth.accessToken;
-
-      if (idToken == null) {
-        throw const core_exceptions.AuthException(
-            message: 'No se pudo obtener el token de Google. '
-                'Verifica que Google esté habilitado en Supabase.');
-      }
-
-      final response = await _client.auth.signInWithIdToken(
-        provider: OAuthProvider.google,
-        idToken: idToken,
-        accessToken: accessToken,
-      );
-
-      if (response.user == null) {
-        throw const core_exceptions.AuthException(
-            message: 'Error al autenticar con Google en Supabase');
-      }
-
-      return await _ensureProfile(response.user!);
+      return completer.future;
     } on core_exceptions.AuthException {
       rethrow;
     } on AuthException catch (e) {
@@ -274,7 +270,23 @@ class AuthRemoteDataSourceImpl implements AuthRemoteDataSource {
         'telefono': user.phone,
         'avatar_url': user.avatarUrl,
       }).eq('id', user.id);
-      return user;
+      final fresh = await _fetchProfile(user.id);
+      return UserModel(
+        id: fresh.id,
+        email: fresh.email,
+        name: fresh.name,
+        phone: fresh.phone,
+        role: fresh.role,
+        avatarUrl: fresh.avatarUrl,
+        rating: fresh.rating,
+        totalServices: fresh.totalServices,
+        isAvailable: fresh.isAvailable,
+        isApproved: fresh.isApproved,
+        specialty: user.specialty,
+        lat: user.lat,
+        lng: user.lng,
+        createdAt: fresh.createdAt,
+      );
     } on PostgrestException catch (e) {
       throw core_exceptions.ServerException(message: e.message);
     }

@@ -75,27 +75,45 @@ class _StatusBody extends ConsumerWidget {
                     padding: const EdgeInsets.symmetric(horizontal: 24),
                     child: Row(
                       children: [
-                        GestureDetector(
-                          onTap: () => context.go(AppRoutes.driverHome),
-                          child: const Icon(Icons.menu,
-                              color: AppColors.onSurface),
-                        ),
-                        const Spacer(),
-                        const Text(
-                          'Solicitudes',
-                          style: TextStyle(
-                            fontSize: 18,
-                            fontWeight: FontWeight.w600,
-                            letterSpacing: -0.3,
-                            color: AppColors.primary,
+                        // Back button
+                        Material(
+                          color: Colors.transparent,
+                          borderRadius: BorderRadius.circular(10),
+                          child: InkWell(
+                            borderRadius: BorderRadius.circular(10),
+                            onTap: () => context.pop(),
+                            child: const Padding(
+                              padding: EdgeInsets.all(8),
+                              child: Icon(Icons.arrow_back_ios_new,
+                                  color: AppColors.onSurface, size: 20),
+                            ),
                           ),
                         ),
                         const Spacer(),
-                        CircleAvatar(
-                          radius: 16,
-                          backgroundColor: AppColors.surfaceContainerHigh,
-                          child: const Icon(Icons.person,
-                              size: 18, color: AppColors.secondary),
+                        const Text(
+                          'Estado del servicio',
+                          style: TextStyle(
+                            fontSize: 18,
+                            fontWeight: FontWeight.w700,
+                            letterSpacing: -0.3,
+                            color: AppColors.onSurface,
+                          ),
+                        ),
+                        const Spacer(),
+                        // Profile avatar → /profile
+                        Material(
+                          color: Colors.transparent,
+                          shape: const CircleBorder(),
+                          child: InkWell(
+                            customBorder: const CircleBorder(),
+                            onTap: () => context.push(AppRoutes.profile),
+                            child: CircleAvatar(
+                              radius: 16,
+                              backgroundColor: AppColors.surfaceContainerHigh,
+                              child: const Icon(Icons.person,
+                                  size: 18, color: AppColors.secondary),
+                            ),
+                          ),
                         ),
                       ],
                     ),

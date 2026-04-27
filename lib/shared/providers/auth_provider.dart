@@ -125,6 +125,10 @@ class AuthNotifier extends StateNotifier<AsyncValue<AppUser?>> {
     );
   }
 
+  void refreshUser(AppUser user) {
+    state = AsyncValue.data(user);
+  }
+
   AppUser? get currentUser => state.value;
 }
 

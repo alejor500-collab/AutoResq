@@ -1,0 +1,238 @@
+<!DOCTYPE html>
+
+<html lang="es"><head>
+<meta charset="utf-8"/>
+<meta content="width=device-width, initial-scale=1.0" name="viewport"/>
+<title>En Ruta - AutoResQ</title>
+<script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+<link href="https://fonts.googleapis.com/css2?family=Poppins:wght@400;500;600;700&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<script id="tailwind-config">
+        tailwind.config = {
+          darkMode: "class",
+          theme: {
+            extend: {
+              "colors": {
+                      "surface-bright": "#fff8f7",
+                      "outline-variant": "#e4beb9",
+                      "secondary": "#0060a8",
+                      "background": "#fff8f7",
+                      "secondary-fixed": "#d3e4ff",
+                      "surface-container": "#ffe9e6",
+                      "inverse-primary": "#ffb4ac",
+                      "on-secondary-fixed": "#001c38",
+                      "inverse-surface": "#3e2c2a",
+                      "on-primary-fixed-variant": "#93000d",
+                      "tertiary-fixed": "#afecff",
+                      "on-primary-container": "#fffbff",
+                      "on-secondary-container": "#003663",
+                      "outline": "#906f6c",
+                      "on-primary": "#ffffff",
+                      "surface-variant": "#fadcd8",
+                      "tertiary-fixed-dim": "#72d4ef",
+                      "on-background": "#271716",
+                      "on-tertiary-fixed-variant": "#004e5d",
+                      "primary-fixed-dim": "#ffb4ac",
+                      "tertiary-container": "#008097",
+                      "primary-container": "#db322f",
+                      "on-error": "#ffffff",
+                      "surface": "#fff8f7",
+                      "surface-container-high": "#ffe2de",
+                      "on-secondary-fixed-variant": "#004881",
+                      "on-tertiary-container": "#f9fdff",
+                      "tertiary": "#006578",
+                      "surface-container-low": "#fff0ee",
+                      "error": "#ba1a1a",
+                      "primary": "#b7131a",
+                      "surface-dim": "#f1d3d0",
+                      "error-container": "#ffdad6",
+                      "secondary-container": "#47a1ff",
+                      "on-tertiary-fixed": "#001f27",
+                      "on-secondary": "#ffffff",
+                      "on-surface-variant": "#5b403d",
+                      "on-tertiary": "#ffffff",
+                      "surface-tint": "#bb171c",
+                      "inverse-on-surface": "#ffedea",
+                      "primary-fixed": "#ffdad6",
+                      "surface-container-lowest": "#ffffff",
+                      "on-surface": "#271716",
+                      "on-primary-fixed": "#410002",
+                      "surface-container-highest": "#fadcd8",
+                      "on-error-container": "#93000a",
+                      "secondary-fixed-dim": "#a2c9ff"
+              },
+              "borderRadius": {
+                      "DEFAULT": "0.25rem",
+                      "lg": "0.5rem",
+                      "xl": "0.75rem",
+                      "full": "9999px"
+              },
+              "spacing": {
+                      "gutter": "16px",
+                      "stack_sm": "8px",
+                      "page_padding": "24px",
+                      "base": "8px",
+                      "bottom_bar_height": "80px",
+                      "stack_md": "16px",
+                      "stack_lg": "24px",
+                      "app_bar_height": "64px"
+              },
+              "fontFamily": {
+                      "label-lg": [
+                              "Poppins"
+                      ],
+                      "headline-md": [
+                              "Poppins"
+                      ],
+                      "display-lg": [
+                              "Poppins"
+                      ],
+                      "title-lg": [
+                              "Poppins"
+                      ],
+                      "body-md": [
+                              "Poppins"
+                      ],
+                      "label-sm": [
+                              "Poppins"
+                      ],
+                      "body-lg": [
+                              "Poppins"
+                      ]
+              },
+              "fontSize": {
+                      "label-lg": [
+                              "14px",
+                              {
+                                      "lineHeight": "20px",
+                                      "letterSpacing": "0.1px",
+                                      "fontWeight": "600"
+                              }
+                      ],
+                      "headline-md": [
+                              "24px",
+                              {
+                                      "lineHeight": "32px",
+                                      "letterSpacing": "0px",
+                                      "fontWeight": "600"
+                              }
+                      ],
+                      "display-lg": [
+                              "32px",
+                              {
+                                      "lineHeight": "40px",
+                                      "letterSpacing": "-0.5px",
+                                      "fontWeight": "700"
+                              }
+                      ],
+                      "title-lg": [
+                              "20px",
+                              {
+                                      "lineHeight": "28px",
+                                      "letterSpacing": "0px",
+                                      "fontWeight": "600"
+                              }
+                      ],
+                      "body-md": [
+                              "14px",
+                              {
+                                      "lineHeight": "20px",
+                                      "letterSpacing": "0.25px",
+                                      "fontWeight": "400"
+                              }
+                      ],
+                      "label-sm": [
+                              "12px",
+                              {
+                                      "lineHeight": "16px",
+                                      "letterSpacing": "0.4px",
+                                      "fontWeight": "500"
+                              }
+                      ],
+                      "body-lg": [
+                              "16px",
+                              {
+                                      "lineHeight": "24px",
+                                      "letterSpacing": "0.15px",
+                                      "fontWeight": "400"
+                              }
+                      ]
+              }
+      },
+          },
+        }
+      </script>
+<style>
+        .material-symbols-outlined {
+          font-variation-settings: 'FILL' 0, 'wght' 400, 'GRAD' 0, 'opsz' 24;
+        }
+      </style>
+<style>
+    body {
+      min-height: max(884px, 100dvh);
+    }
+  </style>
+  </head>
+<body class="bg-background text-on-background font-body-md min-h-screen flex flex-col relative overflow-hidden">
+<!-- Top Navigation (Task-focused, minimal) -->
+<header class="fixed top-0 left-0 w-full z-50 flex items-center px-4 h-app_bar_height bg-transparent">
+<button class="w-10 h-10 bg-white rounded-full shadow-sm flex items-center justify-center text-on-background">
+<span class="material-symbols-outlined" data-icon="arrow_back">arrow_back</span>
+</button>
+</header>
+<!-- Map Canvas (Top 60%) -->
+<main class="flex-1 relative h-[530px]">
+<!-- Map Background -->
+<div class="absolute inset-0 bg-surface-variant bg-cover bg-center" data-alt="Stylized map view of city streets with a red route line indicating a path from a starting point to a destination pin" data-location="Riobamba" style="background-image: url('https://lh3.googleusercontent.com/aida-public/AB6AXuAK0ELZklSRPf6kVhcFew6kA99nDknwiZ3E6YBL_AmevqgmipMN50xbKLW0twus8N9mwQJW-INhwJhOjdbHQuBBMnPOQONZoxKAF8xyH1IpbWAEPJJ4o8rZaXX7J5cbSIu9b_AtmONxb6rHUa2zNvOzBmlXmLG_RfCGXxUBEUqyHPeUpt3kTTNp2ULm4vb14-5QqKV5AnEKpzgFDTtITIaQgJA6z3A2enJlDrFUzyuLrj_1OIulUMChWl70p14WcwxRnOPXNVUQS34');">
+</div>
+<!-- Status Overlay -->
+<div class="absolute top-[88px] left-1/2 transform -translate-x-1/2 z-10">
+<div class="bg-secondary text-on-secondary px-4 py-2 rounded-full font-label-lg shadow-[0_4px_12px_rgba(0,0,0,0.12)] flex items-center gap-2">
+<span class="material-symbols-outlined text-[18px]" data-icon="navigation" data-weight="fill" style="font-variation-settings: 'FILL' 1;">navigation</span>
+                EN RUTA
+            </div>
+</div>
+<!-- Fake Route Elements (Visual Only) -->
+<!-- Center Pin -->
+<div class="absolute top-1/2 left-1/2 transform -translate-x-1/2 -translate-y-1/2">
+<div class="w-8 h-8 bg-primary rounded-full flex items-center justify-center shadow-[0_4px_12px_rgba(183,19,26,0.3)]">
+<span class="material-symbols-outlined text-on-primary text-[16px]" data-icon="location_on" data-weight="fill" style="font-variation-settings: 'FILL' 1;">location_on</span>
+</div>
+</div>
+</main>
+<!-- Bottom Card (Bottom 40%) -->
+<section class="bg-white absolute bottom-0 left-0 w-full rounded-t-[24px] shadow-[0_-4px_12px_rgba(0,0,0,0.08)] z-20 flex flex-col pt-6 pb-8 px-page_padding gap-stack_lg">
+<!-- ETA & Direction -->
+<div class="flex flex-col items-center text-center">
+<h2 class="font-display-lg text-display-lg text-primary">8 min</h2>
+<p class="font-body-md text-body-md text-on-surface-variant mt-1">2.4 km · Hacia Av. Daniel León Borja</p>
+</div>
+<!-- Driver Info -->
+<div class="bg-surface p-4 rounded-[16px] shadow-sm flex items-center gap-4">
+<div class="w-12 h-12 rounded-full overflow-hidden bg-surface-variant flex-shrink-0">
+<img alt="Driver Avatar" class="w-full h-full object-cover" data-alt="Headshot of a friendly hispanic male technician in a professional uniform outdoors" src="https://lh3.googleusercontent.com/aida-public/AB6AXuBI1Mtx7taj93dkcEgWTbKn1aYXfQDoQVt-uPNMirprM8C6XImKCaOp-VJGoxryQxRFhU9lSeju8WEB9nXgu0Z_Je4-oPbycumwgugW6nLTm6wpjmYZgIx10ZNYZ8gKSh_ZmUOOShoLOkX96lHF1cdYXj_Q_ldF_r8nRqc-_jzthbUgbfdGIuYgNfXwtQO-RrBon9gN9jvQdlnn7Z3Y0tku8XDMXwxRDbyR_UZ9sro7-J-XGaelo84qZ4jbWanT6b-1l10UyVSfL3o"/>
+</div>
+<div class="flex-1">
+<h3 class="font-title-lg text-title-lg text-on-surface">Juan Pérez</h3>
+<p class="font-body-md text-body-md text-on-surface-variant">Toyota Hilux · ABC-1234</p>
+</div>
+</div>
+<!-- Actions -->
+<div class="flex gap-4 w-full">
+<button class="flex-1 flex items-center justify-center gap-2 border border-outline-variant rounded-full py-3 font-label-lg text-label-lg text-secondary bg-white hover:bg-surface-bright active:scale-95 transition-transform">
+<span class="material-symbols-outlined text-[20px]" data-icon="call">call</span>
+                Llamar
+            </button>
+<button class="flex-1 flex items-center justify-center gap-2 border border-outline-variant rounded-full py-3 font-label-lg text-label-lg text-secondary bg-white hover:bg-surface-bright active:scale-95 transition-transform">
+<span class="material-symbols-outlined text-[20px]" data-icon="chat">chat</span>
+                Chat
+            </button>
+</div>
+<!-- Main Button -->
+<button class="w-full bg-primary text-on-primary rounded-full py-4 font-label-lg text-label-lg shadow-[0_4px_12px_rgba(183,19,26,0.2)] hover:bg-surface-tint active:scale-95 transition-all flex items-center justify-center gap-2 mt-2">
+<span class="material-symbols-outlined text-[20px]" data-icon="location_on" data-weight="fill" style="font-variation-settings: 'FILL' 1;">location_on</span>
+            He llegado
+        </button>
+</section>
+</body></html>

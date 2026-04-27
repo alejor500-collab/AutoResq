@@ -1,0 +1,246 @@
+<!DOCTYPE html>
+
+<html lang="es"><head>
+<meta charset="utf-8"/>
+<meta content="width=device-width, initial-scale=1.0" name="viewport"/>
+<title>AutoResQ - Resumen de Servicio</title>
+<script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+<link href="https://fonts.googleapis.com/css2?family=Poppins:wght@400;500;600;700;900&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<script id="tailwind-config">
+        tailwind.config = {
+          darkMode: "class",
+          theme: {
+            extend: {
+              "colors": {
+                      "surface-bright": "#fff8f7",
+                      "outline-variant": "#e4beb9",
+                      "secondary": "#0060a8",
+                      "background": "#fff8f7",
+                      "secondary-fixed": "#d3e4ff",
+                      "surface-container": "#ffe9e6",
+                      "inverse-primary": "#ffb4ac",
+                      "on-secondary-fixed": "#001c38",
+                      "inverse-surface": "#3e2c2a",
+                      "on-primary-fixed-variant": "#93000d",
+                      "tertiary-fixed": "#afecff",
+                      "on-primary-container": "#fffbff",
+                      "on-secondary-container": "#003663",
+                      "outline": "#906f6c",
+                      "on-primary": "#ffffff",
+                      "surface-variant": "#fadcd8",
+                      "tertiary-fixed-dim": "#72d4ef",
+                      "on-background": "#271716",
+                      "on-tertiary-fixed-variant": "#004e5d",
+                      "primary-fixed-dim": "#ffb4ac",
+                      "tertiary-container": "#008097",
+                      "primary-container": "#db322f",
+                      "on-error": "#ffffff",
+                      "surface": "#fff8f7",
+                      "surface-container-high": "#ffe2de",
+                      "on-secondary-fixed-variant": "#004881",
+                      "on-tertiary-container": "#f9fdff",
+                      "tertiary": "#006578",
+                      "surface-container-low": "#fff0ee",
+                      "error": "#ba1a1a",
+                      "primary": "#b7131a",
+                      "surface-dim": "#f1d3d0",
+                      "error-container": "#ffdad6",
+                      "secondary-container": "#47a1ff",
+                      "on-tertiary-fixed": "#001f27",
+                      "on-secondary": "#ffffff",
+                      "on-surface-variant": "#5b403d",
+                      "on-tertiary": "#ffffff",
+                      "surface-tint": "#bb171c",
+                      "inverse-on-surface": "#ffedea",
+                      "primary-fixed": "#ffdad6",
+                      "surface-container-lowest": "#ffffff",
+                      "on-surface": "#271716",
+                      "on-primary-fixed": "#410002",
+                      "surface-container-highest": "#fadcd8",
+                      "on-error-container": "#93000a",
+                      "secondary-fixed-dim": "#a2c9ff",
+                      "success": "#10B981"
+              },
+              "borderRadius": {
+                      "DEFAULT": "0.25rem",
+                      "lg": "0.5rem",
+                      "xl": "0.75rem",
+                      "2xl": "1rem",
+                      "full": "9999px"
+              },
+              "spacing": {
+                      "gutter": "16px",
+                      "stack_sm": "8px",
+                      "page_padding": "24px",
+                      "base": "8px",
+                      "bottom_bar_height": "80px",
+                      "stack_md": "16px",
+                      "stack_lg": "24px",
+                      "app_bar_height": "64px"
+              },
+              "fontFamily": {
+                      "label-lg": [
+                              "Poppins"
+                      ],
+                      "headline-md": [
+                              "Poppins"
+                      ],
+                      "display-lg": [
+                              "Poppins"
+                      ],
+                      "title-lg": [
+                              "Poppins"
+                      ],
+                      "body-md": [
+                              "Poppins"
+                      ],
+                      "label-sm": [
+                              "Poppins"
+                      ],
+                      "body-lg": [
+                              "Poppins"
+                      ]
+              },
+              "fontSize": {
+                      "label-lg": [
+                              "14px",
+                              {
+                                      "lineHeight": "20px",
+                                      "letterSpacing": "0.1px",
+                                      "fontWeight": "600"
+                              }
+                      ],
+                      "headline-md": [
+                              "24px",
+                              {
+                                      "lineHeight": "32px",
+                                      "letterSpacing": "0px",
+                                      "fontWeight": "600"
+                              }
+                      ],
+                      "display-lg": [
+                              "32px",
+                              {
+                                      "lineHeight": "40px",
+                                      "letterSpacing": "-0.5px",
+                                      "fontWeight": "700"
+                              }
+                      ],
+                      "title-lg": [
+                              "20px",
+                              {
+                                      "lineHeight": "28px",
+                                      "letterSpacing": "0px",
+                                      "fontWeight": "600"
+                              }
+                      ],
+                      "body-md": [
+                              "14px",
+                              {
+                                      "lineHeight": "20px",
+                                      "letterSpacing": "0.25px",
+                                      "fontWeight": "400"
+                              }
+                      ],
+                      "label-sm": [
+                              "12px",
+                              {
+                                      "lineHeight": "16px",
+                                      "letterSpacing": "0.4px",
+                                      "fontWeight": "500"
+                              }
+                      ],
+                      "body-lg": [
+                              "16px",
+                              {
+                                      "lineHeight": "24px",
+                                      "letterSpacing": "0.15px",
+                                      "fontWeight": "400"
+                              }
+                      ]
+              }
+      },
+          },
+        }
+      </script>
+<style>
+    body {
+      min-height: max(884px, 100dvh);
+    }
+  </style>
+  </head>
+<body class="bg-background text-on-background font-body-md min-h-screen flex flex-col antialiased">
+<!-- Top Navigation Placeholder for completeness (Hidden per rules for transactional, but leaving canvas structure clean) -->
+<!-- The prompt implies a full screen transactional success state. We suppress top/bottom nav shell. -->
+<main class="flex-grow flex flex-col px-page_padding pt-stack_lg pb-[100px] overflow-y-auto">
+<!-- Header Section -->
+<div class="flex flex-col items-center justify-center pt-stack_lg pb-stack_lg mt-8">
+<div class="w-[80px] h-[80px] bg-green-100 rounded-full flex items-center justify-center mb-stack_md shadow-[0_4px_12px_rgba(16,185,129,0.2)]">
+<span class="material-symbols-outlined text-[48px] text-success" data-icon="check_circle" style="font-variation-settings: 'FILL' 1;">check_circle</span>
+</div>
+<h1 class="font-display-lg text-display-lg text-on-background text-center">Servicio Completado</h1>
+<p class="font-body-lg text-body-lg text-on-surface-variant text-center mt-stack_sm">Asistencia exitosa</p>
+</div>
+<!-- Summary Card -->
+<div class="bg-surface-container-lowest rounded-2xl shadow-[0_2px_8px_rgba(0,0,0,0.08)] p-stack_md flex flex-col gap-stack_md border border-surface-container-high relative overflow-hidden">
+<!-- Decorative accent -->
+<div class="absolute top-0 left-0 w-full h-1 bg-success"></div>
+<!-- Client Info -->
+<div class="flex flex-col">
+<span class="font-label-sm text-label-sm text-on-surface-variant uppercase tracking-wider mb-1">CLIENTE</span>
+<span class="font-title-lg text-title-lg text-on-background">Juan Pérez</span>
+</div>
+<div class="w-full h-px bg-surface-container-highest"></div>
+<!-- Service Details -->
+<div class="grid grid-cols-2 gap-stack_md">
+<div class="flex flex-col">
+<span class="font-label-sm text-label-sm text-on-surface-variant uppercase tracking-wider mb-1">TIPO DE FALLA</span>
+<span class="font-body-lg text-body-lg text-on-background font-medium">Mecánica · Motor</span>
+</div>
+<div class="flex flex-col">
+<span class="font-label-sm text-label-sm text-on-surface-variant uppercase tracking-wider mb-1">TIEMPO TOTAL</span>
+<span class="font-body-lg text-body-lg text-on-background font-medium">45 min</span>
+</div>
+</div>
+<div class="w-full h-px bg-surface-container-highest"></div>
+<!-- Payment -->
+<div class="flex flex-col bg-surface-container-low p-stack_sm rounded-lg border border-surface-container-high">
+<span class="font-label-sm text-label-sm text-on-surface-variant uppercase tracking-wider mb-1">MONTO ACORDADO</span>
+<span class="font-headline-md text-headline-md text-primary">$35.00</span>
+<span class="font-label-sm text-label-sm text-on-surface-variant mt-1 italic">Pago directo acordado con el cliente</span>
+</div>
+<!-- Ratings -->
+<div class="flex flex-col gap-stack_sm pt-stack_sm">
+<div class="flex justify-between items-center bg-surface-bright p-2 rounded-lg">
+<span class="font-body-md text-body-md text-on-background">Tu calificación al cliente:</span>
+<div class="flex text-primary">
+<span class="material-symbols-outlined text-[20px]" data-icon="star" style="font-variation-settings: 'FILL' 1;">star</span>
+<span class="material-symbols-outlined text-[20px]" data-icon="star" style="font-variation-settings: 'FILL' 1;">star</span>
+<span class="material-symbols-outlined text-[20px]" data-icon="star" style="font-variation-settings: 'FILL' 1;">star</span>
+<span class="material-symbols-outlined text-[20px]" data-icon="star" style="font-variation-settings: 'FILL' 1;">star</span>
+<span class="material-symbols-outlined text-[20px] text-surface-container-highest" data-icon="star">star</span>
+</div>
+</div>
+<div class="flex justify-between items-center bg-surface-bright p-2 rounded-lg">
+<span class="font-body-md text-body-md text-on-background">Calificación recibida:</span>
+<div class="flex text-primary">
+<span class="material-symbols-outlined text-[20px]" data-icon="star" style="font-variation-settings: 'FILL' 1;">star</span>
+<span class="material-symbols-outlined text-[20px]" data-icon="star" style="font-variation-settings: 'FILL' 1;">star</span>
+<span class="material-symbols-outlined text-[20px]" data-icon="star" style="font-variation-settings: 'FILL' 1;">star</span>
+<span class="material-symbols-outlined text-[20px]" data-icon="star" style="font-variation-settings: 'FILL' 1;">star</span>
+<span class="material-symbols-outlined text-[20px]" data-icon="star" style="font-variation-settings: 'FILL' 1;">star</span>
+</div>
+</div>
+</div>
+</div>
+</main>
+<!-- Bottom Action Button -->
+<div class="fixed bottom-0 left-0 w-full px-page_padding pb-stack_lg pt-stack_md bg-gradient-to-t from-background via-background to-transparent z-50">
+<button class="w-full h-[56px] bg-primary text-on-primary rounded-full font-label-lg text-label-lg shadow-[0_4px_12px_rgba(0,0,0,0.12)] flex items-center justify-center gap-2 transition-transform active:scale-95">
+<span class="material-symbols-outlined" data-icon="dashboard">dashboard</span>
+            Volver al Dashboard
+        </button>
+</div>
+</body></html>

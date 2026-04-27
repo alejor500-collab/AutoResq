@@ -40,8 +40,8 @@ abstract class Validators {
     if (value == null || value.trim().isEmpty) {
       return AppStrings.fieldRequired;
     }
-    final phoneRegex = RegExp(r'^0[0-9]{9}$');
-    if (!phoneRegex.hasMatch(value.trim())) {
+    final digits = value.trim().replaceAll(RegExp(r'\D'), '');
+    if (digits.length < 7 || digits.length > 10) {
       return AppStrings.phoneInvalid;
     }
     return null;
@@ -51,8 +51,31 @@ abstract class Validators {
     if (value == null || value.trim().isEmpty) {
       return AppStrings.fieldRequired;
     }
-    if (value.trim().length < 3) {
-      return 'El nombre debe tener al menos 3 caracteres';
+    if (value.trim().length < 2) {
+      return 'El nombre debe tener al menos 2 caracteres';
+    }
+    return null;
+  }
+
+  static String? year(String? value) {
+    if (value == null || value.trim().isEmpty) {
+      return AppStrings.fieldRequired;
+    }
+    final y = int.tryParse(value.trim());
+    if (y == null) return 'El año debe ser numérico';
+    final current = DateTime.now().year;
+    if (y < 1900 || y > current + 1) {
+      return 'Ingresa un año entre 1900 y ${current + 1}';
+    }
+    return null;
+  }
+
+  static String? plate(String? value) {
+    if (value == null || value.trim().isEmpty) {
+      return AppStrings.fieldRequired;
+    }
+    if (value.trim().length < 5) {
+      return 'La placa debe tener al menos 5 caracteres';
     }
     return null;
   }

@@ -1,0 +1,153 @@
+<!DOCTYPE html>
+
+<html lang="es"><head>
+<meta charset="utf-8"/>
+<meta content="width=device-width, initial-scale=1.0" name="viewport"/>
+<title>Calificar al cliente</title>
+<script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+<link href="https://fonts.googleapis.com/css2?family=Poppins:wght@400;500;600;700;900&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<script id="tailwind-config">
+        tailwind.config = {
+            darkMode: "class",
+            theme: {
+                extend: {
+                    "colors": {
+                        "surface-bright": "#fff8f7",
+                        "outline-variant": "#e4beb9",
+                        "secondary": "#0060a8",
+                        "background": "#fff8f7",
+                        "secondary-fixed": "#d3e4ff",
+                        "surface-container": "#ffe9e6",
+                        "inverse-primary": "#ffb4ac",
+                        "on-secondary-fixed": "#001c38",
+                        "inverse-surface": "#3e2c2a",
+                        "on-primary-fixed-variant": "#93000d",
+                        "tertiary-fixed": "#afecff",
+                        "on-primary-container": "#fffbff",
+                        "on-secondary-container": "#003663",
+                        "outline": "#906f6c",
+                        "on-primary": "#ffffff",
+                        "surface-variant": "#fadcd8",
+                        "tertiary-fixed-dim": "#72d4ef",
+                        "on-background": "#271716",
+                        "on-tertiary-fixed-variant": "#004e5d",
+                        "primary-fixed-dim": "#ffb4ac",
+                        "tertiary-container": "#008097",
+                        "primary-container": "#db322f",
+                        "on-error": "#ffffff",
+                        "surface": "#fff8f7",
+                        "surface-container-high": "#ffe2de",
+                        "on-secondary-fixed-variant": "#004881",
+                        "on-tertiary-container": "#f9fdff",
+                        "tertiary": "#006578",
+                        "surface-container-low": "#fff0ee",
+                        "error": "#ba1a1a",
+                        "primary": "#b7131a",
+                        "surface-dim": "#f1d3d0",
+                        "error-container": "#ffdad6",
+                        "secondary-container": "#47a1ff",
+                        "on-tertiary-fixed": "#001f27",
+                        "on-secondary": "#ffffff",
+                        "on-surface-variant": "#5b403d",
+                        "on-tertiary": "#ffffff",
+                        "surface-tint": "#bb171c",
+                        "inverse-on-surface": "#ffedea",
+                        "primary-fixed": "#ffdad6",
+                        "surface-container-lowest": "#ffffff",
+                        "on-surface": "#271716",
+                        "on-primary-fixed": "#410002",
+                        "surface-container-highest": "#fadcd8",
+                        "on-error-container": "#93000a",
+                        "secondary-fixed-dim": "#a2c9ff"
+                    },
+                    "borderRadius": {
+                        "DEFAULT": "0.25rem",
+                        "lg": "0.5rem",
+                        "xl": "0.75rem",
+                        "full": "9999px"
+                    },
+                    "spacing": {
+                        "gutter": "16px",
+                        "stack_sm": "8px",
+                        "page_padding": "24px",
+                        "base": "8px",
+                        "bottom_bar_height": "80px",
+                        "stack_md": "16px",
+                        "stack_lg": "24px",
+                        "app_bar_height": "64px"
+                    },
+                    "fontFamily": {
+                        "label-lg": ["Poppins"],
+                        "headline-md": ["Poppins"],
+                        "display-lg": ["Poppins"],
+                        "title-lg": ["Poppins"],
+                        "body-md": ["Poppins"],
+                        "label-sm": ["Poppins"],
+                        "body-lg": ["Poppins"]
+                    },
+                    "fontSize": {
+                        "label-lg": ["14px", { "lineHeight": "20px", "letterSpacing": "0.1px", "fontWeight": "600" }],
+                        "headline-md": ["24px", { "lineHeight": "32px", "letterSpacing": "0px", "fontWeight": "600" }],
+                        "display-lg": ["32px", { "lineHeight": "40px", "letterSpacing": "-0.5px", "fontWeight": "700" }],
+                        "title-lg": ["20px", { "lineHeight": "28px", "letterSpacing": "0px", "fontWeight": "600" }],
+                        "body-md": ["14px", { "lineHeight": "20px", "letterSpacing": "0.25px", "fontWeight": "400" }],
+                        "label-sm": ["12px", { "lineHeight": "16px", "letterSpacing": "0.4px", "fontWeight": "500" }],
+                        "body-lg": ["16px", { "lineHeight": "24px", "letterSpacing": "0.15px", "fontWeight": "400" }]
+                    }
+                }
+            }
+        }
+    </script>
+<style>
+    body {
+      min-height: max(884px, 100dvh);
+    }
+  </style>
+  </head>
+<body class="bg-background text-on-background font-body-md min-h-screen flex flex-col antialiased">
+<!-- TopAppBar -->
+<header class="fixed top-0 left-0 w-full z-50 flex items-center justify-between px-6 docked full-width top-0 h-[64px] border-b border-surface-container-high shadow-sm bg-surface-bright text-primary transition-all duration-200">
+<div class="flex items-center gap-4 w-full">
+<button aria-label="Go back" class="material-symbols-outlined text-on-surface hover:bg-surface-variant p-2 rounded-full transition-colors active:scale-95" data-icon="arrow_back">arrow_back</button>
+<h1 class="font-title-lg text-title-lg text-on-surface flex-grow text-center pr-10">Calificar al cliente</h1>
+</div>
+</header>
+<!-- Main Content Canvas -->
+<main class="flex-grow pt-[calc(64px+24px)] pb-page_padding px-page_padding flex flex-col items-center max-w-md mx-auto w-full">
+<!-- Driver Info -->
+<div class="flex flex-col items-center mb-stack_lg w-full">
+<div class="w-[72px] h-[72px] rounded-full overflow-hidden mb-stack_sm shadow-sm ring-4 ring-surface-variant">
+<img alt="Juan Pérez Profile" class="w-full h-full object-cover" data-alt="close-up portrait of a smiling middle-aged hispanic man outdoors in natural daylight, wearing a casual shirt" src="https://lh3.googleusercontent.com/aida-public/AB6AXuBzF96JTmlGM6Z0l45iFb81iJNVGR6rs8CbwkM2aBcNkaXhf7CcuM5rh54atyUhV-L1I387d3M6MOwK8hltGfLsd8HwjAPmrbcnJuu9YIEf7MyWUIxveNqrwPhKAY4ixnhVZWtvKMQTVm6C7B0NtGUmrkVEkT87VxYpzd9bCNgf86S4QBnaSusZb8oTA61CKegt3OqqCQrOiIqNQOlG1uVRRzy2RNlY1vYSArOS8MI2oVEGkYBK4cTSKhv3MMSq0qNmhr7mFuMR7Pg"/>
+</div>
+<h2 class="font-title-lg text-title-lg text-on-surface text-center">Juan Pérez</h2>
+<p class="font-body-md text-body-md text-on-surface-variant text-center mt-1 bg-surface-container px-3 py-1 rounded-full">Toyota Hilux · ABC-1234</p>
+</div>
+<!-- Rating Prompt -->
+<div class="w-full bg-surface-container-lowest rounded-xl shadow-[0_2px_8px_rgba(0,0,0,0.08)] p-page_padding flex flex-col items-center mb-stack_lg">
+<h3 class="font-title-lg text-title-lg text-on-surface text-center mb-stack_lg">¿Cómo fue la experiencia con este cliente?</h3>
+<!-- Stars -->
+<div class="flex justify-center gap-2 mb-stack_lg">
+<span class="material-symbols-outlined text-[48px] text-primary" data-icon="star" style="font-variation-settings: 'FILL' 1;">star</span>
+<span class="material-symbols-outlined text-[48px] text-primary" data-icon="star" style="font-variation-settings: 'FILL' 1;">star</span>
+<span class="material-symbols-outlined text-[48px] text-primary" data-icon="star" style="font-variation-settings: 'FILL' 1;">star</span>
+<span class="material-symbols-outlined text-[48px] text-primary" data-icon="star" style="font-variation-settings: 'FILL' 1;">star</span>
+<span class="material-symbols-outlined text-[48px] text-surface-variant" data-icon="star">star</span>
+</div>
+<!-- Comment Input -->
+<div class="w-full">
+<textarea class="w-full bg-surface text-on-surface font-body-md text-body-md rounded-[24px] border border-outline-variant focus:border-secondary focus:ring-1 focus:ring-secondary p-4 min-h-[120px] resize-none placeholder:text-on-surface-variant/60 transition-colors" placeholder="Añade un comentario..."></textarea>
+</div>
+</div>
+<!-- Actions -->
+<div class="w-full flex flex-col gap-stack_md mt-auto pt-stack_lg">
+<button class="w-full bg-primary text-on-primary font-label-lg text-label-lg rounded-full py-4 shadow-[0_4px_12px_rgba(0,0,0,0.12)] hover:bg-primary-container hover:text-on-primary-container transition-all active:scale-95 text-center">
+                Enviar calificación
+            </button>
+<button class="w-full text-on-surface-variant font-label-lg text-label-lg py-3 hover:text-on-surface transition-colors active:scale-95 text-center">
+                Omitir por ahora
+            </button>
+</div>
+</main>
+</body></html>
