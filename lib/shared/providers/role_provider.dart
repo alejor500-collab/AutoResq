@@ -24,7 +24,7 @@ final isAdminProvider = Provider<bool>((ref) {
 // Uses ref.read for initial value so the notifier is NOT re-created when auth
 // refreshes. ref.listen keeps it in sync with logout (role → null).
 class ActiveRoleNotifier extends StateNotifier<String?> {
-  ActiveRoleNotifier(String? initialRole) : super(initialRole);
+  ActiveRoleNotifier(super.initialRole);
 
   void updateFromAuth(String? role) => state = role;
   void switchTo(String role) => state = role;

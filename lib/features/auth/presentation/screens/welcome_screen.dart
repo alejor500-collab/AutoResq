@@ -68,7 +68,6 @@ class WelcomeScreen extends ConsumerWidget {
               ),
             ),
           ),
-
           SafeArea(
             child: Padding(
               padding: const EdgeInsets.symmetric(horizontal: 24),
@@ -92,7 +91,8 @@ class WelcomeScreen extends ConsumerWidget {
                             ),
                           ],
                         ),
-                        child: const Icon(Icons.car_repair, size: 48, color: Colors.white),
+                        child: const Icon(Icons.car_repair,
+                            size: 48, color: Colors.white),
                       ),
                       const SizedBox(height: 24),
                       const Text(
@@ -121,12 +121,16 @@ class WelcomeScreen extends ConsumerWidget {
                   const Spacer(flex: 3),
 
                   // Feature chips
-                  Row(
+                  const Row(
                     mainAxisAlignment: MainAxisAlignment.center,
                     children: [
-                      _FeatureChip(icon: Icons.location_on, label: 'Riobamba & Chimborazo'),
-                      const SizedBox(width: 10),
-                      _FeatureChip(icon: Icons.verified_user, label: 'Técnicos verificados'),
+                      _FeatureChip(
+                          icon: Icons.location_on,
+                          label: 'Cobertura nacional'),
+                      SizedBox(width: 10),
+                      _FeatureChip(
+                          icon: Icons.verified_user,
+                          label: 'Técnicos verificados'),
                     ],
                   ),
                   const SizedBox(height: 36),
@@ -134,19 +138,24 @@ class WelcomeScreen extends ConsumerWidget {
                   // CTA buttons
                   AppButton(
                     label: 'Ingresar',
-                    onPressed: isLoading ? null : () => context.push(AppRoutes.login),
+                    onPressed:
+                        isLoading ? null : () => context.push(AppRoutes.login),
                     isLoading: false,
-                    suffixIcon: const Icon(Icons.arrow_forward, color: Colors.white, size: 20),
+                    suffixIcon: const Icon(Icons.arrow_forward,
+                        color: Colors.white, size: 20),
                   ),
                   const SizedBox(height: 12),
                   _GoogleButton(
-                    onPressed: isLoading ? null : () => _loginWithGoogle(context, ref),
+                    onPressed:
+                        isLoading ? null : () => _loginWithGoogle(context, ref),
                     isLoading: isLoading,
                   ),
                   const SizedBox(height: 12),
                   AppButton(
                     label: 'Registrarse',
-                    onPressed: isLoading ? null : () => context.push(AppRoutes.roleSelect),
+                    onPressed: isLoading
+                        ? null
+                        : () => context.push(AppRoutes.roleSelect),
                     isLoading: false,
                     variant: AppButtonVariant.outline,
                   ),
@@ -275,7 +284,8 @@ class _GoogleLogoPainter extends CustomPainter {
       ..strokeWidth = strokeWidth
       ..strokeCap = StrokeCap.round;
 
-    final rect = Rect.fromCircle(center: Offset.zero, radius: radius - strokeWidth / 2);
+    final rect =
+        Rect.fromCircle(center: Offset.zero, radius: radius - strokeWidth / 2);
 
     canvas.save();
     canvas.translate(center.dx, center.dy);
@@ -296,7 +306,8 @@ class _GoogleLogoPainter extends CustomPainter {
       ..color = const Color(0xFF4285F4)
       ..strokeWidth = strokeWidth
       ..strokeCap = StrokeCap.round;
-    canvas.drawLine(Offset.zero, Offset(radius - strokeWidth / 2, 0), linePaint);
+    canvas.drawLine(
+        Offset.zero, Offset(radius - strokeWidth / 2, 0), linePaint);
 
     canvas.restore();
   }

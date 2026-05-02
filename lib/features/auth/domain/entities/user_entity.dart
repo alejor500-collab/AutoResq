@@ -1,11 +1,12 @@
 import 'package:equatable/equatable.dart';
+import '../../../../core/constants/app_constants.dart';
 
 class AppUser extends Equatable {
   final String id;
   final String email;
   final String name;
   final String phone;
-  final String role; // conductor | tecnico | admin
+  final String role; // conductor | tecnico | administrador
   final String? avatarUrl;
   final double rating;
   final int totalServices;
@@ -15,6 +16,8 @@ class AppUser extends Equatable {
   final double? lat;
   final double? lng;
   final DateTime createdAt;
+  final String? verificationStatus; // solo técnicos: pendiente | aprobado | rechazado
+  final String? rejectionReason;    // solo técnicos rechazados
 
   const AppUser({
     required this.id,
@@ -31,11 +34,13 @@ class AppUser extends Equatable {
     this.lat,
     this.lng,
     required this.createdAt,
+    this.verificationStatus,
+    this.rejectionReason,
   });
 
   bool get isDriver => role == 'conductor';
   bool get isTechnician => role == 'tecnico';
-  bool get isAdmin => role == 'admin';
+  bool get isAdmin => role == AppConstants.roleAdmin;
 
   AppUser copyWith({
     String? id,
@@ -52,6 +57,8 @@ class AppUser extends Equatable {
     double? lat,
     double? lng,
     DateTime? createdAt,
+    String? verificationStatus,
+    String? rejectionReason,
   }) {
     return AppUser(
       id: id ?? this.id,
@@ -68,6 +75,8 @@ class AppUser extends Equatable {
       lat: lat ?? this.lat,
       lng: lng ?? this.lng,
       createdAt: createdAt ?? this.createdAt,
+      verificationStatus: verificationStatus ?? this.verificationStatus,
+      rejectionReason: rejectionReason ?? this.rejectionReason,
     );
   }
 
@@ -76,5 +85,6 @@ class AppUser extends Equatable {
         id, email, name, phone, role, avatarUrl,
         rating, totalServices, isAvailable, isApproved,
         specialty, lat, lng, createdAt,
+        verificationStatus, rejectionReason,
       ];
 }

@@ -14,7 +14,15 @@
       "Bash(dart analyze *)",
       "WebSearch",
       "WebFetch(domain:stitch.withgoogle.com)",
-      "WebFetch(domain:github.com)"
+      "WebFetch(domain:github.com)",
+      "mcp__stitch__get_screen",
+      "WebFetch(domain:contribution.usercontent.google.com)",
+      "Bash(rg \"rejectTechnician|_RejectSheet|motivo|observaciones|estado_verificacion|rechazado|tableTecnicos\" --include=\"*.dart\" -n)",
+      "Bash(New-Item -ItemType Directory -Force -Path \"C:\\\\src\\\\Proyect\\\\AutoResQ\\\\supabase\\\\functions\\\\send-rejection-email\")",
+      "Bash(Out-Null)",
+      "Bash(Write-Output \"dir created\")",
+      "PowerShell(New-Item *)",
+      "Bash(findstr /V \"withOpacity\\\\|use_build_context\")"
     ]
   }
 }

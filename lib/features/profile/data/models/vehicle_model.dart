@@ -1,13 +1,17 @@
 import 'dart:convert';
 
 class VehicleModel {
-  final String brand;   // Toyota
-  final String model;   // Hilux
-  final String year;    // 2022
-  final String plate;   // ABC-1234
-  final String color;   // Blanco
+  final String? id;
+  final String? userId;
+  final String brand;
+  final String model;
+  final String year;
+  final String plate;
+  final String color;
 
   const VehicleModel({
+    this.id,
+    this.userId,
     required this.brand,
     required this.model,
     required this.year,
@@ -19,6 +23,8 @@ class VehicleModel {
   String get displaySub => '$plate • $color';
 
   Map<String, dynamic> toJson() => {
+        if (id != null) 'id': id,
+        if (userId != null) 'usuario_id': userId,
         'brand': brand,
         'model': model,
         'year': year,
@@ -27,10 +33,16 @@ class VehicleModel {
       };
 
   factory VehicleModel.fromJson(Map<String, dynamic> j) => VehicleModel(
-        brand: j['brand'] ?? '',
-        model: j['model'] ?? '',
-        year: j['year'] ?? '',
-        plate: j['plate'] ?? '',
+        id: j['id'] as String?,
+        userId: j['usuario_id'] as String?,
+        brand: j['brand'] ?? j['marca'] ?? '',
+        model: j['model'] ?? j['modelo'] ?? '',
+        year: (j['anio'] is int
+                ? (j['anio'] as int).toString()
+                : j['anio']?.toString()) ??
+            j['year']?.toString() ??
+            '',
+        plate: j['plate'] ?? j['placa'] ?? '',
         color: j['color'] ?? '',
       );
 
@@ -46,6 +58,8 @@ class VehicleModel {
   }
 
   VehicleModel copyWith({
+    String? id,
+    String? userId,
     String? brand,
     String? model,
     String? year,
@@ -53,6 +67,8 @@ class VehicleModel {
     String? color,
   }) =>
       VehicleModel(
+        id: id ?? this.id,
+        userId: userId ?? this.userId,
         brand: brand ?? this.brand,
         model: model ?? this.model,
         year: year ?? this.year,

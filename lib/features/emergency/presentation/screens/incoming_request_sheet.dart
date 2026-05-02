@@ -151,8 +151,8 @@ class _IncomingRequestSheetState extends ConsumerState<IncomingRequestSheet> {
                         child: Column(
                           crossAxisAlignment: CrossAxisAlignment.start,
                           children: [
-                            Row(
-                              children: const [
+                            const Row(
+                              children: [
                                 Icon(
                                   Icons.auto_awesome_rounded,
                                   size: 13,
@@ -254,7 +254,7 @@ class _IncomingRequestSheetState extends ConsumerState<IncomingRequestSheet> {
                           const Gap(6),
                           Expanded(
                             child: Text(
-                              emergency.direccion ?? 'Riobamba, Ecuador',
+                              emergency.direccion ?? 'Ecuador',
                               style: const TextStyle(
                                 fontSize: 13,
                                 color: AppColors.textSecondary,

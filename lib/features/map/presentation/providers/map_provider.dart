@@ -85,13 +85,13 @@ class MapNotifier extends StateNotifier<MapState> {
         ),
       );
     } catch (e) {
-      // Fallback to Riobamba center
+      // Fallback to Ecuador center
       state = state.copyWith(
         isLoading: false,
         currentLocation: const LocationEntity(
           lat: AppConstants.defaultLat,
           lng: AppConstants.defaultLng,
-          address: 'Riobamba, Chimborazo, Ecuador',
+          address: 'Ecuador',
         ),
       );
     }

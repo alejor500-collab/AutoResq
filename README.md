@@ -1,12 +1,12 @@
 # AutoResQ
 
-> Asistencia en emergencias automotrices — Riobamba, Ecuador
+> Asistencia en emergencias automotrices — Ecuador
 
 ---
 
 ## Descripción
 
-AutoResQ es una aplicación móvil Flutter que conecta conductores con problemas vehiculares con técnicos automotrices en Riobamba, Ecuador. Incluye análisis de emergencias con IA, mapa en tiempo real, chat entre conductor y técnico, y sistema de calificaciones.
+AutoResQ es una aplicación móvil Flutter que conecta conductores con problemas vehiculares con técnicos automotrices en Ecuador. Incluye análisis de emergencias con IA, mapa en tiempo real, chat entre conductor y técnico, y sistema de calificaciones.
 
 ---
 
@@ -66,48 +66,53 @@ lib/
 
 ---
 
-## Pantallas (21)
+## Pantallas (26)
 
-### Auth
+### Auth / Onboarding
 | # | Pantalla | Ruta |
 |---|----------|------|
 | 1 | SplashScreen | `/` |
-| 2 | LoginScreen | `/login` |
-| 3 | RegisterScreen | `/register` |
-| 4 | ForgotPasswordScreen | `/forgot-password` |
+| 2 | WelcomeScreen | `/welcome` |
+| 3 | LoginScreen | `/login` |
+| 4 | RegisterScreen | `/register` |
+| 5 | RoleSelectionScreen | `/role-select` |
+| 6 | ForgotPasswordScreen | `/forgot-password` |
+| 7 | PendingApprovalScreen | `/technician/pending` |
 
 ### Conductor
 | # | Pantalla | Ruta |
 |---|----------|------|
-| 5 | DriverHomeScreen | `/driver/home` |
-| 6 | CreateEmergencyScreen | `/driver/emergency/create` |
-| 7 | EmergencyStatusScreen | `/driver/emergency/status` |
-| 8 | DriverChatScreen | `/driver/chat` |
-| 9 | RateServiceScreen | `/driver/rate-service` |
+| 8 | DriverHomeScreen | `/driver/home` |
+| 9 | CreateEmergencyScreen | `/driver/emergency/create` |
+| 10 | EmergencyStatusScreen | `/driver/emergency/status` |
+| 11 | DriverChatScreen | `/driver/chat` |
+| 12 | RateServiceScreen | `/driver/rate-service` |
 
 ### Técnico
 | # | Pantalla | Ruta |
 |---|----------|------|
-| 10 | TechnicianHomeScreen | `/technician/home` |
-| 11 | IncomingRequestSheet | bottom sheet |
-| 12 | ActiveServiceScreen | `/technician/active-service` |
-| 13 | TechnicianChatScreen | `/technician/chat` |
-| 14 | RateDriverScreen | `/technician/rate-driver` |
+| 13 | TechnicianHomeScreen | `/technician/home` |
+| 14 | IncomingRequestSheet | bottom sheet |
+| 15 | ActiveServiceScreen | `/technician/active-service` |
+| 16 | ServiceClosureScreen | `/technician/service-closure` |
+| 17 | RateDriverScreen | `/technician/rate-driver` |
+| 18 | ServiceCompletedScreen | `/technician/service-completed` |
+| 19 | TechnicianChatScreen | `/technician/chat` |
 
 ### Compartidas
 | # | Pantalla | Ruta |
 |---|----------|------|
-| 15 | ProfileScreen | `/profile` |
-| 16 | EditProfileScreen | `/profile/edit` |
-| 17 | EmergencyHistoryScreen | `/history` |
+| 20 | ProfileScreen | `/profile` |
+| 21 | EditProfileScreen | `/profile/edit` |
+| 22 | EmergencyHistoryScreen | `/history` |
 
 ### Admin
 | # | Pantalla | Ruta |
 |---|----------|------|
-| 18 | AdminDashboardScreen | `/admin` |
-| 19 | UserManagementScreen | `/admin/users` |
-| 20 | TechnicianValidationScreen | `/admin/validate` |
-| 21 | EmergencyMonitorScreen | `/admin/monitor` |
+| 23 | AdminDashboardScreen | `/admin` |
+| 24 | UserManagementScreen | `/admin/users` |
+| 25 | TechnicianValidationScreen | `/admin/validate` |
+| 26 | EmergencyMonitorScreen | `/admin/monitor` |
 
 ---
 
@@ -128,113 +133,35 @@ static const String openAiApiKey = 'sk-...';
 
 ## Configuración de Supabase
 
-### 1. Crear tablas
+El schema completo y actualizado se encuentra en **`supabase/schema.sql`**. Ejecútalo en el editor SQL de tu proyecto Supabase.
 
-Ejecuta este SQL en el editor de Supabase:
+### Tablas (11)
 
-```sql
--- Perfiles de usuario
-create table profiles (
-  id uuid references auth.users primary key,
-  email text,
-  name text,
-  phone text,
-  role text default 'conductor',   -- conductor | tecnico | admin
-  avatar_url text,
-  rating float default 0,
-  total_services int default 0,
-  is_available boolean default false,
-  is_approved boolean default true,
-  specialty text,
-  lat float,
-  lng float,
-  created_at timestamptz default now()
-);
+| Tabla | Descripción |
+|-------|-------------|
+| `usuarios` | Perfil de usuarios (conductor / tecnico / admin) |
+| `vehiculos` | Vehículos registrados por conductores |
+| `tipos_problema` | Catálogo de tipos de emergencia |
+| `tecnicos` | Datos de técnicos (especialidad, verificación, disponibilidad) |
+| `emergencias` | Solicitudes de asistencia |
+| `ubicaciones` | Ubicación de la emergencia |
+| `asignaciones` | Asignación técnico ↔ emergencia |
+| `mensajes` | Chat en tiempo real |
+| `calificaciones` | Calificaciones cruzadas conductor ↔ técnico |
+| `historial` | Log de cambios de estado |
+| `notificaciones` | Notificaciones internas por evento |
 
--- Emergencias
-create table emergencies (
-  id uuid primary key default gen_random_uuid(),
-  driver_id uuid references profiles(id),
-  driver_name text,
-  driver_rating float default 0,
-  technician_id uuid references profiles(id),
-  technician_name text,
-  technician_phone text,
-  technician_lat float,
-  technician_lng float,
-  description text not null,
-  status text default 'pendiente',
-  tech_status text,
-  lat float not null,
-  lng float not null,
-  address text,
-  ai_analysis jsonb,
-  created_at timestamptz default now(),
-  updated_at timestamptz
-);
+### Realtime habilitado en
 
--- Mensajes de chat
-create table messages (
-  id uuid primary key default gen_random_uuid(),
-  emergency_id uuid references emergencies(id) on delete cascade,
-  sender_id uuid references profiles(id),
-  sender_name text,
-  content text not null,
-  is_read boolean default false,
-  created_at timestamptz default now()
-);
+`emergencias`, `asignaciones`, `mensajes`, `notificaciones`, `tecnicos`, `ubicaciones_tecnico`
 
--- Calificaciones
-create table ratings (
-  id uuid primary key default gen_random_uuid(),
-  emergency_id uuid references emergencies(id),
-  rater_id uuid references profiles(id),
-  rated_id uuid references profiles(id),
-  stars int check (stars >= 1 and stars <= 5),
-  review text,
-  created_at timestamptz default now()
-);
-```
+### Trigger de onboarding
 
-### 2. Row Level Security (RLS)
+`on_auth_user_created` → `crear_perfil_usuario()`: crea fila en `usuarios` automáticamente al registrarse.
 
-```sql
--- Habilitar RLS
-alter table profiles enable row level security;
-alter table emergencies enable row level security;
-alter table messages enable row level security;
-alter table ratings enable row level security;
+### RLS
 
--- Políticas básicas (ajustar según necesidad)
-create policy "profiles_public" on profiles for select using (true);
-create policy "profiles_own" on profiles for update using (auth.uid() = id);
-create policy "emergencies_all" on emergencies for all using (true);
-create policy "messages_all" on messages for all using (true);
-create policy "ratings_all" on ratings for all using (true);
-```
-
-### 3. Trigger para crear perfil al registrarse
-
-```sql
-create or replace function handle_new_user()
-returns trigger as $$
-begin
-  insert into public.profiles (id, email, name, phone, role)
-  values (
-    new.id,
-    new.email,
-    new.raw_user_meta_data->>'name',
-    new.raw_user_meta_data->>'phone',
-    coalesce(new.raw_user_meta_data->>'role', 'conductor')
-  );
-  return new;
-end;
-$$ language plpgsql security definer;
-
-create trigger on_auth_user_created
-  after insert on auth.users
-  for each row execute procedure handle_new_user();
-```
+Activo en todas las tablas con políticas granulares por rol (`conductor` / `tecnico` / `administrador` / `service_role`). Ver detalle en `supabase/schema.sql`.
 
 ---
 
@@ -292,4 +219,4 @@ flutter run
 
 ## Licencia
 
-MIT — Proyecto académico / comercial para Riobamba, Ecuador.
+MIT — Proyecto académico / comercial para Ecuador.

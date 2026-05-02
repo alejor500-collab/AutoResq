@@ -1,5 +1,4 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:supabase_flutter/supabase_flutter.dart';
 import '../../../../core/network/dio_client.dart';
 import '../../../../shared/providers/auth_provider.dart';
 import '../../data/datasources/emergency_remote_datasource.dart';
@@ -7,10 +6,8 @@ import '../../data/models/emergency_model.dart';
 import '../../domain/entities/emergency_entity.dart';
 
 // ─── Data Source ──────────────────────────────────────────────────────────────
-final emergencyDataSourceProvider =
-    Provider<EmergencyRemoteDataSource>((ref) {
-  return EmergencyRemoteDataSourceImpl(
-      ref.read(supabaseClientProvider));
+final emergencyDataSourceProvider = Provider<EmergencyRemoteDataSource>((ref) {
+  return EmergencyRemoteDataSourceImpl(ref.read(supabaseClientProvider));
 });
 
 // ─── DioClient ────────────────────────────────────────────────────────────────
@@ -205,12 +202,9 @@ final watchEmergencyProvider =
 });
 
 // ─── Watch Pending Emergencies (Realtime) ─────────────────────────────────────
-final watchPendingProvider =
-    StreamProvider<List<Emergency>>((ref) {
+final watchPendingProvider = StreamProvider<List<Emergency>>((ref) {
   final ds = ref.read(emergencyDataSourceProvider);
   return ds.watchPendingEmergencies().map(
-    (rows) => rows
-        .map((json) => EmergencyModel.fromJson(json))
-        .toList(),
-  );
+        (rows) => rows.map((json) => EmergencyModel.fromJson(json)).toList(),
+      );
 });

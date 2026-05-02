@@ -16,6 +16,8 @@ class UserModel extends AppUser {
     super.lat,
     super.lng,
     required super.createdAt,
+    super.verificationStatus,
+    super.rejectionReason,
   });
 
   factory UserModel.fromJson(Map<String, dynamic> json) {
@@ -36,6 +38,8 @@ class UserModel extends AppUser {
       createdAt: json['created_at'] != null
           ? DateTime.parse(json['created_at'] as String)
           : DateTime.now(),
+      verificationStatus: json['verification_status'] as String?,
+      rejectionReason: json['rejection_reason'] as String?,
     );
   }
 
@@ -55,6 +59,8 @@ class UserModel extends AppUser {
       'lat': lat,
       'lng': lng,
       'created_at': createdAt.toIso8601String(),
+      'verification_status': verificationStatus,
+      'rejection_reason': rejectionReason,
     };
   }
 
@@ -74,6 +80,8 @@ class UserModel extends AppUser {
       lat: entity.lat,
       lng: entity.lng,
       createdAt: entity.createdAt,
+      verificationStatus: entity.verificationStatus,
+      rejectionReason: entity.rejectionReason,
     );
   }
 }

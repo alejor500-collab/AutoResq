@@ -7,6 +7,8 @@ import '../../features/auth/presentation/screens/login_screen.dart';
 import '../../features/auth/presentation/screens/register_screen.dart';
 import '../../features/auth/presentation/screens/role_selection_screen.dart';
 import '../../features/auth/presentation/screens/forgot_password_screen.dart';
+import '../../features/auth/presentation/screens/reset_password_screen.dart';
+import '../../features/auth/presentation/screens/pending_approval_screen.dart';
 import '../../features/emergency/presentation/screens/driver_home_screen.dart';
 import '../../features/emergency/presentation/screens/create_emergency_screen.dart';
 import '../../features/emergency/presentation/screens/emergency_status_screen.dart';
@@ -27,7 +29,6 @@ import '../../features/admin/presentation/screens/user_management_screen.dart';
 import '../../features/admin/presentation/screens/technician_validation_screen.dart';
 import '../../features/admin/presentation/screens/emergency_monitor_screen.dart';
 import '../../shared/providers/auth_provider.dart';
-import '../../core/constants/app_constants.dart';
 
 abstract class AppRoutes {
   static const String splash = '/';
@@ -35,6 +36,7 @@ abstract class AppRoutes {
   static const String login = '/login';
   static const String register = '/register';
   static const String forgotPassword = '/forgot-password';
+  static const String resetPassword = '/reset-password';
   static const String roleSelect = '/role-select';
 
   // Driver
@@ -46,6 +48,7 @@ abstract class AppRoutes {
 
   // Technician
   static const String technicianHome = '/technician/home';
+  static const String technicianPending = '/technician/pending';
   static const String activeService = '/technician/active-service';
   static const String technicianChat = '/technician/chat';
   static const String rateDriver = '/technician/rate-driver';
@@ -67,23 +70,46 @@ abstract class AppRoutes {
 
 final appRouterProvider = Provider<GoRouter>((ref) {
   final authState = ref.watch(authStateProvider);
+  final isRecovery = ref.watch(passwordRecoveryProvider).value == true;
 
   return GoRouter(
     initialLocation: AppRoutes.splash,
     redirect: (context, state) {
-      final isLoggedIn = authState.value != null;
-      final isSplash = state.matchedLocation == AppRoutes.splash;
+      final user = authState.value;
+      final isLoggedIn = user != null;
+      final path = state.matchedLocation;
+      final isSplash = path == AppRoutes.splash;
+      final isResetRoute = path == AppRoutes.resetPassword;
       final isAuthRoute = [
         AppRoutes.welcome,
         AppRoutes.login,
         AppRoutes.register,
         AppRoutes.forgotPassword,
         AppRoutes.roleSelect,
-      ].contains(state.matchedLocation);
+      ].contains(path);
 
       if (isSplash) return null;
+
+      // Password recovery deep link: go to reset screen regardless of other state
+      if (isRecovery && !isResetRoute) return AppRoutes.resetPassword;
+
+      // Reset-password route: allowed when a session exists (recovery grants one)
+      if (isResetRoute) return isLoggedIn ? null : AppRoutes.welcome;
+
       if (!isLoggedIn && !isAuthRoute) return AppRoutes.welcome;
 
+      // Técnico pendiente: bloqueado en pantalla de espera hasta ser aprobado
+      if (isLoggedIn && user.isTechnician && !user.isApproved) {
+        return path == AppRoutes.technicianPending
+            ? null
+            : AppRoutes.technicianPending;
+      }
+
+      if (isLoggedIn && isAuthRoute) {
+        if (user.isAdmin) return AppRoutes.adminDashboard;
+        if (user.isTechnician) return AppRoutes.technicianHome;
+        return AppRoutes.driverHome;
+      }
       return null;
     },
     routes: [
@@ -113,6 +139,10 @@ final appRouterProvider = Provider<GoRouter>((ref) {
       GoRoute(
         path: AppRoutes.forgotPassword,
         builder: (context, state) => const ForgotPasswordScreen(),
+      ),
+      GoRoute(
+        path: AppRoutes.resetPassword,
+        builder: (context, state) => const ResetPasswordScreen(),
       ),
 
       // ─── Driver ────────────────────────────────────────────────────────
@@ -151,6 +181,10 @@ final appRouterProvider = Provider<GoRouter>((ref) {
       ),
 
       // ─── Technician ────────────────────────────────────────────────────
+      GoRoute(
+        path: AppRoutes.technicianPending,
+        builder: (context, state) => const PendingApprovalScreen(),
+      ),
       GoRoute(
         path: AppRoutes.technicianHome,
         builder: (context, state) => const TechnicianHomeScreen(),
@@ -238,4 +272,3 @@ final appRouterProvider = Provider<GoRouter>((ref) {
     ),
   );
 });
-

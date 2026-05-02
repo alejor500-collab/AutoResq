@@ -44,6 +44,9 @@ abstract class Validators {
     if (digits.length < 7 || digits.length > 10) {
       return AppStrings.phoneInvalid;
     }
+    if (digits.length == 10 && !digits.startsWith('0')) {
+      return 'El teléfono debe empezar con 0 (ej: 0991234567)';
+    }
     return null;
   }
 
@@ -53,6 +56,10 @@ abstract class Validators {
     }
     if (value.trim().length < 2) {
       return 'El nombre debe tener al menos 2 caracteres';
+    }
+    final nameRegex = RegExp(r'^[a-zA-ZáéíóúÁÉÍÓÚñÑüÜ\s]+$');
+    if (!nameRegex.hasMatch(value.trim())) {
+      return 'El nombre solo puede contener letras y espacios';
     }
     return null;
   }

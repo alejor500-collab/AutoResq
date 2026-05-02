@@ -7,9 +7,12 @@ import '../../../../core/constants/app_colors.dart';
 import '../../../../core/constants/app_constants.dart';
 import '../../../../core/router/app_router.dart';
 import '../../../../core/utils/helpers.dart';
+import '../../../../features/auth/domain/entities/user_entity.dart';
 import '../../../../shared/providers/auth_provider.dart';
 import '../../../../shared/providers/role_provider.dart';
+import '../../../../shared/providers/tecnico_status_provider.dart';
 import '../../../../shared/widgets/bottom_nav_bar.dart';
+import '../../../../shared/widgets/technician_request_sheet.dart';
 import '../providers/vehicle_provider.dart';
 
 class ProfileScreen extends ConsumerWidget {
@@ -23,8 +26,8 @@ class ProfileScreen extends ConsumerWidget {
 
     if (user == null) {
       return const Scaffold(
-        body: Center(
-            child: CircularProgressIndicator(color: AppColors.primary)),
+        body:
+            Center(child: CircularProgressIndicator(color: AppColors.primary)),
       );
     }
 
@@ -42,8 +45,8 @@ class ProfileScreen extends ConsumerWidget {
                 filter: ImageFilter.blur(sigmaX: 20, sigmaY: 20),
                 child: Container(
                   height: 64 + MediaQuery.of(context).padding.top,
-                  padding: EdgeInsets.only(
-                      top: MediaQuery.of(context).padding.top),
+                  padding:
+                      EdgeInsets.only(top: MediaQuery.of(context).padding.top),
                   decoration: BoxDecoration(
                     color: Colors.white.withOpacity(0.8),
                     boxShadow: [
@@ -123,15 +126,11 @@ class ProfileScreen extends ConsumerWidget {
                   const Gap(32),
 
                   // Vehicle Section
-                  _VehicleSection(),
+                  const _VehicleSection(),
                   const Gap(32),
 
                   // Account Settings
-                  _AccountSettings(
-                    user: user,
-                    activeRole: activeRole,
-                    ref: ref,
-                  ),
+                  _AccountSettings(user: user),
                   const Gap(24),
 
                   // Logout
@@ -139,17 +138,15 @@ class ProfileScreen extends ConsumerWidget {
                     onTap: () async {
                       final confirmed = await _confirmLogout(context);
                       if (confirmed == true && context.mounted) {
-                        await ref
-                            .read(authNotifierProvider.notifier)
-                            .logout();
+                        await ref.read(authNotifierProvider.notifier).logout();
                         context.go(AppRoutes.login);
                       }
                     },
-                    child: Padding(
-                      padding: const EdgeInsets.symmetric(vertical: 20),
+                    child: const Padding(
+                      padding: EdgeInsets.symmetric(vertical: 20),
                       child: Row(
                         mainAxisAlignment: MainAxisAlignment.center,
-                        children: const [
+                        children: [
                           Icon(Icons.logout,
                               color: AppColors.secondary, size: 20),
                           Gap(12),
@@ -199,8 +196,7 @@ class ProfileScreen extends ConsumerWidget {
       context: context,
       builder: (ctx) => AlertDialog(
         title: const Text('Cerrar sesion'),
-        content:
-            const Text('\u00bfEstas seguro que deseas cerrar sesion?'),
+        content: const Text('\u00bfEstas seguro que deseas cerrar sesion?'),
         shape: RoundedRectangleBorder(
           borderRadius: BorderRadius.circular(24),
         ),
@@ -244,7 +240,7 @@ class _ProfileHero extends StatelessWidget {
               padding: const EdgeInsets.all(4),
               decoration: BoxDecoration(
                 shape: BoxShape.circle,
-                gradient: LinearGradient(
+                gradient: const LinearGradient(
                   begin: Alignment.topRight,
                   end: Alignment.bottomLeft,
                   colors: [AppColors.primary, AppColors.tertiary],
@@ -293,8 +289,7 @@ class _ProfileHero extends StatelessWidget {
                       ),
                     ],
                   ),
-                  child: const Icon(Icons.edit,
-                      size: 16, color: Colors.white),
+                  child: const Icon(Icons.edit, size: 16, color: Colors.white),
                 ),
               ),
             ),
@@ -312,8 +307,7 @@ class _ProfileHero extends StatelessWidget {
         ),
         const Gap(8),
         Container(
-          padding:
-              const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
+          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
           decoration: BoxDecoration(
             color: AppColors.primaryFixed,
             borderRadius: BorderRadius.circular(9999),
@@ -354,7 +348,7 @@ class _StatsGrid extends StatelessWidget {
             ),
             child: Column(
               children: [
-                Text(
+                const Text(
                   'Total',
                   style: TextStyle(
                     fontSize: 11,
@@ -387,7 +381,7 @@ class _StatsGrid extends StatelessWidget {
             ),
             child: Column(
               children: [
-                Text(
+                const Text(
                   'Completos',
                   style: TextStyle(
                     fontSize: 11,
@@ -416,7 +410,7 @@ class _StatsGrid extends StatelessWidget {
               color: AppColors.primaryFixed,
               borderRadius: BorderRadius.circular(16),
             ),
-            child: Column(
+            child: const Column(
               children: [
                 Text(
                   'Pendientes',
@@ -426,8 +420,8 @@ class _StatsGrid extends StatelessWidget {
                     letterSpacing: -0.3,
                   ),
                 ),
-                const Gap(4),
-                const Text(
+                Gap(4),
+                Text(
                   '4',
                   style: TextStyle(
                     fontSize: 24,
@@ -460,7 +454,7 @@ class _VehicleSection extends ConsumerWidget {
           child: Row(
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
-              Text(
+              const Text(
                 'MI VEHÍCULO',
                 style: TextStyle(
                   fontSize: 12,
@@ -521,10 +515,10 @@ class _VehicleSection extends ConsumerWidget {
                         size: 28, color: AppColors.primary),
                   ),
                   const Gap(14),
-                  Expanded(
+                  const Expanded(
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
-                      children: const [
+                      children: [
                         Text(
                           'Sin vehículo registrado',
                           style: TextStyle(
@@ -620,24 +614,18 @@ class _VehicleSection extends ConsumerWidget {
 
 // ─── Account Settings ─────────────────────────────────────────────────────────
 
-class _AccountSettings extends StatelessWidget {
-  final dynamic user;
-  final String? activeRole;
-  final WidgetRef ref;
+class _AccountSettings extends ConsumerWidget {
+  final AppUser user;
 
-  const _AccountSettings({
-    required this.user,
-    this.activeRole,
-    required this.ref,
-  });
+  const _AccountSettings({required this.user});
 
   @override
-  Widget build(BuildContext context) {
+  Widget build(BuildContext context, WidgetRef ref) {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        Padding(
-          padding: const EdgeInsets.symmetric(horizontal: 8),
+        const Padding(
+          padding: EdgeInsets.symmetric(horizontal: 8),
           child: Text(
             'AJUSTES DE CUENTA',
             style: TextStyle(
@@ -650,51 +638,11 @@ class _AccountSettings extends StatelessWidget {
         ),
         const Gap(12),
 
-        // Role switch (prominent)
-        if (user.role != AppConstants.roleAdmin)
-          _SettingsItem(
-            icon: Icons.engineering,
-            label: 'Cambiar a modo Tecnico',
-            trailing: Icons.sync_alt,
-            isProminent: true,
-            onTap: () {
-              final newRole =
-                  (activeRole ?? user.role) == AppConstants.roleDriver
-                      ? AppConstants.roleTechnician
-                      : AppConstants.roleDriver;
-              if (newRole == AppConstants.roleTechnician) {
-                final hasSpecialty =
-                    user.specialty != null && user.specialty!.isNotEmpty;
-                if (!hasSpecialty) {
-                  ScaffoldMessenger.of(context).showSnackBar(
-                    const SnackBar(
-                      content: Text(
-                        'Completa tu perfil técnico antes de activar este modo.',
-                      ),
-                    ),
-                  );
-                  return;
-                }
-                if (user.isApproved != true) {
-                  ScaffoldMessenger.of(context).showSnackBar(
-                    const SnackBar(
-                      content: Text(
-                        'Tu perfil técnico está pendiente de aprobación.',
-                      ),
-                    ),
-                  );
-                  return;
-                }
-              }
-              ref.read(activeRoleProvider.notifier).switchTo(newRole);
-              if (newRole == AppConstants.roleDriver) {
-                context.go(AppRoutes.driverHome);
-              } else {
-                context.go(AppRoutes.technicianHome);
-              }
-            },
-          ),
-        const Gap(8),
+        // Role switch — usa tecnicoStatusProvider para conductores
+        if (user.role != AppConstants.roleAdmin) ...[
+          _TechnicianModeItem(user: user),
+          const Gap(8),
+        ],
 
         // Regular settings
         _SettingsItem(
@@ -721,6 +669,165 @@ class _AccountSettings extends StatelessWidget {
           onTap: () {},
         ),
       ],
+    );
+  }
+}
+
+// ─── Technician mode item ─────────────────────────────────────────────────────
+
+class _TechnicianModeItem extends ConsumerWidget {
+  final AppUser user;
+  const _TechnicianModeItem({required this.user});
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    // Técnico registrado: solo alterna la vista activa
+    if (user.isTechnician) {
+      final activeRole = ref.watch(activeRoleProvider);
+      final goingToDriver =
+          (activeRole ?? user.role) != AppConstants.roleDriver;
+      return _SettingsItem(
+        icon: goingToDriver ? Icons.directions_car : Icons.engineering,
+        label: goingToDriver
+            ? 'Cambiar a modo Conductor'
+            : 'Cambiar a modo Técnico',
+        trailing: Icons.sync_alt,
+        isProminent: true,
+        onTap: () {
+          final newRole = goingToDriver
+              ? AppConstants.roleDriver
+              : AppConstants.roleTechnician;
+          ref.read(activeRoleProvider.notifier).switchTo(newRole);
+          context.go(newRole == AppConstants.roleDriver
+              ? AppRoutes.driverHome
+              : AppRoutes.technicianHome);
+        },
+      );
+    }
+
+    // Conductor: consulta estado real en tecnicos
+    final statusAsync = ref.watch(tecnicoStatusProvider);
+    return statusAsync.when(
+      loading: () => _SettingsItem(
+        icon: Icons.engineering,
+        label: 'Verificando...',
+        trailing: Icons.sync_alt,
+        isProminent: false,
+        onTap: () {},
+      ),
+      error: (_, __) => _SettingsItem(
+        icon: Icons.engineering,
+        label: 'Solicitar ser Técnico',
+        trailing: Icons.sync_alt,
+        isProminent: true,
+        onTap: () => _openSheet(context),
+      ),
+      data: (status) {
+        if (status.aprobado) {
+          return _SettingsItem(
+            icon: Icons.engineering,
+            label: 'Cambiar a modo Técnico',
+            trailing: Icons.sync_alt,
+            isProminent: true,
+            onTap: () {
+              ref
+                  .read(activeRoleProvider.notifier)
+                  .switchTo(AppConstants.roleTechnician);
+              context.go(AppRoutes.technicianHome);
+            },
+          );
+        }
+        if (status.pendiente) {
+          return const _PendingTechnicianSettingsTile();
+        }
+        // sinSolicitud o rechazado → abrir sheet con especialidad + cédula
+        return _SettingsItem(
+          icon: Icons.engineering,
+          label: status.rechazado
+              ? 'Re-solicitar ser Técnico'
+              : 'Solicitar ser Técnico',
+          trailing: Icons.sync_alt,
+          isProminent: true,
+          onTap: () => _openSheet(context),
+        );
+      },
+    );
+  }
+
+  void _openSheet(BuildContext context) {
+    showTechnicianRequestSheet(context, user.id).then((submitted) {
+      if (submitted == true && context.mounted) {
+        context.go(AppRoutes.technicianPending);
+      }
+    });
+  }
+}
+
+// ─── Pending technician tile (non-tappable) ───────────────────────────────────
+
+class _PendingTechnicianSettingsTile extends StatelessWidget {
+  const _PendingTechnicianSettingsTile();
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        color: AppColors.warning.withOpacity(0.07),
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(color: AppColors.warning.withOpacity(0.2)),
+      ),
+      child: Row(
+        children: [
+          Container(
+            width: 40,
+            height: 40,
+            decoration: BoxDecoration(
+              color: AppColors.warning.withOpacity(0.12),
+              shape: BoxShape.circle,
+            ),
+            child: const Icon(Icons.engineering_outlined,
+                color: AppColors.warning, size: 20),
+          ),
+          const Gap(16),
+          const Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  'Solicitud en revisión',
+                  style: TextStyle(
+                    fontSize: 15,
+                    fontWeight: FontWeight.w700,
+                    color: AppColors.warning,
+                  ),
+                ),
+                Gap(2),
+                Text(
+                  'El administrador aprobará tu perfil',
+                  style: TextStyle(fontSize: 12, color: AppColors.secondary),
+                ),
+              ],
+            ),
+          ),
+          Container(
+            padding:
+                const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+            decoration: BoxDecoration(
+              color: AppColors.warning.withOpacity(0.15),
+              borderRadius: BorderRadius.circular(20),
+            ),
+            child: const Text(
+              'Pendiente',
+              style: TextStyle(
+                fontSize: 10,
+                fontWeight: FontWeight.w700,
+                color: AppColors.warning,
+              ),
+            ),
+          ),
+        ],
+      ),
     );
   }
 }
@@ -758,9 +865,8 @@ class _SettingsItem extends StatelessWidget {
               width: 40,
               height: 40,
               decoration: BoxDecoration(
-                color: isProminent
-                    ? Colors.white.withOpacity(0.2)
-                    : Colors.white,
+                color:
+                    isProminent ? Colors.white.withOpacity(0.2) : Colors.white,
                 shape: BoxShape.circle,
                 boxShadow: [
                   if (!isProminent)
@@ -784,8 +890,7 @@ class _SettingsItem extends StatelessWidget {
                 label,
                 style: TextStyle(
                   fontSize: 15,
-                  fontWeight:
-                      isProminent ? FontWeight.w700 : FontWeight.w600,
+                  fontWeight: isProminent ? FontWeight.w700 : FontWeight.w600,
                   color: isProminent
                       ? AppColors.onTertiaryContainer
                       : AppColors.onSurface,

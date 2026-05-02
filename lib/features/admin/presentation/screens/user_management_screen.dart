@@ -4,7 +4,9 @@ import 'package:go_router/go_router.dart';
 import 'package:gap/gap.dart';
 import '../../../../core/constants/app_colors.dart';
 import '../../../../core/constants/app_constants.dart';
+import '../../../../core/router/app_router.dart';
 import '../../../../core/utils/helpers.dart';
+import '../../../../shared/widgets/admin_bottom_nav.dart';
 import '../../../../shared/widgets/loading_overlay.dart';
 import '../../../../shared/widgets/user_avatar.dart';
 import '../providers/admin_provider.dart';
@@ -22,12 +24,41 @@ class _UserManagementScreenState
   String _searchQuery = '';
   String _filterRole = 'todos';
 
+  void _onNavTap(int index) {
+    switch (index) {
+      case 0:
+        context.go(AppRoutes.adminDashboard);
+        break;
+      case 1:
+        break;
+      case 2:
+        context.go(AppRoutes.technicianValidation);
+        break;
+      case 3:
+        context.go(AppRoutes.emergencyMonitor);
+        break;
+    }
+  }
+
   @override
   void initState() {
     super.initState();
     WidgetsBinding.instance.addPostFrameCallback((_) {
       ref.read(adminNotifierProvider.notifier).loadUsers();
     });
+  }
+
+  Future<void> _handleToggle(String id, bool currentActivo) async {
+    final ok = await ref
+        .read(adminNotifierProvider.notifier)
+        .toggleUserActive(id, !currentActivo);
+    if (!ok && mounted) {
+      AppHelpers.showSnackBar(
+        context,
+        'No se pudo actualizar la cuenta',
+        isError: true,
+      );
+    }
   }
 
   @override
@@ -45,14 +76,23 @@ class _UserManagementScreenState
       return matchSearch && matchRole;
     }).toList();
 
-    return Scaffold(
+    return PopScope(
+      canPop: false,
+      onPopInvokedWithResult: (didPop, _) {
+        if (!didPop) context.go(AppRoutes.adminDashboard);
+      },
+      child: Scaffold(
       backgroundColor: AppColors.background,
+      bottomNavigationBar: AdminBottomNav(
+        selectedIndex: 1,
+        onItemTapped: _onNavTap,
+      ),
       appBar: AppBar(
         backgroundColor: AppColors.background,
         elevation: 0,
         leading: IconButton(
           icon: const Icon(Icons.arrow_back_ios_new, size: 20),
-          onPressed: () => context.pop(),
+          onPressed: () => context.go(AppRoutes.adminDashboard),
         ),
         title: const Text(
           'Gestion de usuarios',
@@ -143,23 +183,22 @@ class _UserManagementScreenState
                         itemBuilder: (context, i) {
                           return _UserCard(
                             user: filtered[i],
-                            onToggleActive: () {
-                              final id = filtered[i]['id'] as String;
-                              final activo =
-                                  filtered[i]['activo'] as bool? ?? true;
-                              ref
-                                  .read(adminNotifierProvider.notifier)
-                                  .toggleUserActive(id, !activo);
-                            },
+                            onToggleActive: () => _handleToggle(
+                              filtered[i]['id'] as String,
+                              filtered[i]['activo'] as bool? ?? true,
+                            ),
                           );
                         },
                       ),
           ),
         ],
       ),
+      ),
     );
   }
 }
+
+enum _AccountStatus { active, pending, rejected, disabled }
 
 class _UserCard extends StatelessWidget {
   final Map<String, dynamic> user;
@@ -167,12 +206,52 @@ class _UserCard extends StatelessWidget {
 
   const _UserCard({required this.user, required this.onToggleActive});
 
+  _AccountStatus get _status {
+    final activo = user['activo'] as bool? ?? true;
+    if (!activo) return _AccountStatus.disabled;
+    final tecnicoData = user['tecnicos'] as Map<String, dynamic>?;
+    final estado = tecnicoData?['estado_verificacion'] as String?;
+    if (estado == AppConstants.verificationPending) return _AccountStatus.pending;
+    if (estado == AppConstants.verificationRejected) return _AccountStatus.rejected;
+    return _AccountStatus.active;
+  }
+
+  Color _statusColor(_AccountStatus s) {
+    switch (s) {
+      case _AccountStatus.active:   return AppColors.success;
+      case _AccountStatus.pending:  return AppColors.warning;
+      case _AccountStatus.rejected: return AppColors.error;
+      case _AccountStatus.disabled: return AppColors.textHint;
+    }
+  }
+
+  String _statusLabel(_AccountStatus s) {
+    switch (s) {
+      case _AccountStatus.active:   return 'Activa';
+      case _AccountStatus.pending:  return 'Pendiente';
+      case _AccountStatus.rejected: return 'Rechazada';
+      case _AccountStatus.disabled: return 'Deshabilitada';
+    }
+  }
+
+  Color _roleColor(String role) {
+    switch (role) {
+      case AppConstants.roleDriver:     return AppColors.primary;
+      case AppConstants.roleTechnician: return AppColors.secondary;
+      case AppConstants.roleAdmin:      return AppColors.warning;
+      default:                          return AppColors.textSecondary;
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
-    final name = user['nombre'] as String? ?? 'Usuario';
-    final email = user['email'] as String? ?? '';
-    final role = user['rol'] as String? ?? '';
+    final name     = user['nombre'] as String? ?? 'Usuario';
+    final email    = user['email']  as String? ?? '';
+    final role     = user['rol']    as String? ?? '';
     final avatarUrl = user['foto_url'] as String?;
+    final activo   = user['activo'] as bool? ?? true;
+    final status   = _status;
+    final statusColor = _statusColor(status);
 
     return Container(
       margin: const EdgeInsets.only(bottom: 10),
@@ -184,11 +263,7 @@ class _UserCard extends StatelessWidget {
       ),
       child: Row(
         children: [
-          UserAvatar(
-            imageUrl: avatarUrl,
-            name: name,
-            radius: 22,
-          ),
+          UserAvatar(imageUrl: avatarUrl, name: name, radius: 22),
           const Gap(12),
           Expanded(
             child: Column(
@@ -199,7 +274,10 @@ class _UserCard extends StatelessWidget {
                   style: const TextStyle(
                     fontSize: 14,
                     fontWeight: FontWeight.w600,
+                    color: AppColors.textPrimary,
                   ),
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
                 ),
                 Text(
                   email,
@@ -207,13 +285,37 @@ class _UserCard extends StatelessWidget {
                     fontSize: 12,
                     color: AppColors.textSecondary,
                   ),
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                ),
+                const Gap(4),
+                Row(
+                  children: [
+                    Container(
+                      width: 6,
+                      height: 6,
+                      decoration: BoxDecoration(
+                        color: statusColor,
+                        shape: BoxShape.circle,
+                      ),
+                    ),
+                    const Gap(4),
+                    Text(
+                      _statusLabel(status),
+                      style: TextStyle(
+                        fontSize: 10,
+                        fontWeight: FontWeight.w600,
+                        color: statusColor,
+                      ),
+                    ),
+                  ],
                 ),
               ],
             ),
           ),
+          const Gap(8),
           Container(
-            padding:
-                const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+            padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
             decoration: BoxDecoration(
               color: _roleColor(role).withOpacity(0.1),
               borderRadius: BorderRadius.circular(8),
@@ -227,15 +329,11 @@ class _UserCard extends StatelessWidget {
               ),
             ),
           ),
-          const Gap(8),
+          const Gap(4),
           IconButton(
             icon: Icon(
-              (user['activo'] as bool? ?? true)
-                  ? Icons.toggle_on
-                  : Icons.toggle_off,
-              color: (user['activo'] as bool? ?? true)
-                  ? AppColors.success
-                  : AppColors.textHint,
+              activo ? Icons.toggle_on : Icons.toggle_off,
+              color: activo ? statusColor : AppColors.textHint,
               size: 28,
             ),
             onPressed: onToggleActive,
@@ -243,19 +341,6 @@ class _UserCard extends StatelessWidget {
         ],
       ),
     );
-  }
-
-  Color _roleColor(String role) {
-    switch (role) {
-      case AppConstants.roleDriver:
-        return AppColors.primary;
-      case AppConstants.roleTechnician:
-        return AppColors.secondary;
-      case AppConstants.roleAdmin:
-        return AppColors.warning;
-      default:
-        return AppColors.textSecondary;
-    }
   }
 }
 

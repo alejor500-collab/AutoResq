@@ -53,7 +53,7 @@ class AutoResQApp extends ConsumerWidget {
   }
 
   ThemeData _buildTheme() {
-    final colorScheme = ColorScheme(
+    const colorScheme = ColorScheme(
       brightness: Brightness.light,
       primary: AppColors.primary,
       onPrimary: AppColors.onPrimary,

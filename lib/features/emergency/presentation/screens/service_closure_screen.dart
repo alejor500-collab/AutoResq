@@ -31,8 +31,8 @@ class _ServiceClosureScreenState extends ConsumerState<ServiceClosureScreen> {
 
   @override
   Widget build(BuildContext context) {
-    final extra =
-        (ModalRoute.of(context)?.settings.arguments ?? {}) as Map<String, dynamic>;
+    final extra = (ModalRoute.of(context)?.settings.arguments ?? {})
+        as Map<String, dynamic>;
     // Prefer GoRouter extra when available
     final routerExtra =
         GoRouterState.of(context).extra as Map<String, dynamic>?;
@@ -248,8 +248,7 @@ class _ServiceClosureScreenState extends ConsumerState<ServiceClosureScreen> {
                           // ── Tipo de falla ─────────────────────────────
                           if (clasificacionIa != null) ...[
                             Padding(
-                              padding:
-                                  const EdgeInsets.fromLTRB(16, 14, 16, 0),
+                              padding: const EdgeInsets.fromLTRB(16, 14, 16, 0),
                               child: Row(
                                 children: [
                                   const Text(
@@ -294,9 +293,9 @@ class _ServiceClosureScreenState extends ConsumerState<ServiceClosureScreen> {
                                   inputFormatters: [
                                     FilteringTextInputFormatter.digitsOnly,
                                   ],
-                                  prefixIcon: Padding(
-                                    padding: const EdgeInsets.symmetric(
-                                        horizontal: 16),
+                                  prefixIcon: const Padding(
+                                    padding:
+                                        EdgeInsets.symmetric(horizontal: 16),
                                     child: Text(
                                       '\$',
                                       style: TextStyle(
@@ -308,9 +307,9 @@ class _ServiceClosureScreenState extends ConsumerState<ServiceClosureScreen> {
                                   ),
                                 ),
                                 const Gap(12),
-                                Row(
+                                const Row(
                                   mainAxisAlignment: MainAxisAlignment.center,
-                                  children: const [
+                                  children: [
                                     Icon(Icons.payments_outlined,
                                         size: 14,
                                         color: AppColors.textSecondary),

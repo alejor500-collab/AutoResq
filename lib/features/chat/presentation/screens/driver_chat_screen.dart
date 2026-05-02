@@ -72,8 +72,8 @@ class _DriverChatScreenState extends ConsumerState<DriverChatScreen> {
                 filter: ImageFilter.blur(sigmaX: 20, sigmaY: 20),
                 child: Container(
                   height: 64 + MediaQuery.of(context).padding.top,
-                  padding: EdgeInsets.only(
-                      top: MediaQuery.of(context).padding.top),
+                  padding:
+                      EdgeInsets.only(top: MediaQuery.of(context).padding.top),
                   decoration: BoxDecoration(
                     color: Colors.white.withOpacity(0.8),
                     boxShadow: [
@@ -97,11 +97,10 @@ class _DriverChatScreenState extends ConsumerState<DriverChatScreen> {
                         // Tech avatar with online indicator
                         Stack(
                           children: [
-                            CircleAvatar(
+                            const CircleAvatar(
                               radius: 20,
-                              backgroundColor:
-                                  AppColors.surfaceContainerHigh,
-                              child: const Icon(Icons.person,
+                              backgroundColor: AppColors.surfaceContainerHigh,
+                              child: Icon(Icons.person,
                                   color: AppColors.secondary, size: 20),
                             ),
                             Positioned(
@@ -113,19 +112,19 @@ class _DriverChatScreenState extends ConsumerState<DriverChatScreen> {
                                 decoration: BoxDecoration(
                                   color: AppColors.success,
                                   shape: BoxShape.circle,
-                                  border: Border.all(
-                                      color: Colors.white, width: 2),
+                                  border:
+                                      Border.all(color: Colors.white, width: 2),
                                 ),
                               ),
                             ),
                           ],
                         ),
                         const Gap(12),
-                        Expanded(
+                        const Expanded(
                           child: Column(
                             mainAxisAlignment: MainAxisAlignment.center,
                             crossAxisAlignment: CrossAxisAlignment.start,
-                            children: const [
+                            children: [
                               Text(
                                 'Carlos Mendez',
                                 style: TextStyle(
@@ -172,8 +171,8 @@ class _DriverChatScreenState extends ConsumerState<DriverChatScreen> {
                 Expanded(
                   child: messages.when(
                     loading: () => const Center(
-                      child: CircularProgressIndicator(
-                          color: AppColors.primary),
+                      child:
+                          CircularProgressIndicator(color: AppColors.primary),
                     ),
                     error: (e, _) => Center(child: Text(e.toString())),
                     data: (msgs) {
@@ -319,7 +318,7 @@ class _ChatBubble extends StatelessWidget {
                 ),
                 if (isMe) ...[
                   const Gap(4),
-                  Icon(
+                  const Icon(
                     Icons.done_all,
                     size: 14,
                     color: AppColors.primary,
@@ -364,7 +363,7 @@ class _ChatInputBar extends StatelessWidget {
               Container(
                 width: 56,
                 height: 56,
-                decoration: BoxDecoration(
+                decoration: const BoxDecoration(
                   color: AppColors.surfaceContainerLow,
                   shape: BoxShape.circle,
                 ),
@@ -374,8 +373,8 @@ class _ChatInputBar extends StatelessWidget {
               // Text field
               Expanded(
                 child: Container(
-                  constraints: const BoxConstraints(
-                      minHeight: 56, maxHeight: 128),
+                  constraints:
+                      const BoxConstraints(minHeight: 56, maxHeight: 128),
                   child: TextField(
                     controller: controller,
                     maxLines: null,
@@ -422,8 +421,7 @@ class _ChatInputBar extends StatelessWidget {
                       ),
                     ],
                   ),
-                  child: const Icon(Icons.send,
-                      color: Colors.white, size: 20),
+                  child: const Icon(Icons.send, color: Colors.white, size: 20),
                 ),
               ),
             ],

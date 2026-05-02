@@ -2,103 +2,288 @@
 
 Archivo de seguimiento del proyecto. Consultar **antes** de hacer cualquier cambio y actualizar **al terminar** cada tarea.
 
----
-
-## Estado actual del proyecto
-
-El frontend (21 pantallas Flutter) está implementado. Falta conectar el backend real y cubrir funcionalidades críticas para el MVP.
+Última optimización del documento: **2026-05-01**
 
 ---
 
-## CRITICO — Sin esto la app no arranca
+## Estado actual resumido
 
-- [ ] **C1 — Credenciales reales**
-  - `lib/core/constants/app_constants.dart` tiene placeholders: `TU_SUPABASE_URL`, `TU_SUPABASE_ANON_KEY`, `TU_OPENAI_API_KEY`
-  - Crear proyecto en Supabase → copiar URL y anon key
-  - Obtener API key de OpenAI
-  - Reemplazar los valores (o migrar a `flutter_dotenv`)
+AutoResQ tiene el frontend principal implementado, el backend base en Supabase definido y los flujos admin/técnico más críticos ya corregidos. Firebase fue eliminado del proyecto y la app trabaja con Supabase Auth/Data.
 
-- [x] **C2 — Base de datos Supabase**
-  - `supabase/schema.sql` revisado y actualizado (2026-04-15): se agregó columna `activo boolean` en `usuarios`
-  - 11 tablas: usuarios, vehiculos, tipos_problema, tecnicos, emergencias, ubicaciones, asignaciones, mensajes, calificaciones, historial, notificaciones
-  - 4 triggers: `on_auth_user_created`, `on_calificacion_inserted`, `on_emergencia_estado_changed` / `on_asignacion_estado_changed`, `on_usuarios_updated`
-  - RLS activo en todas las tablas con políticas granulares por rol (conductor / técnico / administrador / service_role)
-  - Realtime habilitado en: emergencias, asignaciones, mensajes, notificaciones, tecnicos
-  - Índices de rendimiento creados
-  - Trigger `on_auth_user_created` verificado y funcional (2026-04-15)
-
-- [x] **C3 — Realtime en Supabase**
-  - Realtime habilitado en: `emergencias`, `mensajes`, `asignaciones`, `notificaciones`, `tecnicos`, `ubicaciones_tecnico`
-  - Verificado via `pg_publication_tables` (2026-04-17)
-
-- [x] **C4 — Supabase Auth**
-  - Trigger `on_auth_user_created` → `crear_perfil_usuario` activo y funcional
-  - Email/Password habilitado (configurado desde dashboard)
-  - Trigger verificado via `pg_trigger` (2026-04-17)
+Correcciones antiguas, diagnósticos duplicados y prompts ya resueltos fueron compactados. En este documento quedan detallados únicamente los pendientes reales, riesgos activos o acciones manuales todavía no confirmadas.
 
 ---
 
-## IMPORTANTE — Funcionalidad incompleta (MVP)
+## Pendientes activos / posibles errores persistentes
 
-- [x] **I1 — Subida de foto de perfil (backend)**
-  - Bucket `avatars` creado en Supabase Storage (público, máx 5 MB, JPEG/PNG/WEBP)
-  - RLS configurada: cada usuario sube/edita solo dentro de `{uid}/` (2026-04-17)
-  - `usuarios.avatar_url` ya existe en la tabla
-  - **Pendiente Flutter**: lógica de `image_picker` → `supabase.storage.from('avatars').upload()` → guardar URL
+### P0 — Bloqueantes o críticos
 
-- [ ] **I2 — Notificaciones push**
-  - No existe ningun sistema de notificaciones
-  - Los tecnicos no reciben alerta cuando hay emergencia nueva
-  - Los conductores no reciben alerta cuando un tecnico acepta
-  - Opciones: Firebase Cloud Messaging (FCM) o Supabase Edge Functions + OneSignal
+- [ ] **P0.1 — Validar credenciales reales en configuración**
+  - Revisar `lib/core/constants/app_constants.dart`.
+  - Confirmar que no existan placeholders como:
+    - `TU_SUPABASE_URL`
+    - `TU_SUPABASE_ANON_KEY`
+    - `TU_OPENAI_API_KEY`
+  - Si existen, reemplazarlos por valores reales o migrar a `flutter_dotenv` / build flavors.
+  - Estado: **pendiente de verificación actual**.
 
-- [x] **I3 — Tracking de ubicacion del tecnico en ruta (backend)**
-  - Tabla `ubicaciones_tecnico` creada con índice único por `tecnico_id` (upsert)
-  - RLS: técnico actualiza su propia ubicación; conductor la ve si tiene asignación activa
-  - Añadida a `supabase_realtime` para streaming en tiempo real (2026-04-17)
-  - **Pendiente Flutter**: `Geolocator` → upsert cada ~5s cuando `asignacion.estado = en_ruta` → conductor subscribe al stream
+- [ ] **P0.2 — Aplicar SQL pendiente en Supabase producción**
+  - El código/schema ya fue corregido, pero falta confirmar si se ejecutó manualmente en Supabase Dashboard → SQL Editor.
+  - SQL pendiente principal:
+    - policy `tecnicos_update_own` con `TO authenticated`, `USING` y `WITH CHECK`.
+    - columna `motivo_rechazo text` si aún no existe en producción.
+  - Archivos relacionados:
+    - `supabase/schema.sql`
+    - `lib/features/auth/presentation/screens/register_screen.dart`
+    - `lib/features/admin/presentation/providers/admin_provider.dart`
+  - Estado: **pendiente hasta confirmar ejecución real en Supabase**.
 
-- [x] **I4 — Flujo de validacion de tecnicos (Admin) (backend)**
-  - `tecnicos.estado_verificacion` ya soporta: `pendiente` / `aprobado` / `rechazado`
-  - RLS `tecnicos_admin_all` permite al admin hacer UPDATE directo
-  - Trigger `on_tecnico_verificacion_changed` → `notificar_verificacion_tecnico()`: inserta notificación `verificacion_aprobada` / `verificacion_rechazada` automáticamente (2026-04-17)
-  - **Pendiente Flutter**: `TechnicianValidationScreen` debe hacer `update({'estado_verificacion': 'aprobado', 'verificado_por': uid, 'fecha_verificacion': now})`
+- [x] **P0.3 — Despliegue y configuración de `send-rejection-email` en producción**
+  - Código implementado: `supabase/functions/send-rejection-email/index.ts` (SMTP Gmail).
+  - `admin_provider.dart → rejectTechnician()` ya invoca la función tras actualizar DB.
+  - Si el correo falla, el rechazo en DB no se revierte (error registrado en `debugPrint`).
+  - Secrets requeridos:
+    - `SMTP_USER`
+    - `SMTP_PASS`
+    - `SMTP_HOST`
+    - `SMTP_PORT`
+    - `MAIL_FROM`
+  - Secrets configurados en Supabase para project ref `sseqsmgvovppuzktochd`.
+  - Función desplegada con `supabase functions deploy send-rejection-email --project-ref sseqsmgvovppuzktochd`.
+  - Estado: **operativo a nivel de configuración/despliegue; pendiente prueba funcional de entrega si se requiere confirmación por bandeja de entrada**.
 
-- [ ] **I5 — Manejo de errores de red**
-  - Falta feedback visual cuando no hay conexion o falla una llamada a API
-  - Agregar estados de error en los providers de Riverpod
-
----
-
-## MEJORAS — Post-MVP
-
-- [ ] **M1 — Seguridad de credenciales** — Migrar a `flutter_dotenv` o build flavors
-- [ ] **M2 — Paginacion en historial** — `EmergencyHistoryScreen` puede ser lenta con muchos registros
-- [ ] **M3 — Tests** — El directorio `test/` esta vacio
-- [ ] **M4 — Analytics/Crashlytics** — Firebase Crashlytics o Sentry para produccion
-
----
-
-## Historial de cambios completados
-
-| Fecha | Tarea | Descripcion |
-|-------|-------|-------------|
-| 2026-04-25 | UI rol Técnico — Flujo completo (7 archivos) | **(1) bottom_nav_bar.dart**: `_technicianItems` ampliado de 3 a 4 tabs (INICIO / HISTORIAL / SERVICIOS / PERFIL). **(2) technician_home_screen.dart**: reescritura completa — `GlassAppBar` con avatar + dot online + nombre + campana; `_TechnicianMiniCard` con toggle de disponibilidad (actualiza Supabase `tableTecnicos`); `_VerificationChip`; mapa `AppMapWidget` + markers de emergencias; `AppBottomNavBar(isTechnician: true)` con nav a `emergencyHistory` (tab 1) y `profile` (tab 3). **(3) incoming_request_sheet.dart**: convertido a `ConsumerStatefulWidget`; timer regresivo 30→0 s con auto-cierre; carga `calificacion_promedio` y `total_servicios` del conductor desde Supabase; `_TimerChip` ámbar; `_AiClassificationChip` (rojo mecánica / azul eléctrica / gris otros); al Aceptar → `context.push(activeService, extra: emergency.id)`. **(4) active_service_screen.dart**: subestado local `StateProvider.autoDispose<String>` (EN RUTA / ATENDIENDO); map flex 3:2 ↔ 2:3; `_StatusFloatingChip` pill; `_EnRoutePanel` (Llamar + Chat + He llegado → UPDATE asignacion → cambia substate); `_AttendingPanel` (title + timer mm:ss + Chat + Finalizar → `pushReplacement(serviceClosure, extra: {emergencyId, asignacionId, technicianId, driverId, driverName, clasificacionIa, duration})`). **(5) service_closure_screen.dart** (nuevo): lee extra via `GoRouterState.of(context)`; AppBar "Cerrar Servicio"; check verde 72px; resumen card (avatar conductor, grid vehículo+tiempo, StatusChip clasificación); input monto con `FilteringTextInputFormatter.digitsOnly` y prefijo `$`; botón → `push(rateDriver, extra: {..., vehicleInfo, duration, clasificacionIa, amount})`. **(6) rate_driver_screen.dart**: constructor ampliado con `asignacionId`, `technicianId`, `vehicleInfo`, `duration`, `clasificacionIa`, `amount`; `_runCompletionUpdates()` hace UPDATE `tableAsignaciones(estado=finalizada)` + UPDATE `tableEmergencias(estado=completada)` + UPDATE `tableTecnicos(disponible=true)`; `_submit` INSERT `tableCalificaciones` → completion → `go(serviceCompleted, extra: _resumenParams(techRating: _stars))`; `_skip` solo completion → `go(serviceCompleted)`; `InteractiveStarRating(size:44)`; `TextButton("Omitir por ahora")`. **(7) service_completed_screen.dart** (nuevo): pantalla éxito sin nav; ícono 80px verde; card con acento verde 4px; secciones CLIENTE / TIPO DE FALLA + TIEMPO TOTAL / MONTO / CALIFICACIONES; `techRating > 0` → `StarRating` / else "Omitida"; "Pendiente de calificación del conductor"; `AppButton → context.go(technicianHome)`. **(8) app_router.dart**: constantes `serviceClosure` y `serviceCompleted` ya presentes; imports y GoRoutes para ambas pantallas ya presentes; `rateDriver` usa `Map<String, dynamic>`. |
-| 2026-04-22 | Fix + Animaciones Batch 3 | (1) DriverHomeScreen: Glass AppBar movido al último hijo del Stack (fix z-order, botones menu/perfil ahora responden). (2) TechnicianHomeScreen: SafeArea top bar movido al último hijo del Stack (fix defensivo). (3) AppDrawer: sección ADMINISTRACIÓN agregada para rol admin (Dashboard, Usuarios, Validar Técnicos, Monitor). (4) AppButton: animación de presión con AnimatedScale — scale 0.96 (easeOutQuart 100ms) al presionar, scale 1.0 (elasticOut 220ms) al soltar. (5) AppTextField: micro-interacciones — shake con Curves.elasticOut al error, fillColor verde/rojo por estado, label con ✓ verde cuando válido. |
-| 2026-04-22 | UI/UX Premium Batch 2 | (1) RoleSelectionScreen: Curves.easeOutQuart + AnimatedContainer border feedback. (2) LoginScreen: AnimatedSwitcher revela form email/pass tras "Ingresar con Email" con AnimatedSize + easeOutQuart. (3) DioClient: queryNearbyServices() via Overpass API (radio 5km, amenity=fuel + shop=car_repair). (4) NearbyServicesProvider + NearbyService model (Haversine). (5) DriverHomeScreen: carrusel horizontal interactivo con datos OSM reales. (6) EditProfileScreen: image_picker + upload a bucket avatars de Supabase + sync en AppBar. (7) RegisterScreen: paso de foto de cédula para técnicos + upload url_credencial. (8) DiagnosticStep: wrapped in SingleChildScrollView. |
-| 2026-04-22 | UI — Navegación Apple Style (Task 3) | **Back buttons:** `emergency_status_screen` y `profile_screen` reemplazaron íconos de menú roto por back buttons (`arrow_back_ios_new`) con `InkWell` feedback táctil. `emergency_status_screen` pasa de `context.go(driverHome)` a `context.pop()` y title correcto. **Drawer:** `AppDrawer` creado (`lib/shared/widgets/app_drawer.dart`) con user header, nav items (Inicio / Historial / Perfil) y logout. Integrado en `DriverHomeScreen` y `TechnicianHomeScreen` con `GlobalKey<ScaffoldState>`. Ícono menú wired a `openDrawer()`. **Tactile feedback:** Todos los botones de AppBar usan `Material + InkWell` con `splashColor` y `CircleBorder` para perfil. **activeRoleProvider fix:** eliminado `ref.watch` del factory (evita re-creación del notifier); usa `ref.read` para init y `ref.listen` para sync en logout. **technicianAvailableProvider:** nuevo `StateProvider<bool>` en `role_provider.dart`; `TechnicianHomeScreen` usa el provider en lugar de `_isAvailable` local state (persiste en navegación). |
-| 2026-04-22 | UI — RoleSelectionScreen (Onboarding Premium con Hero) | Creada `role_selection_screen.dart`: pantalla de selección de rol con 2 tarjetas (Conductor / Técnico). Implementa ScaleTransition + AnimationController con `Curves.easeInOutCubic` para feedback táctil de presión. Animación Hero en el ícono de cada tarjeta que vuela hacia `RegisterScreen`. Animaciones de entrada escalonadas (FadeTransition + SlideTransition). Paleta: Rojo #E53935 para Conductor, Azul #1E88E5 para Técnico. Ruta `/role-select` agregada al router y al guard de auth. `WelcomeScreen` "Registrarse" ahora apunta a `/role-select`. `RegisterScreen` acepta `initialRole` (int?), inicializa el selector de rol correspondiente, y muestra el Hero landing widget del ícono. |
-| 2026-04-22 | UI — WelcomeScreen + refactor LoginScreen | Creada `welcome_screen.dart` con 3 CTAs (Ingresar, Google, Registrarse). `login_screen.dart` refactorizado a formulario puro email/contraseña con back button. Router actualizado: ruta `/welcome` agregada, redirect de usuarios no autenticados apunta a `/welcome`. SplashScreen actualizado al mismo. |
-| 2026-04-14 | Setup inicial | Creacion de `cambios_pendientes.md` y memoria del proyecto |
-| 2026-04-15 | C2 — Schema DB | Revisión y actualización de `supabase/schema.sql`: campo `activo` añadido a `usuarios`, schema verificado contra spec definitiva |
-| 2026-04-15 | Fix — RLS recursión infinita en usuarios | Política `usuarios_select_own` causaba recursión al consultar `usuarios` desde sí misma. Fix: función `get_rol_usuario()` con `SECURITY DEFINER` para leer el rol sin activar RLS. |
-| 2026-04-15 | Fix — Registro teléfono + navegación al home | **Teléfono**: trigger `crear_perfil_usuario` ahora incluye `telefono`; metadata de `signUp` corregida a claves `nombre/telefono/rol`. **Home**: `tableProfiles` corregido de `'profiles'` → `'usuarios'`; `_fetchProfile` mapea columnas DB (nombre/telefono/rol) a model; `register()` ya no hace upsert en tabla errónea; se añadió política RLS `tecnicos_insert_own`. ✅ Aplicado en Supabase (2026-04-15) |
-| 2026-04-17 | C3 — Realtime verificado | Confirmado via `pg_publication_tables`: 5 tablas activas. `ubicaciones_tecnico` añadida también. |
-| 2026-04-17 | C4 — Auth verificado | Trigger `on_auth_user_created` activo. Email/Password habilitado desde dashboard. |
-| 2026-04-17 | I1 — Bucket avatars | Bucket `avatars` creado (público, 5MB, img). 4 políticas RLS en `storage.objects` para `{uid}/` path. |
-| 2026-04-17 | I3 — ubicaciones_tecnico | Tabla con unique index por `tecnico_id`, RLS granular (técnico escribe, conductor lee si asignación activa), añadida a Realtime. |
-| 2026-04-17 | I4 — Trigger verificación técnico | Función `notificar_verificacion_tecnico()` + trigger `on_tecnico_verificacion_changed`: notificación automática al aprobar/rechazar. |
+- [ ] **P0.4 — Deriva entre Supabase producción y `schema.sql`**
+  - En Supabase producción existen funciones/triggers de notificación de verificación técnica, pero el documento anterior indica que parte de esa lógica no está reflejada completamente en `supabase/schema.sql`.
+  - Revisar y sincronizar:
+    - función `notificar_verificacion_tecnico()`
+    - trigger `on_tecnico_verificacion_changed`
+  - Objetivo:
+    - Que `supabase/schema.sql` sea la fuente de verdad del backend.
+  - Estado: **pendiente de consolidación**.
 
 ---
 
-> **Regla:** Antes de trabajar en cualquier item, moverlo a "En progreso". Al terminar, marcarlo `[x]` y agregar fila al historial.
+### P1 — Funcionalidad MVP pendiente
+
+- [ ] **P1.1 — Notificaciones push**
+  - No existe sistema de push notifications.
+  - Casos pendientes:
+    - Técnico recibe alerta cuando hay emergencia nueva.
+    - Conductor recibe alerta cuando un técnico acepta.
+  - Opción recomendada:
+    - Supabase Edge Functions + OneSignal.
+  - Nota:
+    - La app no usa Firebase; no usar FCM salvo decisión explícita de reintroducirlo.
+
+- [ ] **P1.2 — Manejo de errores de red**
+  - Falta feedback consistente cuando no hay conexión o falla una llamada a Supabase/API.
+  - Agregar estados de error en providers Riverpod.
+  - Priorizar:
+    - auth
+    - registro técnico
+    - validación admin
+    - emergencias
+    - tracking de ubicación
+
+- [ ] **P1.3 — Tracking de ubicación del técnico en ruta — Flutter**
+  - Backend listo:
+    - tabla `ubicaciones_tecnico`
+    - RLS
+    - Realtime
+  - Pendiente de confirmar/implementar en Flutter:
+    - `Geolocator` → upsert periódico cuando `asignacion.estado = en_ruta`.
+    - conductor suscrito al stream para ver ubicación en tiempo real.
+  - Estado: **backend hecho, Flutter pendiente/por verificar**.
+
+---
+
+### P2 — Mejoras post-MVP
+
+- [ ] **P2.1 — Seguridad de credenciales**
+  - Migrar credenciales a `.env`, `flutter_dotenv`, build flavors o mecanismo seguro equivalente.
+
+- [ ] **P2.2 — Paginación en historial**
+  - `EmergencyHistoryScreen` puede degradarse si hay muchos registros.
+  - Agregar paginación o carga incremental.
+
+- [ ] **P2.3 — Tests**
+  - El directorio `test/` está vacío o sin cobertura suficiente.
+  - Priorizar tests para:
+    - auth
+    - registro técnico
+    - validación admin
+    - provider admin
+    - navegación por roles
+
+- [ ] **P2.4 — Analytics / monitoreo de errores**
+  - Usar Sentry u otra alternativa no Firebase.
+  - No usar Crashlytics mientras Firebase esté descartado.
+
+- [ ] **P2.5 — Limpieza de dependencias no usadas**
+  - Revisar si `google_sign_in` sigue en `pubspec.yaml` sin uso.
+  - Si no se importa en Dart y OAuth ya va por Supabase, eliminar dependencia.
+
+---
+
+## Hecho / cerrado — resumen compacto
+
+### Backend Supabase base
+
+- [x] Base de datos Supabase definida con tablas principales del MVP.
+- [x] RLS activado en tablas principales.
+- [x] Realtime habilitado para módulos críticos.
+- [x] Supabase Auth configurado con Email/Password.
+- [x] Trigger `on_auth_user_created` verificado.
+- [x] Bucket `avatars` creado y configurado con RLS por `{uid}/`.
+
+### Firebase eliminado
+
+- [x] Eliminada configuración FlutterFire residual.
+- [x] Eliminado plugin Gradle `com.google.gms.google-services`.
+- [x] Eliminado `google-services.json`.
+- [x] Eliminado meta tag web de Google Sign-In asociado al flujo anterior.
+- [x] Documentación ajustada para no sugerir Firebase/FCM/Crashlytics.
+
+### Registro y validación de técnicos
+
+- [x] Técnico pendiente ya no debe entrar como aprobado.
+- [x] Navegación corregida para técnico pendiente mediante `/technician/pending`.
+- [x] `isApproved` ahora considera `estado_verificacion` y `usuarios.activo`.
+- [x] Foto de cédula corregida en Flutter:
+  - path Storage cambiado de `technicians/{uid}/...` a `{uid}/...`.
+  - `url_credencial` se guarda en `tecnicos`.
+  - si falla upload/update, no navega al Home.
+- [x] Panel admin consulta `url_credencial` explícitamente.
+- [x] Admin UI muestra documento de identidad.
+- [x] Miniatura de cédula usa `BoxFit.contain`.
+- [x] Imagen de cédula se puede abrir en modal con zoom usando `InteractiveViewer`.
+- [x] `_TecnicoRequestSheet` extraída de `app_drawer.dart` a `shared/widgets/technician_request_sheet.dart` como `TechnicianRequestSheet` (público).
+- [x] `ProfileScreen._AccountSettings` refactorizado a `ConsumerWidget`; usa `tecnicoStatusProvider` en lugar de `user.specialty`/`user.isApproved`.
+- [x] `_TechnicianModeItem` en ProfileScreen: pendiente → tile no-tap; aprobado → switch a technicianHome; sin solicitud/rechazado → abre sheet con especialidad + cédula.
+- [x] Sheet actualiza `usuarios.rol='tecnico'` solo tras subir cédula correctamente, refresca `authNotifier` y navega a `/technician/pending`.
+- [x] Nunca navega a `/technician/home` si `verificationStatus != aprobado`.
+- [x] Drawer post-envío también navega a `/technician/pending`.
+
+### Rechazo de técnicos
+
+- [x] Rechazo exige motivo.
+- [x] TextField de observaciones obligatorio.
+- [x] Motivo combinado se envía a `rejectTechnician()`.
+- [x] `motivo_rechazo` agregado al schema.
+- [x] `rejectTechnician()` guarda `motivo_rechazo` si recibe valor.
+- [x] `AppUser`/`UserModel` exponen `verificationStatus` y `rejectionReason`.
+- [x] `_fetchProfile` selecciona `estado_verificacion` y `motivo_rechazo` y los mapea al modelo.
+- [x] `PendingApprovalScreen` muestra UI distinta para rechazados: icono error, título "Solicitud rechazada", motivo visible.
+- [x] `TecnicoStatus` incluye `motivoRechazo`; query actualizada con `motivo_rechazo`.
+- [x] Edge Function `send-rejection-email` migrada de Resend API a SMTP Gmail.
+  - [x] `rejectTechnician()` invoca la función; fallo de correo no revierte el rechazo en DB.
+  - [x] La función recibe `email`, `nombre` opcional y `motivo`, usa secrets SMTP y escapa HTML del motivo/nombre.
+  - [x] `PendingApprovalScreen` agrega botón principal "Enviar nueva solicitud" para técnicos rechazados.
+  - [x] Reenvío abre `TechnicianRequestSheet` en modo reenvío, mantiene la misma cuenta y reutiliza la fila `tecnicos` mediante `upsert` por `usuario_id`.
+  - [x] Reenvío exige nueva foto de cédula, sube archivo con nombre único `cedula_<timestamp>`, actualiza `url_credencial`, `especialidad`, `estado_verificacion='pendiente'`, `disponible=false` y limpia `motivo_rechazo`.
+  - [x] Tras reenviar, se invalida `tecnicoStatusProvider`, se refrescan `authNotifier`/`currentUserProvider` y se mantiene navegación en `/technician/pending`.
+  - [x] Despliegue y secrets en producción configurados con Supabase CLI para project ref `sseqsmgvovppuzktochd`.
+  - [ ] Verificación local pendiente: `dart format`, `flutter analyze`, `flutter analyze --no-pub` y `dart analyze` no terminaron antes del timeout en esta sesión.
+
+### Gestión de usuarios admin
+
+- [x] `loadUsers()` trae estado de técnico mediante relación con `tecnicos`.
+- [x] Corregido cast de `tecnicos` como `Map<String, dynamic>?` por relación uno-a-uno.
+- [x] Técnico pendiente ya no aparece como activo verde.
+- [x] Tarjetas muestran estado pequeño:
+  - Activa
+  - Pendiente
+  - Deshabilitada
+  - Rechazada
+- [x] Switch actualiza `usuarios.activo`.
+- [x] Switch no aprueba técnicos ni cambia `estado_verificacion`.
+- [x] `activo=false` bloquea técnicos aprobados.
+
+### Admin UI
+
+- [x] Dashboard admin implementado.
+- [x] Validación de técnicos implementada.
+- [x] Monitor de emergencias implementado.
+- [x] Gestión de usuarios con navegación admin corregida.
+- [x] `AdminBottomNav` creado e integrado.
+- [x] Rutas admin verificadas:
+  - `/admin`
+  - `/admin/users`
+  - `/admin/validate`
+  - `/admin/monitor`
+
+### UI/UX general
+
+- [x] Welcome screen.
+- [x] Role selection con estilo premium.
+- [x] Login refactorizado.
+- [x] Drawer principal.
+- [x] Microinteracciones en botones y campos.
+- [x] Ajustes de navegación Apple-style.
+- [x] Flujo técnico visual avanzado.
+- [x] Pantallas de cierre y finalización de servicio.
+
+### Perfil, vehículos y servicios
+
+- [x] `VehicleProvider` ahora guarda vehículos en Supabase por usuario autenticado y usa caché local separada por cuenta.
+- [x] Guardado de vehículo no depende de `upsert(onConflict: usuario_id)`; busca por `usuario_id`, actualiza la fila existente o inserta una nueva.
+- [x] Se consolida una sola fila de `vehiculos` por cuenta eliminando duplicados del mismo usuario después de cargar/guardar.
+- [x] `EditVehicleScreen` muestra errores específicos de `VehicleSaveException`, incluyendo placa ya registrada en otra cuenta.
+- [x] `schema.sql` agrega índice único `idx_vehiculos_usuario_unico` sobre `vehiculos(usuario_id)` para reflejar regla una cuenta → un vehículo.
+- [ ] Acción manual en producción: antes de aplicar `idx_vehiculos_usuario_unico`, limpiar posibles duplicados existentes por `usuario_id`.
+- [x] Pestaña `SERVICIOS` del home técnico ya no muestra emergencias pendientes; ahora usa `nearbyServicesProvider` como conductor y lista gasolineras, mecánicas, vulcanizadoras, lavadoras y cargadores EV con filtros por categoría.
+- [x] En técnico, tocar un servicio cercano cambia al mapa y centra la ubicación seleccionada.
+- [x] Interruptor de disponibilidad del técnico persiste `tecnicos.disponible`, lee el valor devuelto por Supabase y refresca `authNotifier`, `currentUserProvider` y `technicianAvailableProvider`.
+- [ ] Verificación local pendiente: `dart format` y `dart analyze` volvieron a no terminar antes del timeout en esta sesión.
+
+---
+
+## Errores antiguos marcados como resueltos
+
+Estos errores o diagnósticos ya no deben tratarse como pendientes activos:
+
+- [x] Técnico pendiente entra como aprobado por usar `activo = true`.
+- [x] GoRouter manda al Home antes de validar `estado_verificacion`.
+- [x] Foto de cédula no llega al panel admin por path Storage incorrecto.
+- [x] Admin no consulta `url_credencial`.
+- [x] `_CredentialRow` no muestra imagen.
+- [x] Cédula se ve recortada sin zoom.
+- [x] Motivo de rechazo se descarta silenciosamente.
+- [x] Técnico deshabilitado sigue entrando por ignorar `usuarios.activo`.
+- [x] Gestión de usuarios no muestra estado de verificación técnica.
+- [x] Técnico pendiente/rechazado aparece como “Activa” verde por cast incorrecto de `tecnicos`.
+- [x] Switch de usuario no actualiza correctamente `usuarios.activo`.
+- [x] Admin sin navegación inferior consistente.
+- [x] Rutas admin bloqueadas por redirect.
+- [x] Dependencias/configuración Firebase activas en Android/Web.
+
+---
+
+## Historial resumido
+
+| Fecha | Resumen |
+|---|---|
+| 2026-04-14 / 2026-04-17 | Setup inicial, schema Supabase, RLS, Auth, Realtime, Storage y triggers principales. |
+| 2026-04-22 | UI base premium: welcome, login, role selection, drawer, navegación, animaciones y perfil. |
+| 2026-04-25 | Flujo técnico avanzado: home técnico, solicitudes entrantes, servicio activo, cierre, rating y servicio completado. |
+| 2026-04-27 | Módulo admin: dashboard, bottom nav, gestión de usuarios, validación técnicos y monitor de emergencias. |
+| 2026-04-30 | Limpieza Firebase y corrección de navegación para técnico pendiente. |
+| 2026-05-01 | Correcciones críticas: cédula, estado visual admin, switch de usuarios, rechazo con motivo, zoom de documento, bloqueo por `activo=false`. |
+| 2026-05-01 | Propagación de `verificationStatus`/`rejectionReason` desde DB al modelo y UI distinta para técnicos rechazados en `PendingApprovalScreen`. |
+| 2026-05-01 | Edge Function `send-rejection-email` creada e invocada desde `rejectTechnician()`; fallo de correo no revierte el rechazo. |
+| 2026-05-01 | ProfileScreen usa `tecnicoStatusProvider`; sheet extraída a widget compartido; rol actualizado en DB solo tras cédula exitosa; navega a `/technician/pending`. |
+| 2026-05-01 | Reenvío de solicitud para técnicos rechazados: nueva cédula obligatoria, limpieza de `motivo_rechazo`, estado vuelve a `pendiente` y la app permanece en `/technician/pending`. |
+| 2026-05-01 | Vehículo por cuenta robustecido en Supabase/caché, servicios cercanos habilitados en rol técnico y disponibilidad técnica sincronizada con `tecnicos.disponible`. |
+| 2026-05-01 | `send-rejection-email` migrada a SMTP Gmail, secrets `SMTP_*`/`MAIL_FROM` configurados y función desplegada en Supabase. |
+
+---
+
+## Regla de mantenimiento
+
+Antes de trabajar en cualquier pendiente:
+
+1. Moverlo a “En progreso” si aplica.
+2. Ejecutar cambios mínimos sobre rutas específicas.
+3. Actualizar este archivo al finalizar.
+4. No reabrir errores antiguos salvo evidencia nueva en runtime.
+5. Registrar solo pendientes reales, acciones manuales no confirmadas o bugs reproducibles.

@@ -13,6 +13,7 @@ import '../../../../shared/widgets/bottom_nav_bar.dart';
 import '../../../../shared/widgets/user_avatar.dart';
 import '../../../map/presentation/providers/map_provider.dart';
 import '../../../map/presentation/providers/nearby_services_provider.dart';
+import '../../../map/presentation/widgets/location_picker_sheet.dart';
 
 class DriverHomeScreen extends ConsumerStatefulWidget {
   const DriverHomeScreen({super.key});
@@ -24,7 +25,7 @@ class DriverHomeScreen extends ConsumerStatefulWidget {
 class _DriverHomeScreenState extends ConsumerState<DriverHomeScreen> {
   final _scaffoldKey = GlobalKey<ScaffoldState>();
   final _mapController = MapController();
-  int _navIndex = 0;
+  final int _navIndex = 0;
 
   @override
   void initState() {
@@ -52,6 +53,17 @@ class _DriverHomeScreenState extends ConsumerState<DriverHomeScreen> {
     _mapController.move(LatLng(lat, lng), 17);
   }
 
+  Future<void> _editLocation() async {
+    final selected = await showLocationPickerSheet(
+      context,
+      title: 'Editar ubicacion de servicio',
+      initialLocation: ref.read(mapNotifierProvider).currentLocation,
+    );
+    if (selected == null || !mounted) return;
+    ref.read(mapNotifierProvider.notifier).setLocation(selected);
+    _mapController.move(LatLng(selected.lat, selected.lng), 15);
+  }
+
   @override
   Widget build(BuildContext context) {
     final mapState = ref.watch(mapNotifierProvider);
@@ -59,8 +71,7 @@ class _DriverHomeScreenState extends ConsumerState<DriverHomeScreen> {
 
     final lat = mapState.currentLocation?.lat ?? AppConstants.defaultLat;
     final lng = mapState.currentLocation?.lng ?? AppConstants.defaultLng;
-    final address =
-        mapState.currentLocation?.address ?? 'Riobamba, Ecuador';
+    final address = mapState.currentLocation?.address ?? 'Ecuador';
 
     return Scaffold(
       key: _scaffoldKey,
@@ -85,7 +96,7 @@ class _DriverHomeScreenState extends ConsumerState<DriverHomeScreen> {
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
-                        Text(
+                        const Text(
                           'BIENVENIDO DE VUELTA',
                           style: TextStyle(
                             fontSize: 12,
@@ -121,6 +132,16 @@ class _DriverHomeScreenState extends ConsumerState<DriverHomeScreen> {
                                   fontSize: 16,
                                   color: AppColors.secondary,
                                 ),
+                              ),
+                            ),
+                            IconButton(
+                              tooltip: 'Editar ubicacion',
+                              visualDensity: VisualDensity.compact,
+                              onPressed: _editLocation,
+                              icon: const Icon(
+                                Icons.edit_location_alt_outlined,
+                                size: 20,
+                                color: AppColors.primary,
                               ),
                             ),
                           ],
@@ -174,9 +195,9 @@ class _DriverHomeScreenState extends ConsumerState<DriverHomeScreen> {
                       ),
                     ],
                   ),
-                  child: Row(
+                  child: const Row(
                     mainAxisSize: MainAxisSize.min,
-                    children: const [
+                    children: [
                       Icon(Icons.report_problem, color: Colors.white, size: 22),
                       SizedBox(width: 12),
                       Text(
@@ -394,7 +415,7 @@ class _DriverHomeScreenState extends ConsumerState<DriverHomeScreen> {
           // ── Cards ────────────────────────────────────────────────────
           nearbyAsync.when(
             loading: () => SizedBox(
-              height: 120,
+              height: 150,
               child: ListView.separated(
                 scrollDirection: Axis.horizontal,
                 padding: const EdgeInsets.symmetric(horizontal: 24),
@@ -413,9 +434,7 @@ class _DriverHomeScreenState extends ConsumerState<DriverHomeScreen> {
             data: (services) {
               final filtered = selectedCat == null
                   ? services
-                  : services
-                      .where((s) => s.category == selectedCat)
-                      .toList();
+                  : services.where((s) => s.category == selectedCat).toList();
               if (filtered.isEmpty) {
                 return Padding(
                   padding: const EdgeInsets.symmetric(horizontal: 24),
@@ -436,7 +455,7 @@ class _DriverHomeScreenState extends ConsumerState<DriverHomeScreen> {
                 );
               }
               return SizedBox(
-                height: 120,
+                height: 150,
                 child: ListView.separated(
                   scrollDirection: Axis.horizontal,
                   padding: const EdgeInsets.symmetric(horizontal: 24),
@@ -527,8 +546,7 @@ class _MapSection extends ConsumerWidget {
                           decoration: BoxDecoration(
                             color: AppColors.primary,
                             shape: BoxShape.circle,
-                            border:
-                                Border.all(color: Colors.white, width: 2.5),
+                            border: Border.all(color: Colors.white, width: 2.5),
                             boxShadow: [
                               BoxShadow(
                                 color: AppColors.primary.withOpacity(0.35),
@@ -714,7 +732,7 @@ class _NearbyServiceCard extends StatelessWidget {
         ),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
-          mainAxisSize: MainAxisSize.min,
+          mainAxisSize: MainAxisSize.max,
           children: [
             Row(
               children: [
@@ -724,8 +742,7 @@ class _NearbyServiceCard extends StatelessWidget {
                     color: service.color.withOpacity(0.12),
                     borderRadius: BorderRadius.circular(9),
                   ),
-                  child:
-                      Icon(service.icon, color: service.color, size: 18),
+                  child: Icon(service.icon, color: service.color, size: 18),
                 ),
                 const Spacer(),
                 // Category badge
@@ -762,7 +779,7 @@ class _NearbyServiceCard extends StatelessWidget {
             const Spacer(),
             Row(
               children: [
-                Icon(Icons.near_me_rounded,
+                const Icon(Icons.near_me_rounded,
                     size: 11, color: AppColors.secondary),
                 const SizedBox(width: 3),
                 Text(

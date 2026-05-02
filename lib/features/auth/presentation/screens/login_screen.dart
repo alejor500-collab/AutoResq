@@ -89,7 +89,8 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
       onPressed: isLoading ? null : () => setState(() => _showEmailForm = true),
       isLoading: false,
       variant: AppButtonVariant.outline,
-      prefixIcon: const Icon(Icons.email_outlined, color: AppColors.onSurface, size: 20),
+      prefixIcon: const Icon(Icons.email_outlined,
+          color: AppColors.onSurface, size: 20),
     );
   }
 
@@ -98,7 +99,7 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
       key: const ValueKey('email_form'),
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        _FieldLabel('EMAIL'),
+        const _FieldLabel('EMAIL'),
         const SizedBox(height: 8),
         TextFormField(
           controller: _emailCtrl,
@@ -117,7 +118,7 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
         Row(
           mainAxisAlignment: MainAxisAlignment.spaceBetween,
           children: [
-            _FieldLabel('CONTRASEÑA'),
+            const _FieldLabel('CONTRASEÑA'),
             GestureDetector(
               onTap: () => context.push(AppRoutes.forgotPassword),
               child: const Text(
@@ -148,7 +149,9 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
           decoration: _inputDecoration('••••••••').copyWith(
             suffixIcon: IconButton(
               icon: Icon(
-                _obscurePass ? Icons.visibility_off_outlined : Icons.visibility_outlined,
+                _obscurePass
+                    ? Icons.visibility_off_outlined
+                    : Icons.visibility_outlined,
                 color: AppColors.secondary,
                 size: 20,
               ),
@@ -161,7 +164,8 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
           label: 'Continuar',
           onPressed: isLoading ? null : _login,
           isLoading: isLoading,
-          suffixIcon: const Icon(Icons.arrow_forward, color: Colors.white, size: 20),
+          suffixIcon:
+              const Icon(Icons.arrow_forward, color: Colors.white, size: 20),
         ),
         const SizedBox(height: 16),
         Center(
@@ -207,7 +211,6 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
               ),
             ),
           ),
-
           SafeArea(
             child: SingleChildScrollView(
               padding: const EdgeInsets.symmetric(horizontal: 24),
@@ -259,13 +262,16 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
                     const SizedBox(height: 40),
 
                     // Google button
-                    _GoogleSignInButton(onPressed: isLoading ? null : _loginWithGoogle),
+                    _GoogleSignInButton(
+                        onPressed: isLoading ? null : _loginWithGoogle),
                     const SizedBox(height: 20),
 
                     // Divider
                     Row(
                       children: [
-                        Expanded(child: Divider(color: AppColors.outline.withOpacity(0.4))),
+                        Expanded(
+                            child: Divider(
+                                color: AppColors.outline.withOpacity(0.4))),
                         Padding(
                           padding: const EdgeInsets.symmetric(horizontal: 12),
                           child: Text(
@@ -277,7 +283,9 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
                             ),
                           ),
                         ),
-                        Expanded(child: Divider(color: AppColors.outline.withOpacity(0.4))),
+                        Expanded(
+                            child: Divider(
+                                color: AppColors.outline.withOpacity(0.4))),
                       ],
                     ),
                     const SizedBox(height: 20),
@@ -435,7 +443,8 @@ class _GoogleLogoPainter extends CustomPainter {
       ..strokeWidth = strokeWidth
       ..strokeCap = StrokeCap.round;
 
-    final rect = Rect.fromCircle(center: Offset.zero, radius: radius - strokeWidth / 2);
+    final rect =
+        Rect.fromCircle(center: Offset.zero, radius: radius - strokeWidth / 2);
 
     canvas.save();
     canvas.translate(center.dx, center.dy);
@@ -456,7 +465,8 @@ class _GoogleLogoPainter extends CustomPainter {
       ..color = const Color(0xFF4285F4)
       ..strokeWidth = strokeWidth
       ..strokeCap = StrokeCap.round;
-    canvas.drawLine(Offset.zero, Offset(radius - strokeWidth / 2, 0), linePaint);
+    canvas.drawLine(
+        Offset.zero, Offset(radius - strokeWidth / 2, 0), linePaint);
 
     canvas.restore();
   }

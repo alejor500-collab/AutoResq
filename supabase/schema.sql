@@ -53,6 +53,9 @@ CREATE TABLE IF NOT EXISTS public.vehiculos (
 COMMENT ON TABLE public.vehiculos IS
     'Vehículos registrados por los conductores.';
 
+CREATE UNIQUE INDEX IF NOT EXISTS idx_vehiculos_usuario_unico
+    ON public.vehiculos(usuario_id);
+
 -- -------------------------------------
 -- 2.3 tipos_problema
 -- -------------------------------------
@@ -80,8 +83,10 @@ CREATE TABLE IF NOT EXISTS public.tecnicos (
                              CHECK (estado_verificacion IN ('pendiente', 'aprobado', 'rechazado')),
     url_credencial       text,
     verificado_por       uuid REFERENCES public.usuarios(id),
-    fecha_verificacion   timestamp with time zone
+    fecha_verificacion   timestamp with time zone,
+    motivo_rechazo       text
 );
+-- Aplicar en DB existente: ALTER TABLE public.tecnicos ADD COLUMN IF NOT EXISTS motivo_rechazo text;
 
 COMMENT ON TABLE public.tecnicos IS
     'Perfil extendido del técnico: disponibilidad, ubicación y estado de verificación.';
@@ -343,8 +348,11 @@ CREATE POLICY "tecnicos_insert_own" ON public.tecnicos
     FOR INSERT WITH CHECK (usuario_id = auth.uid());
 
 -- Solo el propio técnico puede editar su perfil
+DROP POLICY IF EXISTS "tecnicos_update_own" ON public.tecnicos;
 CREATE POLICY "tecnicos_update_own" ON public.tecnicos
-    FOR UPDATE USING (usuario_id = auth.uid());
+    FOR UPDATE TO authenticated
+    USING (usuario_id = auth.uid())
+    WITH CHECK (usuario_id = auth.uid());
 
 -- Administradores tienen acceso total
 CREATE POLICY "tecnicos_admin_all" ON public.tecnicos
@@ -672,6 +680,43 @@ CREATE TRIGGER on_usuarios_updated
     FOR EACH ROW
     EXECUTE FUNCTION public.set_actualizado_en();
 
+
+-- =============================================================================
+-- SECCIÓN 8: EDGE FUNCTIONS  (documentación — no se ejecuta en SQL Editor)
+-- =============================================================================
+--
+-- send-rejection-email
+-- ---------------------
+-- Archivo:  supabase/functions/send-rejection-email/index.ts
+-- Invocada: admin_provider.dart → rejectTechnician() en Flutter
+--           después de actualizar tecnicos.estado_verificacion = 'rechazado'.
+-- Input:    { email: string, nombre: string, motivo?: string }
+-- Acción:   Envía correo HTML de rechazo via Resend API.
+--
+-- Secrets requeridos (configurar una sola vez en Supabase):
+--   RESEND_API_KEY  — clave de API de Resend (https://resend.com/api-keys)
+--   MAIL_FROM       — remitente verificado, ej: "AutoResQ <no-reply@tudominio.com>"
+--
+-- Pasos manuales de despliegue:
+--   1. supabase functions deploy send-rejection-email --project-ref <ref>
+--   2. supabase secrets set RESEND_API_KEY=<clave> --project-ref <ref>
+--   3. supabase secrets set MAIL_FROM="AutoResQ <no-reply@tudominio.com>" --project-ref <ref>
+--   4. Verificar dominio/remitente en https://resend.com/domains
+--      (sin verificación de dominio Resend solo permite enviar a la cuenta owner)
+--
+-- =============================================================================
+-- SECCIÓN 9: CORRECCIONES DE COLUMNAS DE UBICACIÓN
+-- Estrategia de ubicación:
+--   • usuarios   → NO tiene lat/lng (solo datos de perfil).
+--   • tecnicos   → tiene ubicacion_lat / ubicacion_lng (actualizadas en ruta).
+--   • conductores → ubicación solo en memoria/GPS del dispositivo (no persistida).
+-- Si en algún entorno se añadieron columnas lat/lng por error, se eliminan aquí.
+-- =============================================================================
+
+ALTER TABLE public.usuarios DROP COLUMN IF EXISTS lat;
+ALTER TABLE public.usuarios DROP COLUMN IF EXISTS lng;
+ALTER TABLE public.tecnicos DROP COLUMN IF EXISTS lat;
+ALTER TABLE public.tecnicos DROP COLUMN IF EXISTS lng;
 
 -- =============================================================================
 -- FIN DEL SCHEMA

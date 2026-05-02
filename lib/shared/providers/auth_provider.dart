@@ -26,6 +26,17 @@ final authStateProvider = StreamProvider<AppUser?>((ref) {
   return repo.authStateChanges;
 });
 
+// ─── Password recovery signal ─────────────────────────────────────────────────
+// Emits true when Supabase fires the passwordRecovery event (deep link opened).
+final passwordRecoveryProvider = StreamProvider<bool>((ref) {
+  return ref
+      .read(supabaseClientProvider)
+      .auth
+      .onAuthStateChange
+      .map((e) => e.event == AuthChangeEvent.passwordRecovery)
+      .distinct();
+});
+
 // ─── Current User ─────────────────────────────────────────────────────────────
 final currentUserProvider = StateProvider<AppUser?>((ref) => null);
 

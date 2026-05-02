@@ -79,7 +79,9 @@ class _SplashScreenState extends ConsumerState<SplashScreen>
       case AppConstants.roleDriver:
         context.go(AppRoutes.driverHome);
       case AppConstants.roleTechnician:
-        context.go(AppRoutes.technicianHome);
+        context.go(user.isApproved
+            ? AppRoutes.technicianHome
+            : AppRoutes.technicianPending);
       case AppConstants.roleAdmin:
         context.go(AppRoutes.adminDashboard);
       default:
@@ -215,7 +217,7 @@ class _SplashScreenState extends ConsumerState<SplashScreen>
                             ),
                             const SizedBox(width: 8),
                             Text(
-                              'RIOBAMBA, ECUADOR',
+                              'ECUADOR',
                               style: TextStyle(
                                 fontSize: 12,
                                 fontWeight: FontWeight.w700,

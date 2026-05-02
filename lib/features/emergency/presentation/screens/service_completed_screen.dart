@@ -22,8 +22,8 @@ class ServiceCompletedScreen extends StatelessWidget {
     final duration = extra['duration'] as String?;
     final amount = extra['amount'] as String?;
     final techRating = (extra['techRating'] as num?)?.toInt() ?? 0;
-    final emergencyType = extra['emergencyType'] as String?
-        ?? extra['clasificacionIa'] as String?;
+    final emergencyType = extra['emergencyType'] as String? ??
+        extra['clasificacionIa'] as String?;
 
     return Scaffold(
       backgroundColor: AppColors.background,
@@ -94,8 +94,8 @@ class ServiceCompletedScreen extends StatelessWidget {
                         color: AppColors.surfaceContainerLowest,
                         borderRadius: BorderRadius.circular(
                             AppConstants.borderRadiusCard),
-                        border: Border.all(
-                            color: AppColors.surfaceContainerHigh),
+                        border:
+                            Border.all(color: AppColors.surfaceContainerHigh),
                         boxShadow: [
                           BoxShadow(
                             color: AppColors.onSurface.withOpacity(0.08),
@@ -122,7 +122,7 @@ class ServiceCompletedScreen extends StatelessWidget {
                                 crossAxisAlignment: CrossAxisAlignment.start,
                                 children: [
                                   // ── CLIENTE ──────────────────────
-                                  _SectionLabel('CLIENTE'),
+                                  const _SectionLabel('CLIENTE'),
                                   const Gap(4),
                                   Text(
                                     driverName,
@@ -157,11 +157,11 @@ class ServiceCompletedScreen extends StatelessWidget {
                                           crossAxisAlignment:
                                               CrossAxisAlignment.start,
                                           children: [
-                                            _SectionLabel('TIPO DE FALLA'),
+                                            const _SectionLabel(
+                                                'TIPO DE FALLA'),
                                             const Gap(6),
                                             if (emergencyType != null)
-                                              StatusChip(
-                                                  status: emergencyType)
+                                              StatusChip(status: emergencyType)
                                             else
                                               const Text(
                                                 '—',
@@ -179,7 +179,7 @@ class ServiceCompletedScreen extends StatelessWidget {
                                           crossAxisAlignment:
                                               CrossAxisAlignment.start,
                                           children: [
-                                            _SectionLabel('TIEMPO TOTAL'),
+                                            const _SectionLabel('TIEMPO TOTAL'),
                                             const Gap(6),
                                             Text(
                                               duration ?? '—',
@@ -205,17 +205,16 @@ class ServiceCompletedScreen extends StatelessWidget {
                                     padding: const EdgeInsets.all(12),
                                     decoration: BoxDecoration(
                                       color: AppColors.surfaceContainerLow,
-                                      borderRadius:
-                                          BorderRadius.circular(12),
+                                      borderRadius: BorderRadius.circular(12),
                                       border: Border.all(
-                                          color: AppColors
-                                              .surfaceContainerHigh),
+                                          color:
+                                              AppColors.surfaceContainerHigh),
                                     ),
                                     child: Column(
                                       crossAxisAlignment:
                                           CrossAxisAlignment.start,
                                       children: [
-                                        _SectionLabel('MONTO ACORDADO'),
+                                        const _SectionLabel('MONTO ACORDADO'),
                                         const Gap(4),
                                         Text(
                                           '\$${amount ?? '0'}',
@@ -250,8 +249,7 @@ class ServiceCompletedScreen extends StatelessWidget {
                                         ? StarRating(
                                             rating: techRating.toDouble(),
                                             size: 18,
-                                            activeColor:
-                                                AppColors.primary,
+                                            activeColor: AppColors.primary,
                                           )
                                         : const Text(
                                             'Omitida',
@@ -263,9 +261,9 @@ class ServiceCompletedScreen extends StatelessWidget {
                                           ),
                                   ),
                                   const Gap(8),
-                                  _RatingRow(
+                                  const _RatingRow(
                                     label: 'Calificación recibida:',
-                                    child: const Text(
+                                    child: Text(
                                       'Pendiente de calificación\ndel conductor',
                                       textAlign: TextAlign.end,
                                       style: TextStyle(

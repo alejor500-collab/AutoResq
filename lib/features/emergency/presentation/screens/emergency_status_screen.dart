@@ -24,8 +24,8 @@ class EmergencyStatusScreen extends ConsumerWidget {
 
     return stream.when(
       loading: () => const Scaffold(
-        body: Center(
-            child: CircularProgressIndicator(color: AppColors.primary)),
+        body:
+            Center(child: CircularProgressIndicator(color: AppColors.primary)),
       ),
       error: (e, _) => Scaffold(
         body: Center(child: Text(e.toString())),
@@ -59,8 +59,8 @@ class _StatusBody extends ConsumerWidget {
                 filter: ImageFilter.blur(sigmaX: 20, sigmaY: 20),
                 child: Container(
                   height: 64 + MediaQuery.of(context).padding.top,
-                  padding: EdgeInsets.only(
-                      top: MediaQuery.of(context).padding.top),
+                  padding:
+                      EdgeInsets.only(top: MediaQuery.of(context).padding.top),
                   decoration: BoxDecoration(
                     color: Colors.white.withOpacity(0.8),
                     boxShadow: [
@@ -107,10 +107,10 @@ class _StatusBody extends ConsumerWidget {
                           child: InkWell(
                             customBorder: const CircleBorder(),
                             onTap: () => context.push(AppRoutes.profile),
-                            child: CircleAvatar(
+                            child: const CircleAvatar(
                               radius: 16,
                               backgroundColor: AppColors.surfaceContainerHigh,
-                              child: const Icon(Icons.person,
+                              child: Icon(Icons.person,
                                   size: 18, color: AppColors.secondary),
                             ),
                           ),
@@ -166,8 +166,7 @@ class _StatusBody extends ConsumerWidget {
                     context.go(AppRoutes.driverHome);
                   case 2:
                     if (emergency.hasTechnician) {
-                      context.push(AppRoutes.driverChat,
-                          extra: emergency.id);
+                      context.push(AppRoutes.driverChat, extra: emergency.id);
                     }
                   case 3:
                     context.push(AppRoutes.profile);
@@ -194,7 +193,7 @@ class _ETAHero extends StatelessWidget {
 
     return Column(
       children: [
-        Text(
+        const Text(
           'TIEMPO ESTIMADO',
           style: TextStyle(
             fontSize: 10,
@@ -215,7 +214,7 @@ class _ETAHero extends StatelessWidget {
         ),
         Text(
           subtitle,
-          style: TextStyle(
+          style: const TextStyle(
             fontSize: 14,
             color: AppColors.secondary,
           ),
@@ -276,8 +275,7 @@ class _LiveMap extends StatelessWidget {
             ),
             children: [
               TileLayer(
-                urlTemplate:
-                    'https://tile.openstreetmap.org/{z}/{x}/{y}.png',
+                urlTemplate: 'https://tile.openstreetmap.org/{z}/{x}/{y}.png',
               ),
               MarkerLayer(
                 markers: [
@@ -292,8 +290,8 @@ class _LiveMap extends StatelessWidget {
                         border: Border.all(color: Colors.white, width: 2),
                       ),
                       child: const Center(
-                        child: Icon(Icons.circle,
-                            color: Colors.white, size: 12),
+                        child:
+                            Icon(Icons.circle, color: Colors.white, size: 12),
                       ),
                     ),
                   ),
@@ -325,8 +323,7 @@ class _LiveMap extends StatelessWidget {
             bottom: 16,
             left: 16,
             child: Container(
-              padding:
-                  const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
               decoration: BoxDecoration(
                 color: Colors.white.withOpacity(0.95),
                 borderRadius: BorderRadius.circular(8),
@@ -343,13 +340,13 @@ class _LiveMap extends StatelessWidget {
                   Container(
                     width: 8,
                     height: 8,
-                    decoration: BoxDecoration(
+                    decoration: const BoxDecoration(
                       color: AppColors.primary,
                       shape: BoxShape.circle,
                     ),
                   ),
                   const Gap(8),
-                  Text(
+                  const Text(
                     'AV. DANIEL LEON BORJA',
                     style: TextStyle(
                       fontSize: 11,
@@ -444,8 +441,7 @@ class _TechnicianCard extends StatelessWidget {
                           decoration: BoxDecoration(
                             color: AppColors.tertiary,
                             shape: BoxShape.circle,
-                            border:
-                                Border.all(color: Colors.white, width: 2),
+                            border: Border.all(color: Colors.white, width: 2),
                           ),
                           child: const Icon(Icons.verified,
                               size: 12, color: Colors.white),
@@ -482,14 +478,12 @@ class _TechnicianCard extends StatelessWidget {
                             Text(
                               ' \u2022 ',
                               style: TextStyle(
-                                color:
-                                    AppColors.secondary.withOpacity(0.5),
+                                color: AppColors.secondary.withOpacity(0.5),
                               ),
                             ),
                             Text(
-                              emergency.clasificacionIa ??
-                                  'Especialista',
-                              style: TextStyle(
+                              emergency.clasificacionIa ?? 'Especialista',
+                              style: const TextStyle(
                                 fontSize: 12,
                                 color: AppColors.secondary,
                               ),
@@ -501,18 +495,17 @@ class _TechnicianCard extends StatelessWidget {
                   ),
                   // ETA badge
                   Container(
-                    padding: const EdgeInsets.symmetric(
-                        horizontal: 12, vertical: 6),
+                    padding:
+                        const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
                     decoration: BoxDecoration(
                       color: AppColors.primary.withOpacity(0.1),
                       borderRadius: BorderRadius.circular(9999),
                     ),
-                    child: Row(
+                    child: const Row(
                       mainAxisSize: MainAxisSize.min,
                       children: [
-                        Icon(Icons.near_me,
-                            size: 14, color: AppColors.primary),
-                        const Gap(4),
+                        Icon(Icons.near_me, size: 14, color: AppColors.primary),
+                        Gap(4),
                         Text(
                           'ETA',
                           style: TextStyle(
@@ -557,7 +550,7 @@ class _TechnicianCard extends StatelessWidget {
               // Cancel button
               TextButton(
                 onPressed: () {},
-                child: Text(
+                child: const Text(
                   'Cancelar servicio',
                   style: TextStyle(
                     fontSize: 12,
@@ -629,9 +622,9 @@ class _SearchingCardState extends State<_SearchingCard>
   @override
   void initState() {
     super.initState();
-    _ctrl = AnimationController(
-        vsync: this, duration: const Duration(seconds: 2))
-      ..repeat();
+    _ctrl =
+        AnimationController(vsync: this, duration: const Duration(seconds: 2))
+          ..repeat();
   }
 
   @override
@@ -652,8 +645,7 @@ class _SearchingCardState extends State<_SearchingCard>
         children: [
           RotationTransition(
             turns: _ctrl,
-            child: const Icon(Icons.sync,
-                color: AppColors.primary, size: 32),
+            child: const Icon(Icons.sync, color: AppColors.primary, size: 32),
           ),
           const Gap(16),
           const Text(
@@ -665,7 +657,7 @@ class _SearchingCardState extends State<_SearchingCard>
             ),
           ),
           const Gap(4),
-          Text(
+          const Text(
             'Estamos buscando el tecnico mas cercano',
             style: TextStyle(
               fontSize: 13,
@@ -691,7 +683,8 @@ class _TimelineStepper extends StatelessWidget {
     final steps = [
       _TimelineStep(
         title: 'Solicitud enviada',
-        subtitle: 'Riobamba Central \u2022 ${AppHelpers.formatTime(emergency.fecha)}',
+        subtitle:
+            '${emergency.direccion ?? 'Ecuador'} \u2022 ${AppHelpers.formatTime(emergency.fecha)}',
         status: _StepStatus.completed,
       ),
       _TimelineStep(
@@ -729,9 +722,7 @@ class _TimelineStepper extends StatelessWidget {
         borderRadius: BorderRadius.circular(16),
       ),
       child: Column(
-        children: steps
-            .map((step) => _TimelineStepWidget(step: step))
-            .toList(),
+        children: steps.map((step) => _TimelineStepWidget(step: step)).toList(),
       ),
     );
   }
@@ -796,14 +787,13 @@ class _TimelineStepWidget extends StatelessWidget {
                       : null,
                 ),
                 child: step.status == _StepStatus.completed
-                    ? const Icon(Icons.check,
-                        size: 14, color: Colors.white)
+                    ? const Icon(Icons.check, size: 14, color: Colors.white)
                     : step.status == _StepStatus.active
                         ? Center(
                             child: Container(
                               width: 6,
                               height: 6,
-                              decoration: BoxDecoration(
+                              decoration: const BoxDecoration(
                                 color: AppColors.primary,
                                 shape: BoxShape.circle,
                               ),

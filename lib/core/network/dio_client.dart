@@ -117,7 +117,7 @@ class DioClient {
       final data = response.data as Map<String, dynamic>;
       return data['display_name'] as String? ?? 'Ubicación desconocida';
     } catch (_) {
-      return 'Riobamba, Ecuador';
+      return 'Ecuador';
     }
   }
 

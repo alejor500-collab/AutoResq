@@ -3,13 +3,11 @@ import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:gap/gap.dart';
-import 'package:geolocator/geolocator.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import '../../../../core/constants/app_colors.dart';
 import '../../../../core/constants/app_constants.dart';
 import '../../../../core/constants/app_strings.dart';
-import '../../../../core/network/dio_client.dart';
 import '../../../../core/utils/helpers.dart';
 import '../../../../core/utils/validators.dart';
 import '../../../../shared/providers/auth_provider.dart';
@@ -18,6 +16,7 @@ import '../../../../shared/widgets/app_text_field.dart';
 import '../../../../shared/widgets/user_avatar.dart';
 import '../../../map/domain/entities/location_entity.dart';
 import '../../../map/presentation/providers/map_provider.dart';
+import '../../../map/presentation/widgets/location_picker_sheet.dart';
 
 class EditProfileScreen extends ConsumerStatefulWidget {
   const EditProfileScreen({super.key});
@@ -53,89 +52,54 @@ class _EditProfileScreenState extends ConsumerState<EditProfileScreen> {
   }
 
   Future<void> _updateLocation() async {
+    final user = ref.read(authNotifierProvider).value!;
+    final selected = await showLocationPickerSheet(
+      context,
+      title: 'Editar ubicacion guardada',
+      initialLocation: user.lat != null && user.lng != null
+          ? LocationEntity(
+              lat: user.lat!,
+              lng: user.lng!,
+              address: ref.read(mapNotifierProvider).currentLocation?.address,
+            )
+          : ref.read(mapNotifierProvider).currentLocation,
+    );
+
+    if (selected == null || !mounted) return;
+
     setState(() => _isUpdatingLocation = true);
     try {
-      final serviceEnabled = await Geolocator.isLocationServiceEnabled();
-      if (!serviceEnabled) {
-        if (mounted) {
-          AppHelpers.showSnackBar(
-            context, 'Activa el servicio de ubicación', isError: true);
-        }
-        return;
-      }
-
-      LocationPermission permission = await Geolocator.checkPermission();
-      if (permission == LocationPermission.denied) {
-        permission = await Geolocator.requestPermission();
-        if (permission == LocationPermission.denied) {
-          if (mounted) {
-            AppHelpers.showSnackBar(
-              context, 'Permiso de ubicación denegado', isError: true);
-          }
-          return;
-        }
-      }
-      if (permission == LocationPermission.deniedForever) {
-        if (mounted) {
-          AppHelpers.showSnackBar(
-            context,
-            'Permiso denegado permanentemente. Actívalo en Configuración',
-            isError: true,
-          );
-        }
-        return;
-      }
-
-      final position = await Geolocator.getCurrentPosition(
-        desiredAccuracy: LocationAccuracy.high,
-      );
-      final address = await DioClient()
-          .reverseGeocode(position.latitude, position.longitude);
-
-      final user = ref.read(authNotifierProvider).value!;
       final supabase = ref.read(supabaseClientProvider);
-
-      await supabase.from(AppConstants.tableUsuarios).update({
-        'lat': position.latitude,
-        'lng': position.longitude,
-      }).eq('id', user.id);
 
       if (user.isTechnician) {
         await supabase.from(AppConstants.tableTecnicos).update({
-          'lat': position.latitude,
-          'lng': position.longitude,
+          'ubicacion_lat': selected.lat,
+          'ubicacion_lng': selected.lng,
         }).eq('usuario_id', user.id);
-
-        await supabase.from(AppConstants.tableUbicacionesTecnico).upsert({
-          'usuario_id': user.id,
-          'lat': position.latitude,
-          'lng': position.longitude,
-          'actualizado_en': DateTime.now().toIso8601String(),
-        });
       }
 
       final updated = user.copyWith(
-        lat: position.latitude,
-        lng: position.longitude,
+        lat: selected.lat,
+        lng: selected.lng,
       );
       ref.read(authNotifierProvider.notifier).refreshUser(updated);
       ref.read(currentUserProvider.notifier).state = updated;
-      ref.read(mapNotifierProvider.notifier).setLocation(
-        LocationEntity(
-          lat: position.latitude,
-          lng: position.longitude,
-          address: address,
-        ),
-      );
+      ref.read(mapNotifierProvider.notifier).setLocation(selected);
 
       if (mounted) {
         AppHelpers.showSnackBar(
-          context, 'Ubicación actualizada', isSuccess: true);
+          context,
+          'Ubicacion actualizada',
+          isSuccess: true,
+        );
       }
     } catch (_) {
       if (mounted) {
         AppHelpers.showSnackBar(
-          context, 'Error al obtener ubicación', isError: true);
+          context,
+          'Error al guardar ubicacion',
+          isError: true,
+        );
       }
     } finally {
       if (mounted) setState(() => _isUpdatingLocation = false);
@@ -314,7 +278,7 @@ class _EditProfileScreenState extends ConsumerState<EditProfileScreen> {
                 'Toca para cambiar foto',
                 style: TextStyle(
                   fontSize: 12,
-                  color: AppColors.primary.withOpacity(0.7),
+                  color: AppColors.primary.withValues(alpha: 0.7),
                 ),
               ),
               const Gap(28),
@@ -339,15 +303,27 @@ class _EditProfileScreenState extends ConsumerState<EditProfileScreen> {
                 textInputAction: TextInputAction.next,
               ),
 
-              if (user?.isTechnician == true) ...[
-                const Gap(14),
-                AppTextField(
-                  label: AppStrings.specialty,
-                  controller: _specialtyCtrl,
-                  prefixIcon: const Icon(Icons.build_outlined, size: 20),
-                  textInputAction: TextInputAction.done,
+              const Gap(14),
+              AppTextField(
+                label: 'Especialidad técnica',
+                hint: 'Ej: Mecánica automotriz, Electricidad',
+                controller: _specialtyCtrl,
+                prefixIcon: const Icon(Icons.build_outlined, size: 20),
+                textInputAction: TextInputAction.next,
+              ),
+              const Gap(4),
+              Padding(
+                padding: const EdgeInsets.symmetric(horizontal: 4),
+                child: Text(
+                  user?.isTechnician == true
+                      ? 'Tu especialidad es visible para los conductores que solicitan asistencia.'
+                      : 'Opcional. Indícala si tienes conocimientos técnicos.',
+                  style: const TextStyle(
+                    fontSize: 12,
+                    color: AppColors.textSecondary,
+                  ),
                 ),
-              ],
+              ),
 
               // Email (read only)
               const Gap(14),
@@ -410,7 +386,7 @@ class _EditProfileScreenState extends ConsumerState<EditProfileScreen> {
                               minimumSize: Size.zero,
                               tapTargetSize: MaterialTapTargetSize.shrinkWrap,
                             ),
-                            child: const Text('Actualizar',
+                            child: const Text('Editar',
                                 style: TextStyle(
                                     fontSize: 13,
                                     fontWeight: FontWeight.w600)),

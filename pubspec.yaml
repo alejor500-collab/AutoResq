@@ -1,5 +1,5 @@
 name: autoresq
-description: Asistencia en emergencias automotrices - Riobamba, Ecuador
+description: Asistencia en emergencias automotrices - Ecuador
 publish_to: 'none'
 version: 1.0.0+1
 
@@ -19,9 +19,6 @@ dependencies:
 
   # Backend
   supabase_flutter: ^2.5.0
-
-  # Google Auth (Supabase OAuth)
-  google_sign_in: ^6.2.1
 
   # Map
   flutter_map: ^6.1.0

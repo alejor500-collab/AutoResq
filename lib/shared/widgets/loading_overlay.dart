@@ -65,11 +65,12 @@ class ShimmerList extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Column(
-      children: List.generate(
-        count,
-        (_) => ShimmerCard(height: itemHeight),
-      ),
+    return ListView.separated(
+      shrinkWrap: true,
+      physics: const NeverScrollableScrollPhysics(),
+      itemCount: count,
+      separatorBuilder: (_, __) => const SizedBox.shrink(),
+      itemBuilder: (_, __) => ShimmerCard(height: itemHeight),
     );
   }
 }

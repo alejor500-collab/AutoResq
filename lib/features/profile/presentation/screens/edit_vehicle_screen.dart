@@ -11,7 +11,6 @@ import '../../../../shared/widgets/app_text_field.dart';
 import '../../data/models/vehicle_model.dart';
 import '../providers/vehicle_provider.dart';
 
-
 class EditVehicleScreen extends ConsumerStatefulWidget {
   const EditVehicleScreen({super.key});
 
@@ -65,7 +64,11 @@ class _EditVehicleScreenState extends ConsumerState<EditVehicleScreen> {
         AppHelpers.showSnackBar(context, 'Vehículo guardado', isSuccess: true);
         context.pop();
       }
-    } catch (_) {
+    } on VehicleSaveException catch (e) {
+      if (mounted) {
+        AppHelpers.showSnackBar(context, e.message, isError: true);
+      }
+    } catch (e) {
       if (mounted) {
         AppHelpers.showSnackBar(context, 'Error al guardar', isError: true);
       }
@@ -82,10 +85,16 @@ class _EditVehicleScreenState extends ConsumerState<EditVehicleScreen> {
         title: const Text('Eliminar vehículo'),
         content: const Text('¿Deseas eliminar los datos de tu vehículo?'),
         actions: [
-          TextButton(onPressed: () => Navigator.pop(ctx, false), child: const Text('Cancelar')),
+          TextButton(
+            onPressed: () => Navigator.pop(ctx, false),
+            child: const Text('Cancelar'),
+          ),
           TextButton(
             onPressed: () => Navigator.pop(ctx, true),
-            child: const Text('Eliminar', style: TextStyle(color: AppColors.error)),
+            child: const Text(
+              'Eliminar',
+              style: TextStyle(color: AppColors.error),
+            ),
           ),
         ],
       ),
@@ -106,7 +115,11 @@ class _EditVehicleScreenState extends ConsumerState<EditVehicleScreen> {
         backgroundColor: AppColors.background,
         elevation: 0,
         leading: IconButton(
-          icon: const Icon(Icons.arrow_back_ios_new, size: 20, color: AppColors.onSurface),
+          icon: const Icon(
+            Icons.arrow_back_ios_new,
+            size: 20,
+            color: AppColors.onSurface,
+          ),
           onPressed: () => context.pop(),
         ),
         title: Text(
@@ -144,13 +157,17 @@ class _EditVehicleScreenState extends ConsumerState<EditVehicleScreen> {
                     borderRadius: BorderRadius.circular(24),
                     boxShadow: [
                       BoxShadow(
-                        color: AppColors.primary.withOpacity(0.25),
+                        color: AppColors.primary.withValues(alpha: 0.25),
                         blurRadius: 20,
                         offset: const Offset(0, 8),
                       ),
                     ],
                   ),
-                  child: const Icon(Icons.directions_car, size: 44, color: Colors.white),
+                  child: const Icon(
+                    Icons.directions_car,
+                    size: 44,
+                    color: Colors.white,
+                  ),
                 ),
               ),
               const Gap(32),
@@ -161,7 +178,9 @@ class _EditVehicleScreenState extends ConsumerState<EditVehicleScreen> {
                 controller: _brandCtrl,
                 prefixIcon: const Icon(Icons.business, size: 20),
                 hint: 'Toyota, Chevrolet, Hyundai...',
-                validator: (v) => (v == null || v.trim().isEmpty) ? 'Ingresa la marca' : null,
+                validator: (v) => (v == null || v.trim().isEmpty)
+                    ? 'Ingresa la marca'
+                    : null,
                 textInputAction: TextInputAction.next,
               ),
               const Gap(14),
@@ -170,9 +189,12 @@ class _EditVehicleScreenState extends ConsumerState<EditVehicleScreen> {
               AppTextField(
                 label: 'Modelo',
                 controller: _modelCtrl,
-                prefixIcon: const Icon(Icons.directions_car_outlined, size: 20),
+                prefixIcon:
+                    const Icon(Icons.directions_car_outlined, size: 20),
                 hint: 'Hilux, Aveo, Tucson...',
-                validator: (v) => (v == null || v.trim().isEmpty) ? 'Ingresa el modelo' : null,
+                validator: (v) => (v == null || v.trim().isEmpty)
+                    ? 'Ingresa el modelo'
+                    : null,
                 textInputAction: TextInputAction.next,
               ),
               const Gap(14),
@@ -215,7 +237,9 @@ class _EditVehicleScreenState extends ConsumerState<EditVehicleScreen> {
                 controller: _colorCtrl,
                 prefixIcon: const Icon(Icons.palette_outlined, size: 20),
                 hint: 'Blanco, Negro, Rojo...',
-                validator: (v) => (v == null || v.trim().isEmpty) ? 'Ingresa el color' : null,
+                validator: (v) => (v == null || v.trim().isEmpty)
+                    ? 'Ingresa el color'
+                    : null,
                 textInputAction: TextInputAction.done,
               ),
               const Gap(32),

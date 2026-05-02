@@ -11,7 +11,7 @@ abstract class AppConstants {
   // ─── App ───────────────────────────────────────────────────────────────────
   static const String appName = 'AutoResQ';
   static const String appVersion = '1.0.0';
-  static const String appTagline = 'Asistencia de confianza en Riobamba';
+  static const String appTagline = 'Asistencia de confianza en Ecuador';
 
   // ─── Roles ─────────────────────────────────────────────────────────────────
   static const String roleDriver = 'conductor';
@@ -38,9 +38,9 @@ abstract class AppConstants {
   static const String verificationRejected = 'rechazado';
 
   // ─── Map ───────────────────────────────────────────────────────────────────
-  static const double defaultLat = -1.6635;  // Riobamba, Ecuador
-  static const double defaultLng = -78.6538;
-  static const double defaultZoom = 14.0;
+  static const double defaultLat = -1.8312;  // Ecuador
+  static const double defaultLng = -78.1834;
+  static const double defaultZoom = 6.5;
   static const String nominatimUrl = 'https://nominatim.openstreetmap.org';
   static const String osmTileUrl =
       'https://tile.openstreetmap.org/{z}/{x}/{y}.png';

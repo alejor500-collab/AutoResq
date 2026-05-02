@@ -18,6 +18,7 @@ abstract class AuthRemoteDataSource {
   });
   Future<void> logout();
   Future<void> sendPasswordReset(String email);
+  Future<void> updatePassword(String newPassword);
   Future<UserModel?> getCurrentUser();
   Future<UserModel> updateProfile(UserModel user);
   Stream<UserModel?> get authStateChanges;
@@ -39,9 +40,8 @@ class AuthRemoteDataSourceImpl implements AuthRemoteDataSource {
     } catch (_) {
       final meta = supabaseUser.userMetadata ?? {};
       final email = supabaseUser.email ?? '';
-      final name =
-          (meta['full_name'] ?? meta['name'] ?? email.split('@').first)
-              .toString();
+      final name = (meta['full_name'] ?? meta['name'] ?? email.split('@').first)
+          .toString();
       final avatarUrl = (meta['avatar_url'] ?? meta['picture']) as String?;
 
       await _client.from(AppConstants.tableProfiles).upsert({
@@ -77,6 +77,34 @@ class AuthRemoteDataSourceImpl implements AuthRemoteDataSource {
         .select()
         .eq('id', userId)
         .single();
+
+    String? specialty;
+    String? verificationStatus;
+    String? rejectionReason;
+    double? lat;
+    double? lng;
+    bool isAvailable = false;
+    bool isApproved = data['activo'] as bool? ?? true;
+
+    if (data['rol'] == AppConstants.roleTechnician) {
+      final tecnico = await _client
+          .from(AppConstants.tableTecnicos)
+          .select(
+              'especialidad, disponible, estado_verificacion, motivo_rechazo, ubicacion_lat, ubicacion_lng')
+          .eq('usuario_id', userId)
+          .maybeSingle();
+      specialty = tecnico?['especialidad'] as String?;
+      isAvailable = tecnico?['disponible'] as bool? ?? false;
+      // Sin fila, estado != aprobado, o cuenta desactivada → no aprobado
+      isApproved = (tecnico?['estado_verificacion'] ==
+              AppConstants.verificationApproved) &&
+          (data['activo'] as bool? ?? true);
+      verificationStatus = tecnico?['estado_verificacion'] as String?;
+      rejectionReason = tecnico?['motivo_rechazo'] as String?;
+      lat = (tecnico?['ubicacion_lat'] as num?)?.toDouble();
+      lng = (tecnico?['ubicacion_lng'] as num?)?.toDouble();
+    }
+
     return UserModel.fromJson({
       'id': data['id'],
       'email': data['email'],
@@ -86,10 +114,15 @@ class AuthRemoteDataSourceImpl implements AuthRemoteDataSource {
       'avatar_url': data['avatar_url'],
       'rating': 0.0,
       'total_services': 0,
-      'is_available': false,
-      'is_approved': data['activo'] ?? true,
-      'created_at': data['creado_en']?.toString() ??
-          DateTime.now().toIso8601String(),
+      'is_available': isAvailable,
+      'is_approved': isApproved,
+      'specialty': specialty,
+      'lat': lat,
+      'lng': lng,
+      'created_at':
+          data['creado_en']?.toString() ?? DateTime.now().toIso8601String(),
+      'verification_status': verificationStatus,
+      'rejection_reason': rejectionReason,
     });
   }
 
@@ -155,6 +188,8 @@ class AuthRemoteDataSourceImpl implements AuthRemoteDataSource {
         await _client.from(AppConstants.tableTecnicos).insert({
           'usuario_id': userId,
           'especialidad': specialty ?? '',
+          'estado_verificacion': AppConstants.verificationPending,
+          'disponible': false,
         });
       }
 
@@ -242,10 +277,24 @@ class AuthRemoteDataSourceImpl implements AuthRemoteDataSource {
   @override
   Future<void> sendPasswordReset(String email) async {
     try {
-      await _client.auth.resetPasswordForEmail(email);
+      await _client.auth.resetPasswordForEmail(
+        email,
+        redirectTo: 'com.autoresq.app://reset-password',
+      );
     } catch (e) {
-      throw core_exceptions.AuthException(
+      throw const core_exceptions.AuthException(
           message: 'No se pudo enviar el correo de recuperación');
+    }
+  }
+
+  @override
+  Future<void> updatePassword(String newPassword) async {
+    try {
+      await _client.auth.updateUser(UserAttributes(password: newPassword));
+    } on AuthException catch (e) {
+      throw core_exceptions.AuthException(message: e.message);
+    } catch (e) {
+      throw core_exceptions.ServerException(message: e.toString());
     }
   }
 
@@ -270,6 +319,13 @@ class AuthRemoteDataSourceImpl implements AuthRemoteDataSource {
         'telefono': user.phone,
         'avatar_url': user.avatarUrl,
       }).eq('id', user.id);
+
+      if (user.role == AppConstants.roleTechnician && user.specialty != null) {
+        await _client.from(AppConstants.tableTecnicos).update({
+          'especialidad': user.specialty,
+        }).eq('usuario_id', user.id);
+      }
+
       final fresh = await _fetchProfile(user.id);
       return UserModel(
         id: fresh.id,
@@ -283,9 +339,11 @@ class AuthRemoteDataSourceImpl implements AuthRemoteDataSource {
         isAvailable: fresh.isAvailable,
         isApproved: fresh.isApproved,
         specialty: user.specialty,
-        lat: user.lat,
-        lng: user.lng,
+        lat: fresh.lat,
+        lng: fresh.lng,
         createdAt: fresh.createdAt,
+        verificationStatus: fresh.verificationStatus,
+        rejectionReason: fresh.rejectionReason,
       );
     } on PostgrestException catch (e) {
       throw core_exceptions.ServerException(message: e.message);

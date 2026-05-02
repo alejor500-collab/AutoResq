@@ -1,5 +1,6 @@
 import 'dart:typed_data';
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:image_picker/image_picker.dart';
@@ -50,21 +51,44 @@ class _RegisterScreenState extends ConsumerState<RegisterScreen> {
     super.dispose();
   }
 
-  String get _roleName =>
-      _selectedRole == 0 ? AppConstants.roleDriver : AppConstants.roleTechnician;
+  String get _roleName => _selectedRole == 0
+      ? AppConstants.roleDriver
+      : AppConstants.roleTechnician;
 
   Future<void> _pickCedula() async {
+    final source = await showModalBottomSheet<ImageSource>(
+      context: context,
+      builder: (_) => SafeArea(
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            ListTile(
+              leading: const Icon(Icons.camera_alt_outlined),
+              title: const Text('Tomar foto'),
+              onTap: () => Navigator.pop(context, ImageSource.camera),
+            ),
+            ListTile(
+              leading: const Icon(Icons.photo_library_outlined),
+              title: const Text('Elegir de galería'),
+              onTap: () => Navigator.pop(context, ImageSource.gallery),
+            ),
+          ],
+        ),
+      ),
+    );
+    if (source == null) return;
     final picker = ImagePicker();
     final xFile = await picker.pickImage(
-      source: ImageSource.camera,
+      source: source,
       imageQuality: 85,
       maxWidth: 1024,
     );
     if (xFile == null) return;
     final bytes = await xFile.readAsBytes();
+    final nameForExt = xFile.name.isNotEmpty ? xFile.name : xFile.path;
     setState(() {
       _cedulaBytes = bytes;
-      _cedulaExt = xFile.path.split('.').last.toLowerCase();
+      _cedulaExt = nameForExt.split('.').last.toLowerCase();
     });
   }
 
@@ -101,7 +125,8 @@ class _RegisterScreenState extends ConsumerState<RegisterScreen> {
     if (!_formKey.currentState!.validate()) return;
 
     if (_passwordCtrl.text != _confirmPassCtrl.text) {
-      AppHelpers.showSnackBar(context, 'Las contraseñas no coinciden', isError: true);
+      AppHelpers.showSnackBar(context, 'Las contraseñas no coinciden',
+          isError: true);
       return;
     }
 
@@ -127,27 +152,61 @@ class _RegisterScreenState extends ConsumerState<RegisterScreen> {
     if (!mounted) return;
 
     if (success) {
-      // Upload cedula for technician
       if (_selectedRole == 1 && _cedulaBytes != null) {
-        try {
-          final user = ref.read(authNotifierProvider).value;
-          if (user != null) {
-            final supabase = ref.read(supabaseClientProvider);
-            final path = '${user.id}/cedula.$_cedulaExt';
-            await supabase.storage
-                .from(AppConstants.bucketAvatars)
-                .uploadBinary(path, _cedulaBytes!,
-                    fileOptions: const FileOptions(upsert: true));
-            final url = supabase.storage
-                .from(AppConstants.bucketAvatars)
-                .getPublicUrl(path);
-            await supabase
-                .from(AppConstants.tableTecnicos)
-                .update({'url_credencial': url}).eq('usuario_id', user.id);
+        final user = ref.read(authNotifierProvider).value;
+        if (user == null) {
+          if (mounted) {
+            AppHelpers.showSnackBar(
+              context,
+              'No se pudo subir el documento de identidad.',
+              isError: true,
+            );
           }
-        } catch (_) {
-          // Non-fatal: cedula upload failed, user can add it later
+          return;
         }
+        try {
+          final supabase = ref.read(supabaseClientProvider);
+          final ext = _cedulaExt.isEmpty ? 'jpg' : _cedulaExt;
+          final mimeType = switch (ext) {
+            'png' => 'image/png',
+            'webp' => 'image/webp',
+            _ => 'image/jpeg',
+          };
+          final path =
+              '${user.id}/cedula_${DateTime.now().millisecondsSinceEpoch}.$ext';
+          await supabase.storage.from(AppConstants.bucketAvatars).uploadBinary(
+              path, _cedulaBytes!,
+              fileOptions: FileOptions(upsert: true, contentType: mimeType));
+          final url = supabase.storage
+              .from(AppConstants.bucketAvatars)
+              .getPublicUrl(path);
+          final rows = await supabase
+              .from(AppConstants.tableTecnicos)
+              .update({'url_credencial': url})
+              .eq('usuario_id', user.id)
+              .select('url_credencial');
+          if (rows.isEmpty) {
+            if (mounted) {
+              AppHelpers.showSnackBar(
+                context,
+                'No se pudo subir el documento de identidad.',
+                isError: true,
+              );
+            }
+            return;
+          }
+        } catch (e) {
+          if (mounted) {
+            AppHelpers.showSnackBar(
+              context,
+              'No se pudo subir el documento de identidad.',
+              isError: true,
+            );
+          }
+          return;
+        }
+        // Upload completo. El router redirige al técnico a la pantalla de espera.
+        return;
       }
       _navigateByRole();
     } else {
@@ -202,7 +261,8 @@ class _RegisterScreenState extends ConsumerState<RegisterScreen> {
                           color: AppColors.surfaceContainerLow,
                           borderRadius: BorderRadius.circular(12),
                         ),
-                        child: const Icon(Icons.arrow_back, size: 20, color: AppColors.secondary),
+                        child: const Icon(Icons.arrow_back,
+                            size: 20, color: AppColors.secondary),
                       ),
                     ),
                     const SizedBox(height: 24),
@@ -267,9 +327,14 @@ class _RegisterScreenState extends ConsumerState<RegisterScreen> {
                       label: 'Nombre completo',
                       hint: 'Juan Pérez',
                       controller: _nameCtrl,
-                      validator: Validators.required,
+                      validator: Validators.name,
                       textInputAction: TextInputAction.next,
-                      prefixIcon: const Icon(Icons.person_outline, size: 20, color: AppColors.secondary),
+                      prefixIcon: const Icon(Icons.person_outline,
+                          size: 20, color: AppColors.secondary),
+                      inputFormatters: [
+                        FilteringTextInputFormatter.allow(
+                            RegExp(r'[a-zA-ZáéíóúÁÉÍÓÚñÑüÜ\s]')),
+                      ],
                     ),
                     const SizedBox(height: 16),
 
@@ -281,7 +346,8 @@ class _RegisterScreenState extends ConsumerState<RegisterScreen> {
                       keyboardType: TextInputType.emailAddress,
                       validator: Validators.email,
                       textInputAction: TextInputAction.next,
-                      prefixIcon: const Icon(Icons.email_outlined, size: 20, color: AppColors.secondary),
+                      prefixIcon: const Icon(Icons.email_outlined,
+                          size: 20, color: AppColors.secondary),
                     ),
                     const SizedBox(height: 16),
 
@@ -293,7 +359,9 @@ class _RegisterScreenState extends ConsumerState<RegisterScreen> {
                       keyboardType: TextInputType.phone,
                       validator: Validators.phone,
                       textInputAction: TextInputAction.next,
-                      prefixIcon: const Icon(Icons.phone_outlined, size: 20, color: AppColors.secondary),
+                      prefixIcon: const Icon(Icons.phone_outlined,
+                          size: 20, color: AppColors.secondary),
+                      inputFormatters: [FilteringTextInputFormatter.digitsOnly],
                     ),
                     const SizedBox(height: 16),
 
@@ -303,9 +371,10 @@ class _RegisterScreenState extends ConsumerState<RegisterScreen> {
                         label: 'Especialidad',
                         hint: 'Ej: Mecánica automotriz',
                         controller: _specialtyCtrl,
-                        validator: Validators.required,
+                        validator: (v) => Validators.minLength(v, 3),
                         textInputAction: TextInputAction.next,
-                        prefixIcon: const Icon(Icons.build_outlined, size: 20, color: AppColors.secondary),
+                        prefixIcon: const Icon(Icons.build_outlined,
+                            size: 20, color: AppColors.secondary),
                       ),
                       const SizedBox(height: 16),
                       // Cedula photo picker
@@ -371,12 +440,13 @@ class _RegisterScreenState extends ConsumerState<RegisterScreen> {
                                           ? 'Toca para cambiar'
                                           : 'Requerida para verificación técnica',
                                       style: const TextStyle(
-                                          fontSize: 12, color: AppColors.secondary),
+                                          fontSize: 12,
+                                          color: AppColors.secondary),
                                     ),
                                   ],
                                 ),
                               ),
-                              Icon(
+                              const Icon(
                                 Icons.camera_alt_outlined,
                                 color: AppColors.secondary,
                                 size: 20,
@@ -415,14 +485,17 @@ class _RegisterScreenState extends ConsumerState<RegisterScreen> {
                       label: 'Crear cuenta',
                       onPressed: _register,
                       isLoading: isLoading,
-                      suffixIcon: const Icon(Icons.arrow_forward, color: Colors.white, size: 20),
+                      suffixIcon: const Icon(Icons.arrow_forward,
+                          color: Colors.white, size: 20),
                     ),
                     const SizedBox(height: 20),
 
                     // Divider con "o"
                     Row(
                       children: [
-                        Expanded(child: Divider(color: AppColors.outline.withOpacity(0.4))),
+                        Expanded(
+                            child: Divider(
+                                color: AppColors.outline.withOpacity(0.4))),
                         Padding(
                           padding: const EdgeInsets.symmetric(horizontal: 12),
                           child: Text(
@@ -434,13 +507,16 @@ class _RegisterScreenState extends ConsumerState<RegisterScreen> {
                             ),
                           ),
                         ),
-                        Expanded(child: Divider(color: AppColors.outline.withOpacity(0.4))),
+                        Expanded(
+                            child: Divider(
+                                color: AppColors.outline.withOpacity(0.4))),
                       ],
                     ),
                     const SizedBox(height: 20),
 
                     // Botón Google
-                    _GoogleRegisterButton(onPressed: isLoading ? null : _loginWithGoogle),
+                    _GoogleRegisterButton(
+                        onPressed: isLoading ? null : _loginWithGoogle),
                     const SizedBox(height: 24),
 
                     // Login link
@@ -450,7 +526,8 @@ class _RegisterScreenState extends ConsumerState<RegisterScreen> {
                         children: [
                           const Text(
                             '¿Ya tienes cuenta? ',
-                            style: TextStyle(color: AppColors.secondary, fontSize: 14),
+                            style: TextStyle(
+                                color: AppColors.secondary, fontSize: 14),
                           ),
                           GestureDetector(
                             onTap: () => context.pop(),
@@ -502,7 +579,9 @@ class _RegisterScreenState extends ConsumerState<RegisterScreen> {
           duration: const Duration(milliseconds: 200),
           padding: const EdgeInsets.symmetric(vertical: 12),
           decoration: BoxDecoration(
-            color: isActive ? AppColors.surfaceContainerLowest : Colors.transparent,
+            color: isActive
+                ? AppColors.surfaceContainerLowest
+                : Colors.transparent,
             borderRadius: BorderRadius.circular(9999),
             boxShadow: isActive
                 ? [
@@ -594,7 +673,8 @@ class _GoogleLogoPainter extends CustomPainter {
       ..strokeWidth = strokeWidth
       ..strokeCap = StrokeCap.round;
 
-    final rect = Rect.fromCircle(center: Offset.zero, radius: radius - strokeWidth / 2);
+    final rect =
+        Rect.fromCircle(center: Offset.zero, radius: radius - strokeWidth / 2);
 
     canvas.save();
     canvas.translate(center.dx, center.dy);
@@ -615,7 +695,8 @@ class _GoogleLogoPainter extends CustomPainter {
       ..color = const Color(0xFF4285F4)
       ..strokeWidth = strokeWidth
       ..strokeCap = StrokeCap.round;
-    canvas.drawLine(Offset.zero, Offset(radius - strokeWidth / 2, 0), linePaint);
+    canvas.drawLine(
+        Offset.zero, Offset(radius - strokeWidth / 2, 0), linePaint);
 
     canvas.restore();
   }

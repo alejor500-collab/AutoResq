@@ -10,6 +10,7 @@ import '../../../../core/constants/app_constants.dart';
 import '../../../../core/router/app_router.dart';
 import '../../../../core/utils/helpers.dart';
 import '../../../map/presentation/providers/map_provider.dart';
+import '../../../map/presentation/widgets/location_picker_sheet.dart';
 import '../providers/emergency_provider.dart';
 import '../../domain/entities/emergency_entity.dart';
 
@@ -30,7 +31,9 @@ class _CreateEmergencyScreenState extends ConsumerState<CreateEmergencyScreen> {
   void initState() {
     super.initState();
     WidgetsBinding.instance.addPostFrameCallback((_) {
-      ref.read(mapNotifierProvider.notifier).getCurrentLocation();
+      if (ref.read(mapNotifierProvider).currentLocation == null) {
+        ref.read(mapNotifierProvider.notifier).getCurrentLocation();
+      }
     });
   }
 
@@ -72,15 +75,14 @@ class _CreateEmergencyScreenState extends ConsumerState<CreateEmergencyScreen> {
       );
     }
 
-    final emergency = await ref
-        .read(emergencyNotifierProvider.notifier)
-        .createEmergency(
-          description: _descCtrl.text.trim(),
-          lat: lat,
-          lng: lng,
-          address: address,
-          aiAnalysis: aiAnalysis,
-        );
+    final emergency =
+        await ref.read(emergencyNotifierProvider.notifier).createEmergency(
+              description: _descCtrl.text.trim(),
+              lat: lat,
+              lng: lng,
+              address: address,
+              aiAnalysis: aiAnalysis,
+            );
 
     if (!mounted) return;
 
@@ -91,6 +93,16 @@ class _CreateEmergencyScreenState extends ConsumerState<CreateEmergencyScreen> {
       AppHelpers.showSnackBar(context, error ?? 'Error al crear emergencia',
           isError: true);
     }
+  }
+
+  Future<void> _editEmergencyLocation() async {
+    final selected = await showLocationPickerSheet(
+      context,
+      title: 'Editar ubicacion de emergencia',
+      initialLocation: ref.read(mapNotifierProvider).currentLocation,
+    );
+    if (selected == null || !mounted) return;
+    ref.read(mapNotifierProvider.notifier).setLocation(selected);
   }
 
   @override
@@ -142,7 +154,7 @@ class _CreateEmergencyScreenState extends ConsumerState<CreateEmergencyScreen> {
                           ),
                         ),
                         const Spacer(),
-                        Text(
+                        const Text(
                           'Reportar Emergencia',
                           style: TextStyle(
                             fontSize: 18,
@@ -155,7 +167,7 @@ class _CreateEmergencyScreenState extends ConsumerState<CreateEmergencyScreen> {
                         Container(
                           width: 32,
                           height: 32,
-                          decoration: BoxDecoration(
+                          decoration: const BoxDecoration(
                             color: AppColors.surfaceContainerHigh,
                             shape: BoxShape.circle,
                           ),
@@ -207,7 +219,10 @@ class _CreateEmergencyScreenState extends ConsumerState<CreateEmergencyScreen> {
 
                   // Step Content
                   if (_currentStep == 0)
-                    _LocationStep(mapState: mapState),
+                    _LocationStep(
+                      mapState: mapState,
+                      onEdit: _editEmergencyLocation,
+                    ),
                   if (_currentStep == 1)
                     _DescriptionStep(
                       controller: _descCtrl,
@@ -345,8 +360,12 @@ class _StepProgress extends StatelessWidget {
 
 class _LocationStep extends StatelessWidget {
   final dynamic mapState;
+  final VoidCallback onEdit;
 
-  const _LocationStep({required this.mapState});
+  const _LocationStep({
+    required this.mapState,
+    required this.onEdit,
+  });
 
   @override
   Widget build(BuildContext context) {
@@ -374,6 +393,7 @@ class _LocationStep extends StatelessWidget {
             child: Stack(
               children: [
                 FlutterMap(
+                  key: ValueKey('$lat,$lng'),
                   options: MapOptions(
                     initialCenter: LatLng(lat, lng),
                     initialZoom: 15,
@@ -383,8 +403,8 @@ class _LocationStep extends StatelessWidget {
                   ),
                   children: [
                     TileLayer(
-                      urlTemplate:
-                          'https://tile.openstreetmap.org/{z}/{x}/{y}.png',
+                      urlTemplate: AppConstants.osmTileUrl,
+                      userAgentPackageName: 'com.autoresq.app',
                     ),
                     MarkerLayer(
                       markers: [
@@ -396,8 +416,7 @@ class _LocationStep extends StatelessWidget {
                             decoration: BoxDecoration(
                               color: AppColors.primary,
                               shape: BoxShape.circle,
-                              border: Border.all(
-                                  color: Colors.white, width: 3),
+                              border: Border.all(color: Colors.white, width: 3),
                               boxShadow: [
                                 BoxShadow(
                                   color: AppColors.primary.withOpacity(0.4),
@@ -425,7 +444,10 @@ class _LocationStep extends StatelessWidget {
                       gradient: LinearGradient(
                         begin: Alignment.topCenter,
                         end: Alignment.bottomCenter,
-                        colors: [Colors.transparent, Colors.black.withOpacity(0.2)],
+                        colors: [
+                          Colors.transparent,
+                          Colors.black.withOpacity(0.2)
+                        ],
                       ),
                     ),
                   ),
@@ -441,9 +463,9 @@ class _LocationStep extends StatelessWidget {
                       color: AppColors.primary,
                       borderRadius: BorderRadius.circular(9999),
                     ),
-                    child: Row(
+                    child: const Row(
                       mainAxisSize: MainAxisSize.min,
-                      children: const [
+                      children: [
                         Icon(Icons.my_location, color: Colors.white, size: 12),
                         Gap(6),
                         Text(
@@ -468,7 +490,7 @@ class _LocationStep extends StatelessWidget {
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Text(
+                const Text(
                   'DIRECCION ACTUAL',
                   style: TextStyle(
                     fontSize: 10,
@@ -485,7 +507,7 @@ class _LocationStep extends StatelessWidget {
                         mapState.isLoading
                             ? 'Obteniendo ubicacion...'
                             : mapState.currentLocation?.address ??
-                                'Riobamba, Ecuador',
+                                'Ecuador',
                         style: const TextStyle(
                           fontSize: 16,
                           fontWeight: FontWeight.w600,
@@ -494,7 +516,7 @@ class _LocationStep extends StatelessWidget {
                       ),
                     ),
                     TextButton(
-                      onPressed: () {},
+                      onPressed: onEdit,
                       child: const Text(
                         'EDITAR',
                         style: TextStyle(
@@ -506,8 +528,8 @@ class _LocationStep extends StatelessWidget {
                     ),
                   ],
                 ),
-                Text(
-                  'Riobamba, Chimborazo',
+                const Text(
+                  'Cobertura nacional en Ecuador',
                   style: TextStyle(
                     fontSize: 13,
                     color: AppColors.secondary,
@@ -548,11 +570,11 @@ class _DescriptionStep extends StatelessWidget {
                 color: AppColors.tertiary.withOpacity(0.1),
                 borderRadius: BorderRadius.circular(9999),
               ),
-              child: Row(
+              child: const Row(
                 mainAxisSize: MainAxisSize.min,
                 children: [
                   Icon(Icons.psychology, size: 14, color: AppColors.tertiary),
-                  const Gap(6),
+                  Gap(6),
                   Text(
                     'IA analizando tipo de falla...',
                     style: TextStyle(
@@ -579,7 +601,7 @@ class _DescriptionStep extends StatelessWidget {
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              Text(
+              const Text(
                 'DESCRIBE TU PROBLEMA',
                 style: TextStyle(
                   fontSize: 10,
@@ -597,7 +619,7 @@ class _DescriptionStep extends StatelessWidget {
                   color: AppColors.onSurface,
                   height: 1.5,
                 ),
-                decoration: InputDecoration(
+                decoration: const InputDecoration(
                   hintText:
                       'Ej: Mi auto no enciende y hace un ruido metalico al girar la llave...',
                   hintStyle: TextStyle(
@@ -690,163 +712,164 @@ class _DiagnosticStep extends StatelessWidget {
     return SingleChildScrollView(
       physics: const NeverScrollableScrollPhysics(),
       child: Container(
-      padding: const EdgeInsets.all(24),
-      decoration: BoxDecoration(
-        gradient: LinearGradient(
-          begin: Alignment.topLeft,
-          end: Alignment.bottomRight,
-          colors: [
-            AppColors.tertiary.withOpacity(0.05),
-            Colors.white,
+        padding: const EdgeInsets.all(24),
+        decoration: BoxDecoration(
+          gradient: LinearGradient(
+            begin: Alignment.topLeft,
+            end: Alignment.bottomRight,
+            colors: [
+              AppColors.tertiary.withOpacity(0.05),
+              Colors.white,
+            ],
+          ),
+          borderRadius: BorderRadius.circular(16),
+          border: Border.all(color: AppColors.tertiary.withOpacity(0.1)),
+          boxShadow: [
+            BoxShadow(
+              color: AppColors.onSurface.withOpacity(0.03),
+              blurRadius: 20,
+            ),
           ],
         ),
-        borderRadius: BorderRadius.circular(16),
-        border: Border.all(color: AppColors.tertiary.withOpacity(0.1)),
-        boxShadow: [
-          BoxShadow(
-            color: AppColors.onSurface.withOpacity(0.03),
-            blurRadius: 20,
-          ),
-        ],
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          // Header with icon
-          Row(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Container(
-                padding: const EdgeInsets.all(12),
-                decoration: BoxDecoration(
-                  color: AppColors.tertiary,
-                  borderRadius: BorderRadius.circular(16),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            // Header with icon
+            Row(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Container(
+                  padding: const EdgeInsets.all(12),
+                  decoration: BoxDecoration(
+                    color: AppColors.tertiary,
+                    borderRadius: BorderRadius.circular(16),
+                  ),
+                  child: const Icon(Icons.build, color: Colors.white, size: 24),
                 ),
-                child: const Icon(Icons.build, color: Colors.white, size: 24),
-              ),
-              const Gap(16),
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(
-                      'Sugerencia de la IA',
-                      style: TextStyle(
-                        fontSize: 10,
-                        fontWeight: FontWeight.w700,
-                        color: AppColors.tertiary,
-                        letterSpacing: 1.5,
-                      ),
-                    ),
-                    const Gap(4),
-                    Text(
-                      'Falla Mecanica ($tipo)',
-                      style: const TextStyle(
-                        fontSize: 20,
-                        fontWeight: FontWeight.w700,
-                        color: AppColors.onSurface,
-                      ),
-                    ),
-                    if (desc.isNotEmpty || sugerencia.isNotEmpty) ...[
-                      const Gap(6),
-                      Text(
-                        desc.isNotEmpty ? desc : sugerencia,
+                const Gap(16),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      const Text(
+                        'Sugerencia de la IA',
                         style: TextStyle(
-                          fontSize: 13,
-                          color: AppColors.secondary,
-                          height: 1.4,
+                          fontSize: 10,
+                          fontWeight: FontWeight.w700,
+                          color: AppColors.tertiary,
+                          letterSpacing: 1.5,
                         ),
                       ),
+                      const Gap(4),
+                      Text(
+                        'Falla Mecanica ($tipo)',
+                        style: const TextStyle(
+                          fontSize: 20,
+                          fontWeight: FontWeight.w700,
+                          color: AppColors.onSurface,
+                        ),
+                      ),
+                      if (desc.isNotEmpty || sugerencia.isNotEmpty) ...[
+                        const Gap(6),
+                        Text(
+                          desc.isNotEmpty ? desc : sugerencia,
+                          style: const TextStyle(
+                            fontSize: 13,
+                            color: AppColors.secondary,
+                            height: 1.4,
+                          ),
+                        ),
+                      ],
                     ],
-                  ],
+                  ),
                 ),
-              ),
-            ],
-          ),
-          const Gap(20),
+              ],
+            ),
+            const Gap(20),
 
-          // Stats grid
-          Row(
-            children: [
-              Expanded(
-                child: Container(
-                  padding: const EdgeInsets.all(12),
-                  decoration: BoxDecoration(
-                    color: Colors.white,
-                    borderRadius: BorderRadius.circular(16),
-                  ),
-                  child: Row(
-                    children: [
-                      Icon(Icons.timer, color: AppColors.tertiary, size: 20),
-                      const Gap(10),
-                      Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Text(
-                            'TIEMPO ESTIMADO',
-                            style: TextStyle(
-                              fontSize: 9,
-                              fontWeight: FontWeight.w700,
-                              color: AppColors.secondary,
-                              letterSpacing: 0.5,
+            // Stats grid
+            Row(
+              children: [
+                Expanded(
+                  child: Container(
+                    padding: const EdgeInsets.all(12),
+                    decoration: BoxDecoration(
+                      color: Colors.white,
+                      borderRadius: BorderRadius.circular(16),
+                    ),
+                    child: const Row(
+                      children: [
+                        Icon(Icons.timer, color: AppColors.tertiary, size: 20),
+                        Gap(10),
+                        Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text(
+                              'TIEMPO ESTIMADO',
+                              style: TextStyle(
+                                fontSize: 9,
+                                fontWeight: FontWeight.w700,
+                                color: AppColors.secondary,
+                                letterSpacing: 0.5,
+                              ),
                             ),
-                          ),
-                          const Text(
-                            '15 - 20 min',
-                            style: TextStyle(
-                              fontSize: 13,
-                              fontWeight: FontWeight.w700,
-                              color: AppColors.onSurface,
+                            Text(
+                              '15 - 20 min',
+                              style: TextStyle(
+                                fontSize: 13,
+                                fontWeight: FontWeight.w700,
+                                color: AppColors.onSurface,
+                              ),
                             ),
-                          ),
-                        ],
-                      ),
-                    ],
-                  ),
-                ),
-              ),
-              const Gap(12),
-              Expanded(
-                child: Container(
-                  padding: const EdgeInsets.all(12),
-                  decoration: BoxDecoration(
-                    color: Colors.white,
-                    borderRadius: BorderRadius.circular(16),
-                  ),
-                  child: Row(
-                    children: [
-                      Icon(Icons.payments, color: AppColors.tertiary, size: 20),
-                      const Gap(10),
-                      Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Text(
-                            'COSTO BASE',
-                            style: TextStyle(
-                              fontSize: 9,
-                              fontWeight: FontWeight.w700,
-                              color: AppColors.secondary,
-                              letterSpacing: 0.5,
-                            ),
-                          ),
-                          const Text(
-                            '\$25.00',
-                            style: TextStyle(
-                              fontSize: 13,
-                              fontWeight: FontWeight.w700,
-                              color: AppColors.onSurface,
-                            ),
-                          ),
-                        ],
-                      ),
-                    ],
+                          ],
+                        ),
+                      ],
+                    ),
                   ),
                 ),
-              ),
-            ],
-          ),
-        ],
-      ),
+                const Gap(12),
+                Expanded(
+                  child: Container(
+                    padding: const EdgeInsets.all(12),
+                    decoration: BoxDecoration(
+                      color: Colors.white,
+                      borderRadius: BorderRadius.circular(16),
+                    ),
+                    child: const Row(
+                      children: [
+                        Icon(Icons.payments,
+                            color: AppColors.tertiary, size: 20),
+                        Gap(10),
+                        Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text(
+                              'COSTO BASE',
+                              style: TextStyle(
+                                fontSize: 9,
+                                fontWeight: FontWeight.w700,
+                                color: AppColors.secondary,
+                                letterSpacing: 0.5,
+                              ),
+                            ),
+                            Text(
+                              '\$25.00',
+                              style: TextStyle(
+                                fontSize: 13,
+                                fontWeight: FontWeight.w700,
+                                color: AppColors.onSurface,
+                              ),
+                            ),
+                          ],
+                        ),
+                      ],
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          ],
+        ),
       ),
     );
   }
