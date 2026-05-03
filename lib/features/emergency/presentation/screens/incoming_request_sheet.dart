@@ -76,6 +76,47 @@ class _IncomingRequestSheetState extends ConsumerState<IncomingRequestSheet> {
     super.dispose();
   }
 
+  void _showPendingRatingDialog(Map<String, dynamic> pendingRating) {
+    showDialog<void>(
+      context: context,
+      builder: (context) {
+        return AlertDialog(
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(24),
+          ),
+          title: const Text('Tienes una calificacion pendiente'),
+          content: const Text(
+            'Califica tu ultimo servicio para poder aceptar una nueva emergencia.',
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(context),
+              child: const Text('Ahora no'),
+            ),
+            FilledButton(
+              onPressed: () {
+                Navigator.pop(context);
+                context.push(
+                  AppRoutes.rateDriver,
+                  extra: {
+                    'emergencyId':
+                        pendingRating['emergency_id']?.toString() ?? '',
+                    'driverId':
+                        pendingRating['rated_user_id']?.toString() ?? '',
+                    'driverName':
+                        pendingRating['rated_user_name']?.toString() ??
+                            'Conductor',
+                  },
+                );
+              },
+              child: const Text('Calificar ahora'),
+            ),
+          ],
+        );
+      },
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     final emergencyState = ref.watch(emergencyNotifierProvider);
@@ -172,7 +213,9 @@ class _IncomingRequestSheetState extends ConsumerState<IncomingRequestSheet> {
                             ),
                             const Gap(8),
                             Text(
-                              emergency.descripcion,
+                              emergency.aiTechnicianSummary?.isNotEmpty == true
+                                  ? emergency.aiTechnicianSummary!
+                                  : emergency.descripcion,
                               style: const TextStyle(
                                 fontSize: 13,
                                 color: AppColors.textSecondary,
@@ -180,6 +223,34 @@ class _IncomingRequestSheetState extends ConsumerState<IncomingRequestSheet> {
                                 fontStyle: FontStyle.italic,
                               ),
                             ),
+                            if (emergency.aiPriority != null ||
+                                emergency.aiDetectedRisks.isNotEmpty) ...[
+                              const Gap(10),
+                              Wrap(
+                                spacing: 6,
+                                runSpacing: 6,
+                                children: [
+                                  if (emergency.aiPriority != null)
+                                    _AiMetaChip(
+                                      label: emergency.aiPriority!,
+                                      icon: Icons.priority_high_rounded,
+                                    ),
+                                  if (emergency.aiEmergencyType != null)
+                                    _AiMetaChip(
+                                      label: emergency.aiEmergencyType!,
+                                      icon: Icons.category_rounded,
+                                    ),
+                                  ...emergency.aiDetectedRisks
+                                      .where((risk) => risk != 'none')
+                                      .map(
+                                        (risk) => _AiMetaChip(
+                                          label: risk,
+                                          icon: Icons.warning_amber_rounded,
+                                        ),
+                                      ),
+                                ],
+                              ),
+                            ],
                           ],
                         ),
                       ),
@@ -263,7 +334,9 @@ class _IncomingRequestSheetState extends ConsumerState<IncomingRequestSheet> {
                           ),
                         ],
                       ),
-                      const Gap(28),
+                      const Gap(16),
+                      _ProtectedPriceCard(emergency: emergency),
+                      const Gap(20),
 
                       // ─── Botón Aceptar ────────────────────────────────
                       AppButton(
@@ -281,6 +354,23 @@ class _IncomingRequestSheetState extends ConsumerState<IncomingRequestSheet> {
                                     AppRoutes.activeService,
                                     extra: emergency.id,
                                   );
+                                } else {
+                                  final pending = await ref
+                                      .read(emergencyNotifierProvider.notifier)
+                                      .getPendingRating('technician');
+                                  if (!context.mounted) return;
+                                  if (pending != null) {
+                                    _showPendingRatingDialog(pending);
+                                  } else {
+                                    AppHelpers.showSnackBar(
+                                      context,
+                                      ref
+                                              .read(emergencyNotifierProvider)
+                                              .error ??
+                                          'No se pudo aceptar el servicio',
+                                      isError: true,
+                                    );
+                                  }
                                 }
                               },
                         isLoading: emergencyState.isLoading,
@@ -305,6 +395,124 @@ class _IncomingRequestSheetState extends ConsumerState<IncomingRequestSheet> {
   }
 }
 
+class _ProtectedPriceCard extends StatelessWidget {
+  final Emergency emergency;
+
+  const _ProtectedPriceCard({required this.emergency});
+
+  @override
+  Widget build(BuildContext context) {
+    final snapshot = emergency.priceSnapshot;
+    final amount = emergency.protectedTotal ?? emergency.estimatedTotal;
+    final serviceName = emergency.pricingServiceName ?? 'Servicio';
+    final amountText =
+        amount == null ? 'Revision pendiente' : AppHelpers.formatCurrency(amount);
+
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.all(14),
+      decoration: BoxDecoration(
+        color: AppColors.primary.withValues(alpha: 0.06),
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(color: AppColors.primary.withValues(alpha: 0.16)),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          const Text(
+            'CONDICIONES DEL SERVICIO',
+            style: TextStyle(
+              fontSize: 10,
+              fontWeight: FontWeight.w800,
+              letterSpacing: 0.8,
+              color: AppColors.primary,
+            ),
+          ),
+          const Gap(6),
+          Row(
+            children: [
+              Expanded(
+                child: Text(
+                  serviceName,
+                  style: const TextStyle(
+                    fontSize: 15,
+                    fontWeight: FontWeight.w800,
+                    color: AppColors.onSurface,
+                  ),
+                ),
+              ),
+              Text(
+                amountText,
+                style: const TextStyle(
+                  fontSize: 18,
+                  fontWeight: FontWeight.w900,
+                  color: AppColors.primary,
+                ),
+              ),
+            ],
+          ),
+          const Gap(6),
+          const Text(
+            'Precio protegido. Extras solo con aprobacion del usuario.',
+            style: TextStyle(
+              fontSize: 12,
+              color: AppColors.textSecondary,
+              height: 1.35,
+            ),
+          ),
+          if (snapshot?['includes_text'] is String) ...[
+            const Gap(6),
+            Text(
+              snapshot!['includes_text'] as String,
+              style: const TextStyle(
+                fontSize: 12,
+                color: AppColors.textSecondary,
+              ),
+            ),
+          ],
+        ],
+      ),
+    );
+  }
+}
+
+class _AiMetaChip extends StatelessWidget {
+  final String label;
+  final IconData icon;
+
+  const _AiMetaChip({
+    required this.label,
+    required this.icon,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+      decoration: BoxDecoration(
+        color: AppColors.tertiary.withValues(alpha: 0.10),
+        borderRadius: BorderRadius.circular(20),
+        border: Border.all(color: AppColors.tertiary.withValues(alpha: 0.25)),
+      ),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Icon(icon, size: 12, color: AppColors.tertiary),
+          const Gap(4),
+          Text(
+            label,
+            style: const TextStyle(
+              fontSize: 11,
+              fontWeight: FontWeight.w700,
+              color: AppColors.tertiary,
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
 // ─── Chip temporizador regresivo ──────────────────────────────────────────────
 
 class _TimerChip extends StatelessWidget {
@@ -317,9 +525,9 @@ class _TimerChip extends StatelessWidget {
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
       decoration: BoxDecoration(
-        color: AppColors.warning.withOpacity(0.15),
+        color: AppColors.warning.withValues(alpha: 0.15),
         borderRadius: BorderRadius.circular(20),
-        border: Border.all(color: AppColors.warning.withOpacity(0.4)),
+        border: Border.all(color: AppColors.warning.withValues(alpha: 0.4)),
       ),
       child: Text(
         '⏱ $seconds s',
@@ -367,9 +575,9 @@ class _AiClassificationChip extends StatelessWidget {
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
       decoration: BoxDecoration(
-        color: _color.withOpacity(0.12),
+        color: _color.withValues(alpha: 0.12),
         borderRadius: BorderRadius.circular(20),
-        border: Border.all(color: _color.withOpacity(0.30)),
+        border: Border.all(color: _color.withValues(alpha: 0.30)),
       ),
       child: Row(
         mainAxisSize: MainAxisSize.min,

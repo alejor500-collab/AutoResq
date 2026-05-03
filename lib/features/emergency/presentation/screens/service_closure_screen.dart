@@ -1,5 +1,4 @@
 import 'package:flutter/material.dart';
-import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:gap/gap.dart';
@@ -7,7 +6,6 @@ import '../../../../core/constants/app_colors.dart';
 import '../../../../core/constants/app_constants.dart';
 import '../../../../core/router/app_router.dart';
 import '../../../../shared/widgets/app_button.dart';
-import '../../../../shared/widgets/app_text_field.dart';
 import '../../../../shared/widgets/status_chip.dart';
 import '../../../../shared/widgets/user_avatar.dart';
 
@@ -21,14 +19,6 @@ class ServiceClosureScreen extends ConsumerStatefulWidget {
 }
 
 class _ServiceClosureScreenState extends ConsumerState<ServiceClosureScreen> {
-  final _montoController = TextEditingController();
-
-  @override
-  void dispose() {
-    _montoController.dispose();
-    super.dispose();
-  }
-
   @override
   Widget build(BuildContext context) {
     final extra = (ModalRoute.of(context)?.settings.arguments ?? {})
@@ -46,6 +36,7 @@ class _ServiceClosureScreenState extends ConsumerState<ServiceClosureScreen> {
     final vehicleInfo = params['vehicleInfo'] as String?;
     final duration = params['duration'] as String?;
     final clasificacionIa = params['clasificacionIa'] as String?;
+    final amount = params['amount'] as String?;
 
     return Scaffold(
       backgroundColor: AppColors.background,
@@ -127,7 +118,7 @@ class _ServiceClosureScreenState extends ConsumerState<ServiceClosureScreen> {
                             AppConstants.borderRadiusCard),
                         boxShadow: [
                           BoxShadow(
-                            color: AppColors.onSurface.withOpacity(0.07),
+                            color: AppColors.onSurface.withValues(alpha: 0.07),
                             blurRadius: 16,
                             offset: const Offset(0, 2),
                           ),
@@ -285,32 +276,32 @@ class _ServiceClosureScreenState extends ConsumerState<ServiceClosureScreen> {
                             child: Column(
                               crossAxisAlignment: CrossAxisAlignment.center,
                               children: [
-                                AppTextField(
-                                  label: 'Monto acordado',
-                                  hint: '0',
-                                  controller: _montoController,
-                                  keyboardType: TextInputType.number,
-                                  inputFormatters: [
-                                    FilteringTextInputFormatter.digitsOnly,
-                                  ],
-                                  prefixIcon: const Padding(
-                                    padding:
-                                        EdgeInsets.symmetric(horizontal: 16),
-                                    child: Text(
-                                      '\$',
-                                      style: TextStyle(
-                                        fontSize: 18,
-                                        fontWeight: FontWeight.w700,
-                                        color: AppColors.primary,
-                                      ),
-                                    ),
+                                const Text(
+                                  'PRECIO PROTEGIDO',
+                                  style: TextStyle(
+                                    fontSize: 10,
+                                    fontWeight: FontWeight.w800,
+                                    color: AppColors.textSecondary,
+                                    letterSpacing: 1,
+                                  ),
+                                ),
+                                const Gap(4),
+                                Text(
+                                  amount == null || amount.isEmpty
+                                      ? 'Revision pendiente'
+                                      : '\$$amount',
+                                  style: const TextStyle(
+                                    fontSize: 30,
+                                    fontWeight: FontWeight.w900,
+                                    color: AppColors.primary,
+                                    letterSpacing: -0.5,
                                   ),
                                 ),
                                 const Gap(12),
                                 const Row(
                                   mainAxisAlignment: MainAxisAlignment.center,
                                   children: [
-                                    Icon(Icons.payments_outlined,
+                                    Icon(Icons.lock_outline,
                                         size: 14,
                                         color: AppColors.textSecondary),
                                     Gap(6),
@@ -356,7 +347,7 @@ class _ServiceClosureScreenState extends ConsumerState<ServiceClosureScreen> {
                     'vehicleInfo': vehicleInfo,
                     'duration': duration,
                     'clasificacionIa': clasificacionIa,
-                    'amount': _montoController.text,
+                    'amount': amount,
                   },
                 ),
               ),

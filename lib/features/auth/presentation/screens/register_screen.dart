@@ -1,4 +1,3 @@
-import 'dart:typed_data';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -115,7 +114,9 @@ class _RegisterScreenState extends ConsumerState<RegisterScreen> {
       case AppConstants.roleDriver:
         context.go(AppRoutes.driverHome);
       case AppConstants.roleTechnician:
-        context.go(AppRoutes.technicianHome);
+        context.go(
+          user.isApproved ? AppRoutes.technicianHome : AppRoutes.driverHome,
+        );
       case AppConstants.roleAdmin:
         context.go(AppRoutes.adminDashboard);
     }
@@ -206,6 +207,13 @@ class _RegisterScreenState extends ConsumerState<RegisterScreen> {
           return;
         }
         // Upload completo. El router redirige al técnico a la pantalla de espera.
+        if (!mounted) return;
+        AppHelpers.showSnackBar(
+          context,
+          'Solicitud tecnica enviada. Puedes usar AutoResQ como conductor.',
+          isSuccess: true,
+        );
+        context.go(AppRoutes.driverHome);
         return;
       }
       _navigateByRole();
@@ -237,7 +245,7 @@ class _RegisterScreenState extends ConsumerState<RegisterScreen> {
               height: 300,
               decoration: BoxDecoration(
                 shape: BoxShape.circle,
-                color: AppColors.primary.withOpacity(0.05),
+                color: AppColors.primary.withValues(alpha: 0.05),
               ),
             ),
           ),
@@ -280,7 +288,7 @@ class _RegisterScreenState extends ConsumerState<RegisterScreen> {
                             color: (widget.initialRole == 0
                                     ? const Color(0xFFE53935)
                                     : const Color(0xFF1E88E5))
-                                .withOpacity(0.12),
+                                .withValues(alpha: 0.12),
                             borderRadius: BorderRadius.circular(16),
                           ),
                           child: Icon(
@@ -385,12 +393,12 @@ class _RegisterScreenState extends ConsumerState<RegisterScreen> {
                           padding: const EdgeInsets.all(20),
                           decoration: BoxDecoration(
                             color: _cedulaBytes != null
-                                ? const Color(0xFF1E88E5).withOpacity(0.08)
+                                ? const Color(0xFF1E88E5).withValues(alpha: 0.08)
                                 : AppColors.surfaceContainerLow,
                             borderRadius: BorderRadius.circular(16),
                             border: Border.all(
                               color: _cedulaBytes != null
-                                  ? const Color(0xFF1E88E5).withOpacity(0.3)
+                                  ? const Color(0xFF1E88E5).withValues(alpha: 0.3)
                                   : AppColors.surfaceContainerHigh,
                               width: 1.5,
                             ),
@@ -404,7 +412,7 @@ class _RegisterScreenState extends ConsumerState<RegisterScreen> {
                                   color: (_cedulaBytes != null
                                           ? const Color(0xFF1E88E5)
                                           : AppColors.secondary)
-                                      .withOpacity(0.1),
+                                      .withValues(alpha: 0.1),
                                   borderRadius: BorderRadius.circular(12),
                                 ),
                                 child: Icon(
@@ -495,7 +503,7 @@ class _RegisterScreenState extends ConsumerState<RegisterScreen> {
                       children: [
                         Expanded(
                             child: Divider(
-                                color: AppColors.outline.withOpacity(0.4))),
+                                color: AppColors.outline.withValues(alpha: 0.4))),
                         Padding(
                           padding: const EdgeInsets.symmetric(horizontal: 12),
                           child: Text(
@@ -503,13 +511,13 @@ class _RegisterScreenState extends ConsumerState<RegisterScreen> {
                             style: TextStyle(
                               fontSize: 13,
                               fontWeight: FontWeight.w500,
-                              color: AppColors.secondary.withOpacity(0.6),
+                              color: AppColors.secondary.withValues(alpha: 0.6),
                             ),
                           ),
                         ),
                         Expanded(
                             child: Divider(
-                                color: AppColors.outline.withOpacity(0.4))),
+                                color: AppColors.outline.withValues(alpha: 0.4))),
                       ],
                     ),
                     const SizedBox(height: 20),
@@ -586,7 +594,7 @@ class _RegisterScreenState extends ConsumerState<RegisterScreen> {
             boxShadow: isActive
                 ? [
                     BoxShadow(
-                      color: AppColors.onSurface.withOpacity(0.05),
+                      color: AppColors.onSurface.withValues(alpha: 0.05),
                       blurRadius: 8,
                       offset: const Offset(0, 2),
                     ),
@@ -626,10 +634,10 @@ class _GoogleRegisterButton extends StatelessWidget {
           decoration: BoxDecoration(
             color: Colors.white,
             borderRadius: BorderRadius.circular(9999),
-            border: Border.all(color: AppColors.outline.withOpacity(0.3)),
+            border: Border.all(color: AppColors.outline.withValues(alpha: 0.3)),
             boxShadow: [
               BoxShadow(
-                color: AppColors.onSurface.withOpacity(0.04),
+                color: AppColors.onSurface.withValues(alpha: 0.04),
                 blurRadius: 8,
                 offset: const Offset(0, 2),
               ),

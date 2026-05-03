@@ -52,7 +52,7 @@ class WelcomeScreen extends ConsumerWidget {
               height: 380,
               decoration: BoxDecoration(
                 shape: BoxShape.circle,
-                color: AppColors.primary.withOpacity(0.05),
+                color: AppColors.primary.withValues(alpha: 0.05),
               ),
             ),
           ),
@@ -64,7 +64,7 @@ class WelcomeScreen extends ConsumerWidget {
               height: 280,
               decoration: BoxDecoration(
                 shape: BoxShape.circle,
-                color: AppColors.tertiary.withOpacity(0.05),
+                color: AppColors.tertiary.withValues(alpha: 0.05),
               ),
             ),
           ),
@@ -85,7 +85,7 @@ class WelcomeScreen extends ConsumerWidget {
                           borderRadius: BorderRadius.circular(24),
                           boxShadow: [
                             BoxShadow(
-                              color: AppColors.primary.withOpacity(0.25),
+                              color: AppColors.primary.withValues(alpha: 0.25),
                               blurRadius: 32,
                               offset: const Offset(0, 12),
                             ),
@@ -225,10 +225,10 @@ class _GoogleButton extends StatelessWidget {
             decoration: BoxDecoration(
               color: Colors.white,
               borderRadius: BorderRadius.circular(9999),
-              border: Border.all(color: AppColors.outline.withOpacity(0.3)),
+              border: Border.all(color: AppColors.outline.withValues(alpha: 0.3)),
               boxShadow: [
                 BoxShadow(
-                  color: AppColors.onSurface.withOpacity(0.04),
+                  color: AppColors.onSurface.withValues(alpha: 0.04),
                   blurRadius: 8,
                   offset: const Offset(0, 2),
                 ),

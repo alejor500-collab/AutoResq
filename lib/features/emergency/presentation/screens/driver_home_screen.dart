@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:flutter_map/flutter_map.dart';
+import 'package:google_fonts/google_fonts.dart';
 import 'package:latlong2/latlong.dart';
 import '../../../../core/constants/app_colors.dart';
 import '../../../../core/constants/app_constants.dart';
@@ -14,6 +15,8 @@ import '../../../../shared/widgets/user_avatar.dart';
 import '../../../map/presentation/providers/map_provider.dart';
 import '../../../map/presentation/providers/nearby_services_provider.dart';
 import '../../../map/presentation/widgets/location_picker_sheet.dart';
+import '../../domain/entities/emergency_entity.dart';
+import '../providers/emergency_provider.dart';
 
 class DriverHomeScreen extends ConsumerStatefulWidget {
   const DriverHomeScreen({super.key});
@@ -26,13 +29,115 @@ class _DriverHomeScreenState extends ConsumerState<DriverHomeScreen> {
   final _scaffoldKey = GlobalKey<ScaffoldState>();
   final _mapController = MapController();
   final int _navIndex = 0;
+  bool _activeWarningShown = false;
+  bool _pendingRatingWarningShown = false;
 
   @override
   void initState() {
     super.initState();
     WidgetsBinding.instance.addPostFrameCallback((_) {
       ref.read(mapNotifierProvider.notifier).getCurrentLocation();
+      _restoreActiveEmergency();
     });
+  }
+
+  Future<void> _restoreActiveEmergency() async {
+    final active = await ref
+        .read(emergencyNotifierProvider.notifier)
+        .loadActiveDriverEmergency();
+    if (!mounted) return;
+    if (active != null) {
+      _showActiveEmergencyDialog(active, fromStartup: true);
+      return;
+    }
+
+    Map<String, dynamic>? pending;
+    try {
+      pending = await ref
+          .read(emergencyNotifierProvider.notifier)
+          .getPendingRating('driver');
+    } catch (_) {
+      pending = null;
+    }
+    if (!mounted || pending == null) return;
+    _showPendingRatingDialog(pending, fromStartup: true);
+  }
+
+  void _showActiveEmergencyDialog(
+    Emergency active, {
+    bool fromStartup = false,
+  }) {
+    if (fromStartup && _activeWarningShown) return;
+    _activeWarningShown = true;
+    showDialog<void>(
+      context: context,
+      builder: (dialogContext) => AlertDialog(
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(24),
+        ),
+        title: const Text('Emergencia en curso'),
+        content: const Text(
+          'Ya tienes una emergencia activa. Para registrar una nueva solicitud primero debes cancelar o finalizar el servicio actual.',
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(dialogContext),
+            child: const Text('Entendido'),
+          ),
+          FilledButton(
+            onPressed: () {
+              Navigator.pop(dialogContext);
+              context.push(AppRoutes.emergencyStatus, extra: active.id);
+            },
+            child: const Text('Ver servicio'),
+          ),
+        ],
+      ),
+    );
+  }
+
+  void _showPendingRatingDialog(
+    Map<String, dynamic> pendingRating, {
+    bool fromStartup = false,
+  }) {
+    if (fromStartup && _pendingRatingWarningShown) return;
+    _pendingRatingWarningShown = true;
+    showDialog<void>(
+      context: context,
+      builder: (context) => AlertDialog(
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(24),
+        ),
+        title: const Text('Calificacion pendiente'),
+        content: const Text(
+          'Tu ultimo servicio ya finalizo. Califica al tecnico para cerrar el flujo y poder solicitar una nueva emergencia.',
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context),
+            child: const Text('Ahora no'),
+          ),
+          FilledButton(
+            onPressed: () {
+              Navigator.pop(context);
+              context.push(
+                AppRoutes.rateService,
+                extra: {
+                  'emergencyId':
+                      pendingRating['emergency_id']?.toString() ?? '',
+                  'technicianId':
+                      pendingRating['rated_user_id']?.toString() ?? '',
+                  'technicianName':
+                      pendingRating['rated_user_name']?.toString() ??
+                          'Tecnico',
+                },
+              );
+            },
+            child: const Text('Calificar ahora'),
+          ),
+        ],
+      ),
+    );
   }
 
   void _onNavTap(int index) {
@@ -64,6 +169,31 @@ class _DriverHomeScreenState extends ConsumerState<DriverHomeScreen> {
     _mapController.move(LatLng(selected.lat, selected.lng), 15);
   }
 
+  Future<void> _openCreateEmergency() async {
+    Map<String, dynamic>? pending;
+    try {
+      pending = await ref
+          .read(emergencyNotifierProvider.notifier)
+          .getPendingRating('driver');
+    } catch (_) {
+      pending = null;
+    }
+    if (!mounted) return;
+    final active = await ref
+        .read(emergencyNotifierProvider.notifier)
+        .loadActiveDriverEmergency();
+    if (!mounted) return;
+    if (active != null) {
+      _showActiveEmergencyDialog(active);
+      return;
+    }
+    if (pending != null) {
+      _showPendingRatingDialog(pending);
+      return;
+    }
+    context.push(AppRoutes.createEmergency);
+  }
+
   @override
   Widget build(BuildContext context) {
     final mapState = ref.watch(mapNotifierProvider);
@@ -71,7 +201,8 @@ class _DriverHomeScreenState extends ConsumerState<DriverHomeScreen> {
 
     final lat = mapState.currentLocation?.lat ?? AppConstants.defaultLat;
     final lng = mapState.currentLocation?.lng ?? AppConstants.defaultLng;
-    final address = mapState.currentLocation?.address ?? 'Ecuador';
+    final address =
+        mapState.error ?? mapState.currentLocation?.address ?? 'Ecuador';
 
     return Scaffold(
       key: _scaffoldKey,
@@ -90,63 +221,87 @@ class _DriverHomeScreenState extends ConsumerState<DriverHomeScreen> {
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  // Hero greeting
+                  // Driver hero
                   Padding(
-                    padding: const EdgeInsets.fromLTRB(24, 32, 24, 16),
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        const Text(
-                          'BIENVENIDO DE VUELTA',
-                          style: TextStyle(
-                            fontSize: 12,
-                            fontWeight: FontWeight.w700,
-                            letterSpacing: 0.5,
-                            color: AppColors.secondary,
-                          ),
-                        ),
-                        const SizedBox(height: 4),
-                        Text(
-                          'Hola, ${user?.name.split(' ').first ?? 'Conductor'}',
-                          style: const TextStyle(
-                            fontSize: 44,
-                            fontWeight: FontWeight.w800,
-                            color: AppColors.onSurface,
-                            letterSpacing: -1.5,
-                            height: 1.1,
-                          ),
-                        ),
-                        const SizedBox(height: 8),
-                        Row(
-                          children: [
-                            const Icon(Icons.location_on,
-                                size: 16, color: AppColors.secondary),
-                            const SizedBox(width: 4),
-                            Expanded(
-                              child: Text(
-                                mapState.isLoading
-                                    ? 'Obteniendo ubicación...'
-                                    : address,
-                                overflow: TextOverflow.ellipsis,
-                                style: const TextStyle(
-                                  fontSize: 16,
-                                  color: AppColors.secondary,
-                                ),
-                              ),
-                            ),
-                            IconButton(
-                              tooltip: 'Editar ubicacion',
-                              visualDensity: VisualDensity.compact,
-                              onPressed: _editLocation,
-                              icon: const Icon(
-                                Icons.edit_location_alt_outlined,
-                                size: 20,
-                                color: AppColors.primary,
-                              ),
-                            ),
+                    padding: const EdgeInsets.fromLTRB(16, 20, 16, 12),
+                    child: Container(
+                      width: double.infinity,
+                      padding: const EdgeInsets.all(18),
+                      decoration: BoxDecoration(
+                        gradient: const LinearGradient(
+                          begin: Alignment.topLeft,
+                          end: Alignment.bottomRight,
+                          colors: [
+                            AppColors.primaryContainer,
+                            AppColors.primary,
                           ],
                         ),
-                      ],
+                        borderRadius: BorderRadius.circular(24),
+                        boxShadow: [
+                          BoxShadow(
+                            color: AppColors.primary.withValues(alpha: 0.18),
+                            blurRadius: 26,
+                            offset: const Offset(0, 14),
+                          ),
+                        ],
+                      ),
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(
+                            'BIENVENIDO DE VUELTA',
+                            style: GoogleFonts.poppins(
+                              fontSize: 12,
+                              fontWeight: FontWeight.w700,
+                              letterSpacing: 0.5,
+                              color: Colors.white.withValues(alpha: 0.72),
+                            ),
+                          ),
+                          const SizedBox(height: 4),
+                          Text(
+                            'Hola, ${user?.name.split(' ').first ?? 'Conductor'}',
+                            style: GoogleFonts.poppins(
+                              fontSize: 34,
+                              fontWeight: FontWeight.w800,
+                              color: Colors.white,
+                              letterSpacing: -0.5,
+                              height: 1.1,
+                            ),
+                          ),
+                          const SizedBox(height: 8),
+                          Row(
+                            children: [
+                              Icon(Icons.location_on_rounded,
+                                  size: 16,
+                                  color: Colors.white.withValues(alpha: 0.84)),
+                              const SizedBox(width: 4),
+                              Expanded(
+                                child: Text(
+                                  mapState.isLoading
+                                      ? 'Obteniendo ubicación...'
+                                      : address,
+                                  overflow: TextOverflow.ellipsis,
+                                  style: GoogleFonts.poppins(
+                                    fontSize: 13,
+                                    color: Colors.white.withValues(alpha: 0.84),
+                                    fontWeight: FontWeight.w500,
+                                  ),
+                                ),
+                              ),
+                              IconButton(
+                                tooltip: 'Editar ubicacion',
+                                visualDensity: VisualDensity.compact,
+                                onPressed: _editLocation,
+                                icon: const Icon(
+                                  Icons.edit_location_alt_rounded,
+                                  size: 20,
+                                  color: Colors.white,
+                                ),
+                              ),
+                            ],
+                          ),
+                        ],
+                      ),
                     ),
                   ),
 
@@ -156,11 +311,16 @@ class _DriverHomeScreenState extends ConsumerState<DriverHomeScreen> {
                     lng: lng,
                     mapController: _mapController,
                     mapState: mapState,
-                    onRecenter: () {
-                      ref
+                    onRecenter: () async {
+                      await ref
                           .read(mapNotifierProvider.notifier)
                           .getCurrentLocation();
-                      _mapController.move(LatLng(lat, lng), 14.5);
+                      final location =
+                          ref.read(mapNotifierProvider).currentLocation;
+                      _mapController.move(
+                        LatLng(location?.lat ?? lat, location?.lng ?? lng),
+                        14.5,
+                      );
                     },
                   ),
 
@@ -180,16 +340,20 @@ class _DriverHomeScreenState extends ConsumerState<DriverHomeScreen> {
             right: 0,
             child: Center(
               child: GestureDetector(
-                onTap: () => context.push(AppRoutes.createEmergency),
+                onTap: _openCreateEmergency,
                 child: Container(
                   padding:
                       const EdgeInsets.symmetric(horizontal: 32, vertical: 16),
                   decoration: BoxDecoration(
                     gradient: AppColors.primaryGradient,
                     borderRadius: BorderRadius.circular(9999),
+                    border: Border.all(
+                      color: Colors.white.withValues(alpha: 0.45),
+                      width: 1.2,
+                    ),
                     boxShadow: [
                       BoxShadow(
-                        color: AppColors.primary.withOpacity(0.25),
+                        color: AppColors.primary.withValues(alpha: 0.25),
                         blurRadius: 40,
                         offset: const Offset(0, 20),
                       ),
@@ -240,10 +404,15 @@ class _DriverHomeScreenState extends ConsumerState<DriverHomeScreen> {
                   padding:
                       EdgeInsets.only(top: MediaQuery.of(context).padding.top),
                   decoration: BoxDecoration(
-                    color: Colors.white.withOpacity(0.8),
+                    color: Colors.white.withValues(alpha: 0.82),
+                    border: Border(
+                      bottom: BorderSide(
+                        color: Colors.white.withValues(alpha: 0.65),
+                      ),
+                    ),
                     boxShadow: [
                       BoxShadow(
-                        color: AppColors.onSurface.withOpacity(0.06),
+                        color: AppColors.onSurface.withValues(alpha: 0.06),
                         blurRadius: 40,
                         offset: const Offset(0, 40),
                       ),
@@ -258,7 +427,7 @@ class _DriverHomeScreenState extends ConsumerState<DriverHomeScreen> {
                           borderRadius: BorderRadius.circular(10),
                           child: InkWell(
                             borderRadius: BorderRadius.circular(10),
-                            splashColor: AppColors.primary.withOpacity(0.08),
+                            splashColor: AppColors.primary.withValues(alpha: 0.08),
                             onTap: () =>
                                 _scaffoldKey.currentState?.openDrawer(),
                             child: const Padding(
@@ -269,9 +438,9 @@ class _DriverHomeScreenState extends ConsumerState<DriverHomeScreen> {
                           ),
                         ),
                         const Spacer(),
-                        const Text(
+                        Text(
                           'AutoResQ',
-                          style: TextStyle(
+                          style: GoogleFonts.poppins(
                             fontSize: 20,
                             fontWeight: FontWeight.w900,
                             color: AppColors.onSurface,
@@ -284,7 +453,7 @@ class _DriverHomeScreenState extends ConsumerState<DriverHomeScreen> {
                           shape: const CircleBorder(),
                           child: InkWell(
                             customBorder: const CircleBorder(),
-                            splashColor: AppColors.primary.withOpacity(0.08),
+                            splashColor: AppColors.primary.withValues(alpha: 0.08),
                             onTap: () => context.push(AppRoutes.profile),
                             child: Container(
                               width: 40,
@@ -292,7 +461,7 @@ class _DriverHomeScreenState extends ConsumerState<DriverHomeScreen> {
                               decoration: BoxDecoration(
                                 shape: BoxShape.circle,
                                 border: Border.all(
-                                  color: AppColors.primary.withOpacity(0.15),
+                                  color: AppColors.primary.withValues(alpha: 0.15),
                                   width: 2,
                                 ),
                               ),
@@ -481,7 +650,7 @@ class _MapSection extends ConsumerWidget {
   final double lng;
   final MapController mapController;
   final MapState mapState;
-  final VoidCallback onRecenter;
+  final Future<void> Function() onRecenter;
 
   const _MapSection({
     required this.lat,
@@ -517,11 +686,23 @@ class _MapSection extends ConsumerWidget {
     );
 
     return Padding(
-      padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 8),
-      child: ClipRRect(
-        borderRadius: BorderRadius.circular(20),
-        child: SizedBox(
-          height: 380,
+      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+      child: Container(
+        height: 380,
+        decoration: BoxDecoration(
+          color: AppColors.surfaceContainerLowest,
+          borderRadius: BorderRadius.circular(24),
+          border: Border.all(color: Colors.white.withValues(alpha: 0.72)),
+          boxShadow: [
+            BoxShadow(
+              color: AppColors.onSurface.withValues(alpha: 0.08),
+              blurRadius: 24,
+              offset: const Offset(0, 12),
+            ),
+          ],
+        ),
+        child: ClipRRect(
+          borderRadius: BorderRadius.circular(24),
           child: Stack(
             children: [
               FlutterMap(
@@ -549,7 +730,7 @@ class _MapSection extends ConsumerWidget {
                             border: Border.all(color: Colors.white, width: 2.5),
                             boxShadow: [
                               BoxShadow(
-                                color: AppColors.primary.withOpacity(0.35),
+                                color: AppColors.primary.withValues(alpha: 0.35),
                                 blurRadius: 14,
                                 spreadRadius: 2,
                               ),
@@ -567,11 +748,58 @@ class _MapSection extends ConsumerWidget {
               ),
               // Map controls
               Positioned(
+                top: 14,
+                left: 14,
+                child: ClipRRect(
+                  borderRadius: BorderRadius.circular(18),
+                  child: BackdropFilter(
+                    filter: ImageFilter.blur(sigmaX: 18, sigmaY: 18),
+                    child: Container(
+                      padding: const EdgeInsets.symmetric(
+                          horizontal: 14, vertical: 10),
+                      decoration: BoxDecoration(
+                        color: Colors.white.withValues(alpha: 0.82),
+                        borderRadius: BorderRadius.circular(18),
+                      ),
+                      child: Row(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          Container(
+                            width: 28,
+                            height: 28,
+                            decoration: const BoxDecoration(
+                              color: AppColors.primary,
+                              shape: BoxShape.circle,
+                            ),
+                            child: const Icon(
+                              Icons.near_me_rounded,
+                              color: Colors.white,
+                              size: 15,
+                            ),
+                          ),
+                          const SizedBox(width: 8),
+                          Text(
+                            'Servicios en ruta',
+                            style: GoogleFonts.poppins(
+                              fontSize: 12,
+                              fontWeight: FontWeight.w700,
+                              color: AppColors.onSurface,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ),
+                ),
+              ),
+              Positioned(
                 bottom: 16,
                 right: 16,
                 child: Column(
                   children: [
-                    _MapControlButton(Icons.my_location, onRecenter),
+                    _MapControlButton(Icons.my_location, () {
+                      onRecenter();
+                    }),
                     const SizedBox(height: 8),
                     _MapControlButton(Icons.layers, () {}),
                   ],
@@ -601,7 +829,7 @@ class _ServiceMapPin extends StatelessWidget {
         border: Border.all(color: Colors.white, width: 2),
         boxShadow: [
           BoxShadow(
-            color: color.withOpacity(0.45),
+            color: color.withValues(alpha: 0.45),
             blurRadius: 8,
             spreadRadius: 1,
           ),
@@ -629,7 +857,7 @@ class _MapControlButton extends StatelessWidget {
           shape: BoxShape.circle,
           boxShadow: [
             BoxShadow(
-              color: AppColors.onSurface.withOpacity(0.1),
+              color: AppColors.onSurface.withValues(alpha: 0.1),
               blurRadius: 12,
             ),
           ],
@@ -665,20 +893,22 @@ class _CategoryChip extends StatelessWidget {
         padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 6),
         decoration: BoxDecoration(
           color: selected ? color : Colors.white,
-          borderRadius: BorderRadius.circular(20),
+          borderRadius: BorderRadius.circular(22),
           border: Border.all(
-            color: selected ? color : color.withOpacity(0.3),
-            width: selected ? 0 : 1,
+            color: selected
+                ? Colors.white.withValues(alpha: 0.0)
+                : color.withValues(alpha: 0.22),
+            width: 1,
           ),
-          boxShadow: selected
-              ? [
-                  BoxShadow(
-                    color: color.withOpacity(0.3),
-                    blurRadius: 10,
-                    offset: const Offset(0, 3),
-                  ),
-                ]
-              : [],
+          boxShadow: [
+            BoxShadow(
+              color: selected
+                  ? color.withValues(alpha: 0.26)
+                  : AppColors.onSurface.withValues(alpha: 0.04),
+              blurRadius: selected ? 14 : 8,
+              offset: Offset(0, selected ? 5 : 2),
+            ),
+          ],
         ),
         child: Row(
           mainAxisSize: MainAxisSize.min,
@@ -693,7 +923,7 @@ class _CategoryChip extends StatelessWidget {
               label,
               style: TextStyle(
                 fontSize: 12,
-                fontWeight: FontWeight.w600,
+                fontWeight: FontWeight.w800,
                 color: selected ? Colors.white : color,
               ),
             ),
@@ -720,13 +950,13 @@ class _NearbyServiceCard extends StatelessWidget {
         padding: const EdgeInsets.all(14),
         decoration: BoxDecoration(
           color: AppColors.surfaceContainerLowest,
-          borderRadius: BorderRadius.circular(16),
-          border: Border.all(color: service.color.withOpacity(0.14)),
+          borderRadius: BorderRadius.circular(18),
+          border: Border.all(color: service.color.withValues(alpha: 0.14)),
           boxShadow: [
             BoxShadow(
-              color: AppColors.onSurface.withOpacity(0.04),
-              blurRadius: 12,
-              offset: const Offset(0, 3),
+              color: AppColors.onSurface.withValues(alpha: 0.07),
+              blurRadius: 18,
+              offset: const Offset(0, 8),
             ),
           ],
         ),
@@ -739,7 +969,7 @@ class _NearbyServiceCard extends StatelessWidget {
                 Container(
                   padding: const EdgeInsets.all(7),
                   decoration: BoxDecoration(
-                    color: service.color.withOpacity(0.12),
+                    color: service.color.withValues(alpha: 0.12),
                     borderRadius: BorderRadius.circular(9),
                   ),
                   child: Icon(service.icon, color: service.color, size: 18),
@@ -750,7 +980,7 @@ class _NearbyServiceCard extends StatelessWidget {
                   padding:
                       const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
                   decoration: BoxDecoration(
-                    color: service.color.withOpacity(0.08),
+                    color: service.color.withValues(alpha: 0.08),
                     borderRadius: BorderRadius.circular(6),
                   ),
                   child: Text(
@@ -792,7 +1022,7 @@ class _NearbyServiceCard extends StatelessWidget {
                 ),
                 const Spacer(),
                 Icon(Icons.chevron_right_rounded,
-                    size: 14, color: service.color.withOpacity(0.6)),
+                    size: 14, color: service.color.withValues(alpha: 0.6)),
               ],
             ),
           ],

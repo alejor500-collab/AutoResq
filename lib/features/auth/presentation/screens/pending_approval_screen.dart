@@ -113,7 +113,7 @@ class PendingApprovalScreen extends ConsumerWidget {
                     if (!context.mounted) return;
                     if (submitted == true) {
                       ref.invalidate(tecnicoStatusProvider);
-                      context.go(AppRoutes.technicianPending);
+                      context.go(AppRoutes.driverHome);
                     }
                   },
                   prefixIcon: const Icon(
@@ -124,6 +124,11 @@ class PendingApprovalScreen extends ConsumerWidget {
                 ),
                 const SizedBox(height: 12),
               ],
+              AppButton(
+                label: 'Usar como conductor',
+                onPressed: () => context.go(AppRoutes.driverHome),
+              ),
+              const SizedBox(height: 12),
               AppButton(
                 label: 'Cerrar sesión',
                 onPressed: () =>

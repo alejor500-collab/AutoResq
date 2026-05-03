@@ -397,6 +397,9 @@ class _EmergencyCard extends StatelessWidget {
     final descripcion = data['descripcion'] as String? ?? '';
     final fechaStr = data['fecha'] as String?;
     final clasificacionIa = data['clasificacion_ia'] as String?;
+    final aiPriority = data['ai_priority'] as String?;
+    final aiType = data['ai_emergency_type'] as String?;
+    final aiSummary = data['ai_technician_summary'] as String?;
 
     final usuario = data['usuarios'] as Map<String, dynamic>? ?? {};
     final conductorNombre = usuario['nombre'] as String? ?? 'Conductor';
@@ -431,7 +434,7 @@ class _EmergencyCard extends StatelessWidget {
         border: Border.all(color: AppColors.border),
         boxShadow: [
           BoxShadow(
-            color: AppColors.onSurface.withOpacity(0.04),
+            color: AppColors.onSurface.withValues(alpha: 0.04),
             blurRadius: 8,
             offset: const Offset(0, 2),
           ),
@@ -448,7 +451,7 @@ class _EmergencyCard extends StatelessWidget {
               children: [
                 Expanded(
                   child: Text(
-                    descripcion,
+                    aiSummary?.isNotEmpty == true ? aiSummary! : descripcion,
                     maxLines: 2,
                     overflow: TextOverflow.ellipsis,
                     style: GoogleFonts.poppins(
@@ -510,11 +513,21 @@ class _EmergencyCard extends StatelessWidget {
                     ),
                   ],
                 ),
-                if (clasificacionIa != null && clasificacionIa.isNotEmpty) ...[
+                if ((aiType != null && aiType.isNotEmpty) ||
+                    (clasificacionIa != null && clasificacionIa.isNotEmpty) ||
+                    (aiPriority != null && aiPriority.isNotEmpty)) ...[
                   const Gap(6),
                   Align(
                     alignment: Alignment.centerLeft,
-                    child: _AiChip(label: clasificacionIa),
+                    child: Wrap(
+                      spacing: 6,
+                      runSpacing: 6,
+                      children: [
+                        _AiChip(label: aiType ?? clasificacionIa ?? 'IA'),
+                        if (aiPriority != null && aiPriority.isNotEmpty)
+                          _AiChip(label: aiPriority),
+                      ],
+                    ),
                   ),
                 ],
               ],
@@ -533,7 +546,7 @@ class _EmergencyCard extends StatelessWidget {
                       Container(
                         padding: const EdgeInsets.all(6),
                         decoration: BoxDecoration(
-                          color: AppColors.secondary.withOpacity(0.08),
+                          color: AppColors.secondary.withValues(alpha: 0.08),
                           shape: BoxShape.circle,
                         ),
                         child: const Icon(
@@ -613,9 +626,9 @@ class _AiChip extends StatelessWidget {
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
       decoration: BoxDecoration(
-        color: AppColors.info.withOpacity(0.08),
+        color: AppColors.info.withValues(alpha: 0.08),
         borderRadius: BorderRadius.circular(20),
-        border: Border.all(color: AppColors.info.withOpacity(0.25)),
+        border: Border.all(color: AppColors.info.withValues(alpha: 0.25)),
       ),
       child: Row(
         mainAxisSize: MainAxisSize.min,

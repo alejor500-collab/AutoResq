@@ -172,7 +172,7 @@ class _AnimatedPillButtonState extends State<_AnimatedPillButton> {
         borderRadius: BorderRadius.circular(9999),
         boxShadow: [
           BoxShadow(
-            color: AppColors.primary.withOpacity(0.2),
+            color: AppColors.primary.withValues(alpha: 0.2),
             blurRadius: 20,
             offset: const Offset(0, 8),
           ),

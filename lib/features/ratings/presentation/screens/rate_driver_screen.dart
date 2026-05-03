@@ -11,6 +11,8 @@ import '../../../../shared/widgets/app_button.dart';
 import '../../../../shared/widgets/app_text_field.dart';
 import '../../../../shared/widgets/star_rating.dart';
 import '../../../../shared/widgets/user_avatar.dart';
+import '../../../emergency/presentation/providers/emergency_provider.dart';
+import '../providers/rating_provider.dart';
 
 class RateDriverScreen extends ConsumerStatefulWidget {
   final String emergencyId;
@@ -63,6 +65,8 @@ class _RateDriverScreenState extends ConsumerState<RateDriverScreen> {
   // ─── Actualiza estado en Supabase al finalizar ────────────────────────────
   Future<void> _runCompletionUpdates() async {
     final client = ref.read(supabaseClientProvider);
+    final user = ref.read(authNotifierProvider).value ??
+        ref.read(authStateProvider).valueOrNull;
 
     if (widget.asignacionId != null && widget.asignacionId!.isNotEmpty) {
       await client
@@ -81,8 +85,11 @@ class _RateDriverScreenState extends ConsumerState<RateDriverScreen> {
     if (widget.technicianId != null && widget.technicianId!.isNotEmpty) {
       await client
           .from(AppConstants.tableTecnicos)
-          .update({'disponible': true}).eq(
-              'usuario_id', widget.technicianId!);
+          .update({'disponible': true}).eq('id', widget.technicianId!);
+    } else if (user != null) {
+      await client
+          .from(AppConstants.tableTecnicos)
+          .update({'disponible': true}).eq('usuario_id', user.id);
     }
   }
 
@@ -96,39 +103,39 @@ class _RateDriverScreenState extends ConsumerState<RateDriverScreen> {
 
     setState(() => _isLoading = true);
     try {
-      final client = ref.read(supabaseClientProvider);
-
-      await client.from(AppConstants.tableCalificaciones).insert({
-        'emergencia_id': widget.emergencyId,
-        'calificador_id': widget.technicianId ?? '',
-        'calificado_id': widget.driverId,
-        'puntuacion': _stars,
-        if (_reviewCtrl.text.trim().isNotEmpty)
-          'comentario': _reviewCtrl.text.trim(),
-      });
-
       await _runCompletionUpdates();
+      final ok = await ref.read(ratingNotifierProvider.notifier).submitRating(
+            emergenciaId: widget.emergencyId,
+            calificadoId: widget.driverId,
+            puntuacion: _stars,
+            raterRole: 'technician',
+            comentario: _reviewCtrl.text.trim().isEmpty
+                ? null
+                : _reviewCtrl.text.trim(),
+          );
+      if (!ok) {
+        final error = ref.read(ratingNotifierProvider).error;
+        throw Exception(
+          error?.toString() ?? 'No se pudo guardar la calificacion',
+        );
+      }
 
       if (!mounted) return;
-      context.go(AppRoutes.serviceCompleted, extra: _resumenParams(techRating: _stars));
+      ref.read(emergencyNotifierProvider.notifier).clearActiveEmergency();
+      context.go(
+        AppRoutes.serviceCompleted,
+        extra: _resumenParams(techRating: _stars),
+      );
     } catch (e) {
       if (!mounted) return;
-      AppHelpers.showSnackBar(context, 'Error al enviar calificación',
-          isError: true);
+      AppHelpers.showSnackBar(
+        context,
+        'Error al enviar calificacion: $e',
+        isError: true,
+      );
     } finally {
       if (mounted) setState(() => _isLoading = false);
     }
-  }
-
-  // ─── Omitir: solo updates, sin calificación ───────────────────────────────
-  Future<void> _skip() async {
-    setState(() => _isLoading = true);
-    try {
-      await _runCompletionUpdates();
-    } catch (_) {}
-    if (!mounted) return;
-    setState(() => _isLoading = false);
-    context.go(AppRoutes.serviceCompleted, extra: _resumenParams());
   }
 
   @override
@@ -225,7 +232,7 @@ class _RateDriverScreenState extends ConsumerState<RateDriverScreen> {
                             AppConstants.borderRadiusCard),
                         boxShadow: [
                           BoxShadow(
-                            color: AppColors.onSurface.withOpacity(0.06),
+                            color: AppColors.onSurface.withValues(alpha: 0.06),
                             blurRadius: 16,
                             offset: const Offset(0, 2),
                           ),
@@ -275,18 +282,6 @@ class _RateDriverScreenState extends ConsumerState<RateDriverScreen> {
                     label: 'Enviar calificación',
                     onPressed: _isLoading ? null : _submit,
                     isLoading: _isLoading,
-                  ),
-                  const Gap(4),
-                  TextButton(
-                    onPressed: _isLoading ? null : _skip,
-                    child: const Text(
-                      'Omitir por ahora',
-                      style: TextStyle(
-                        fontSize: 14,
-                        fontWeight: FontWeight.w600,
-                        color: AppColors.textSecondary,
-                      ),
-                    ),
                   ),
                 ],
               ),

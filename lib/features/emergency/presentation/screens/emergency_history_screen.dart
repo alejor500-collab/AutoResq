@@ -4,6 +4,7 @@ import 'package:go_router/go_router.dart';
 import 'package:gap/gap.dart';
 import '../../../../core/constants/app_colors.dart';
 import '../../../../core/constants/app_constants.dart';
+import '../../../../core/router/app_router.dart';
 import '../../../../core/utils/helpers.dart';
 import '../../../../shared/providers/auth_provider.dart';
 import '../../../../shared/widgets/loading_overlay.dart';
@@ -37,6 +38,13 @@ class _EmergencyHistoryScreenState
   @override
   Widget build(BuildContext context) {
     final state = ref.watch(emergencyNotifierProvider);
+    final user = ref.watch(authNotifierProvider).value;
+    final visibleEmergencies = state.emergencies
+        .where((emergency) =>
+            user != null &&
+            emergency.usuarioId == user.id &&
+            emergency.estado != AppConstants.statusPending)
+        .toList();
 
     return Scaffold(
       backgroundColor: AppColors.background,
@@ -45,7 +53,7 @@ class _EmergencyHistoryScreenState
         elevation: 0,
         leading: IconButton(
           icon: const Icon(Icons.arrow_back_ios_new, size: 20),
-          onPressed: () => context.pop(),
+          onPressed: _handleBack,
         ),
         title: const Text(
           'Historial de emergencias',
@@ -59,20 +67,38 @@ class _EmergencyHistoryScreenState
       body: state.isLoading
           ? const Center(
               child: CircularProgressIndicator(color: AppColors.primary))
-          : state.emergencies.isEmpty
+          : visibleEmergencies.isEmpty
               ? const EmptyStateWidget(
                   message: 'Sin emergencias registradas',
-                  subtitle: 'Tu historial de servicios aparecerá aquí',
+                  subtitle: 'Tus servicios atendidos apareceran aqui',
                   icon: Icons.history,
                 )
               : ListView.builder(
                   padding: const EdgeInsets.all(AppConstants.pagePadding),
-                  itemCount: state.emergencies.length,
+                  itemCount: visibleEmergencies.length,
                   itemBuilder: (context, i) {
-                    return _HistoryCard(emergency: state.emergencies[i]);
+                    return _HistoryCard(emergency: visibleEmergencies[i]);
                   },
                 ),
     );
+  }
+
+  void _handleBack() {
+    if (context.canPop()) {
+      context.pop();
+      return;
+    }
+
+    final user = ref.read(authNotifierProvider).value;
+    if (user?.isAdmin == true) {
+      context.go(AppRoutes.adminDashboard);
+      return;
+    }
+    if (user?.isTechnician == true) {
+      context.go(AppRoutes.technicianHome);
+      return;
+    }
+    context.go(AppRoutes.driverHome);
   }
 }
 
@@ -101,7 +127,7 @@ class _HistoryCardState extends State<_HistoryCard> {
         border: Border.all(color: AppColors.border),
         boxShadow: [
           BoxShadow(
-            color: Colors.black.withOpacity(0.04),
+            color: Colors.black.withValues(alpha: 0.04),
             blurRadius: 8,
             offset: const Offset(0, 2),
           ),
@@ -121,7 +147,7 @@ class _HistoryCardState extends State<_HistoryCard> {
                     height: 44,
                     decoration: BoxDecoration(
                       color: AppHelpers.statusColor(e.estado)
-                          .withOpacity(0.1),
+                          .withValues(alpha: 0.1),
                       borderRadius: BorderRadius.circular(10),
                     ),
                     child: Icon(

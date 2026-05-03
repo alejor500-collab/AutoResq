@@ -13,7 +13,112 @@ import '../../../../shared/providers/role_provider.dart';
 import '../../../../shared/providers/tecnico_status_provider.dart';
 import '../../../../shared/widgets/bottom_nav_bar.dart';
 import '../../../../shared/widgets/technician_request_sheet.dart';
+import '../../../emergency/presentation/providers/emergency_provider.dart';
 import '../providers/vehicle_provider.dart';
+
+class ProfileServiceStats {
+  final int total;
+  final int attended;
+  final int completed;
+  final int pending;
+
+  const ProfileServiceStats({
+    required this.total,
+    required this.attended,
+    required this.completed,
+    required this.pending,
+  });
+
+  static const empty = ProfileServiceStats(
+    total: 0,
+    attended: 0,
+    completed: 0,
+    pending: 0,
+  );
+}
+
+final profileServiceStatsProvider = FutureProvider.autoDispose
+    .family<ProfileServiceStats, ({String userId, bool isTechnician})>(
+        (ref, args) async {
+  final client = ref.read(supabaseClientProvider);
+
+  if (args.isTechnician) {
+    final technicianRows = await client
+        .from(AppConstants.tableTecnicos)
+        .select('id')
+        .eq('usuario_id', args.userId)
+        .limit(1);
+    final technicianProfileId = (technicianRows as List).isEmpty
+        ? args.userId
+        : (technicianRows.first as Map)['id']?.toString() ?? args.userId;
+
+    final rows = await client
+        .from(AppConstants.tableAsignaciones)
+        .select('estado, emergencias(estado)')
+        .eq('tecnico_id', technicianProfileId);
+
+    var attended = 0;
+    var completed = 0;
+    var pending = 0;
+
+    for (final raw in rows as List) {
+      final row = Map<String, dynamic>.from(raw as Map);
+      final assignmentStatus = row['estado'] as String?;
+      final emergencyData = row['emergencias'];
+      final emergencyStatus =
+          emergencyData is Map ? emergencyData['estado'] as String? : null;
+      final status = emergencyStatus ?? assignmentStatus;
+
+      if (status == AppConstants.statusCompleted ||
+          assignmentStatus == AppConstants.assignFinished) {
+        completed++;
+      } else if (status == AppConstants.statusAttended ||
+          assignmentStatus == AppConstants.assignAttending) {
+        attended++;
+      } else if (status == AppConstants.statusPending ||
+          status == AppConstants.statusInProgress ||
+          assignmentStatus == AppConstants.assignAccepted ||
+          assignmentStatus == AppConstants.assignEnRoute) {
+        pending++;
+      }
+    }
+
+    return ProfileServiceStats(
+      total: attended + completed,
+      attended: attended,
+      completed: completed,
+      pending: pending,
+    );
+  }
+
+  final rows = await client
+      .from(AppConstants.tableEmergencias)
+      .select('estado')
+      .eq('usuario_id', args.userId);
+
+  var attended = 0;
+  var completed = 0;
+  var pending = 0;
+
+  for (final raw in rows as List) {
+    final status = (raw as Map)['estado'] as String?;
+    if (status == AppConstants.statusCompleted) {
+      completed++;
+    } else if (status == AppConstants.statusAttended) {
+      attended++;
+    } else if (status == AppConstants.statusPending ||
+        status == AppConstants.statusInProgress) {
+      pending++;
+    }
+  }
+
+  return ProfileServiceStats(
+    total: attended + completed,
+    attended: attended,
+    completed: completed,
+    pending: pending,
+  );
+});
 
 class ProfileScreen extends ConsumerWidget {
   const ProfileScreen({super.key});
@@ -23,6 +128,9 @@ class ProfileScreen extends ConsumerWidget {
     final authState = ref.watch(authNotifierProvider);
     final user = authState.value;
     final activeRole = ref.watch(activeRoleProvider);
+    final isTechnicianMode = activeRole == AppConstants.roleTechnician &&
+        user?.isTechnician == true &&
+        user?.isApproved == true;
 
     if (user == null) {
       return const Scaffold(
@@ -48,10 +156,10 @@ class ProfileScreen extends ConsumerWidget {
                   padding:
                       EdgeInsets.only(top: MediaQuery.of(context).padding.top),
                   decoration: BoxDecoration(
-                    color: Colors.white.withOpacity(0.8),
+                    color: Colors.white.withValues(alpha: 0.8),
                     boxShadow: [
                       BoxShadow(
-                        color: AppColors.onSurface.withOpacity(0.06),
+                        color: AppColors.onSurface.withValues(alpha: 0.06),
                         blurRadius: 40,
                         offset: const Offset(0, 40),
                       ),
@@ -67,10 +175,13 @@ class ProfileScreen extends ConsumerWidget {
                           borderRadius: BorderRadius.circular(10),
                           child: InkWell(
                             borderRadius: BorderRadius.circular(10),
-                            splashColor: AppColors.primary.withOpacity(0.08),
+                            splashColor:
+                                AppColors.primary.withValues(alpha: 0.08),
                             onTap: () => context.canPop()
                                 ? context.pop()
-                                : context.go(AppRoutes.driverHome),
+                                : context.go(isTechnicianMode
+                                    ? AppRoutes.technicianHome
+                                    : AppRoutes.driverHome),
                             child: const Padding(
                               padding: EdgeInsets.all(8),
                               child: Icon(Icons.arrow_back_ios_new,
@@ -122,7 +233,10 @@ class ProfileScreen extends ConsumerWidget {
                   const Gap(40),
 
                   // Stats Grid (Bento)
-                  _StatsGrid(user: user),
+                  _StatsGrid(
+                    user: user,
+                    isTechnicianMode: isTechnicianMode,
+                  ),
                   const Gap(32),
 
                   // Vehicle Section
@@ -138,8 +252,10 @@ class ProfileScreen extends ConsumerWidget {
                     onTap: () async {
                       final confirmed = await _confirmLogout(context);
                       if (confirmed == true && context.mounted) {
+                        final router = GoRouter.of(context);
                         await ref.read(authNotifierProvider.notifier).logout();
-                        context.go(AppRoutes.login);
+                        if (!context.mounted) return;
+                        router.go(AppRoutes.login);
                       }
                     },
                     child: const Padding(
@@ -173,15 +289,40 @@ class ProfileScreen extends ConsumerWidget {
             left: 0,
             right: 0,
             child: AppBottomNavBar(
-              currentIndex: 3,
+              currentIndex: isTechnicianMode ? 4 : 3,
+              isTechnician: isTechnicianMode,
               onTap: (i) {
-                switch (i) {
-                  case 0:
-                    context.go(AppRoutes.driverHome);
-                  case 1:
-                    context.go(AppRoutes.emergencyHistory);
-                  case 2:
-                    break;
+                if (isTechnicianMode) {
+                  switch (i) {
+                    case 0:
+                      context.go(AppRoutes.technicianHome, extra: 0);
+                      break;
+                    case 1:
+                      context.go(AppRoutes.technicianHome, extra: 1);
+                      break;
+                    case 2:
+                      context.go(AppRoutes.technicianHome, extra: 2);
+                      break;
+                    case 3:
+                      _openTechnicianChat(context, ref);
+                      break;
+                    case 4:
+                      break;
+                  }
+                } else {
+                  switch (i) {
+                    case 0:
+                      context.go(AppRoutes.driverHome);
+                      break;
+                    case 1:
+                      context.go(AppRoutes.emergencyHistory);
+                      break;
+                    case 2:
+                      context.go(AppRoutes.emergencyHistory);
+                      break;
+                    case 3:
+                      break;
+                  }
                 }
               },
             ),
@@ -189,6 +330,22 @@ class ProfileScreen extends ConsumerWidget {
         ],
       ),
     );
+  }
+
+  void _openTechnicianChat(BuildContext context, WidgetRef ref) {
+    final activeEmergency = ref.read(emergencyNotifierProvider).activeEmergency;
+    final emergencyId = activeEmergency?.id;
+
+    if (emergencyId == null || emergencyId.isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('No tienes un chat activo en este momento'),
+        ),
+      );
+      return;
+    }
+
+    context.push(AppRoutes.technicianChat, extra: emergencyId);
   }
 
   Future<bool?> _confirmLogout(BuildContext context) {
@@ -247,7 +404,7 @@ class _ProfileHero extends StatelessWidget {
                 ),
                 boxShadow: [
                   BoxShadow(
-                    color: AppColors.primary.withOpacity(0.2),
+                    color: AppColors.primary.withValues(alpha: 0.2),
                     blurRadius: 20,
                     offset: const Offset(0, 8),
                   ),
@@ -284,7 +441,7 @@ class _ProfileHero extends StatelessWidget {
                     shape: BoxShape.circle,
                     boxShadow: [
                       BoxShadow(
-                        color: AppColors.primary.withOpacity(0.3),
+                        color: AppColors.primary.withValues(alpha: 0.3),
                         blurRadius: 8,
                       ),
                     ],
@@ -318,7 +475,7 @@ class _ProfileHero extends StatelessWidget {
               fontSize: 11,
               fontWeight: FontWeight.w700,
               letterSpacing: 1.5,
-              color: AppColors.onSurface.withOpacity(0.7),
+              color: AppColors.onSurface.withValues(alpha: 0.7),
             ),
           ),
         ),
@@ -329,110 +486,138 @@ class _ProfileHero extends StatelessWidget {
 
 // ─── Stats Grid ───────────────────────────────────────────────────────────────
 
-class _StatsGrid extends StatelessWidget {
-  final dynamic user;
+class _StatsGrid extends ConsumerWidget {
+  final AppUser user;
+  final bool isTechnicianMode;
 
-  const _StatsGrid({required this.user});
+  const _StatsGrid({
+    required this.user,
+    required this.isTechnicianMode,
+  });
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final statsAsync = ref.watch(
+      profileServiceStatsProvider(
+        (userId: user.id, isTechnician: isTechnicianMode),
+      ),
+    );
+
+    return statsAsync.when(
+      data: (stats) => _StatsCards(stats: stats),
+      loading: () => const _StatsCards(stats: ProfileServiceStats.empty),
+      error: (_, __) => const _StatsCards(stats: ProfileServiceStats.empty),
+    );
+  }
+}
+
+class _StatsCards extends StatelessWidget {
+  final ProfileServiceStats stats;
+
+  const _StatsCards({required this.stats});
 
   @override
   Widget build(BuildContext context) {
-    return Row(
-      children: [
-        // Total
-        Expanded(
-          child: Container(
-            padding: const EdgeInsets.symmetric(vertical: 20),
-            decoration: BoxDecoration(
-              color: AppColors.surfaceContainerLow,
-              borderRadius: BorderRadius.circular(16),
-            ),
-            child: Column(
-              children: [
-                const Text(
-                  'Total',
-                  style: TextStyle(
-                    fontSize: 11,
-                    fontWeight: FontWeight.w700,
-                    color: AppColors.secondary,
-                    letterSpacing: -0.3,
-                  ),
-                ),
-                const Gap(4),
-                Text(
-                  '${user.totalServices}',
-                  style: const TextStyle(
-                    fontSize: 24,
-                    fontWeight: FontWeight.w900,
-                    color: AppColors.onSurface,
-                  ),
-                ),
-              ],
+    final items = [
+      (
+        label: 'Total',
+        value: stats.total,
+        color: AppColors.surfaceContainerLow,
+        textColor: AppColors.onSurface,
+      ),
+      (
+        label: 'Atendidas',
+        value: stats.attended,
+        color: AppColors.success.withValues(alpha: 0.10),
+        textColor: AppColors.success,
+      ),
+      (
+        label: 'Completas',
+        value: stats.completed,
+        color: AppColors.tertiaryFixed,
+        textColor: AppColors.onSurface,
+      ),
+      (
+        label: 'Pendientes',
+        value: stats.pending,
+        color: AppColors.primaryFixed,
+        textColor: AppColors.onSurface,
+      ),
+    ];
+
+    return LayoutBuilder(
+      builder: (context, constraints) {
+        final columns = constraints.maxWidth < 680 ? 2 : 4;
+        return GridView.builder(
+          itemCount: items.length,
+          shrinkWrap: true,
+          physics: const NeverScrollableScrollPhysics(),
+          gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
+            crossAxisCount: columns,
+            mainAxisExtent: 98,
+            crossAxisSpacing: 14,
+            mainAxisSpacing: 14,
+          ),
+          itemBuilder: (context, index) {
+            final item = items[index];
+            return _StatCard(
+              label: item.label,
+              value: item.value,
+              color: item.color,
+              textColor: item.textColor,
+            );
+          },
+        );
+      },
+    );
+  }
+}
+
+class _StatCard extends StatelessWidget {
+  final String label;
+  final int value;
+  final Color color;
+  final Color textColor;
+
+  const _StatCard({
+    required this.label,
+    required this.value,
+    required this.color,
+    required this.textColor,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.symmetric(vertical: 18, horizontal: 12),
+      decoration: BoxDecoration(
+        color: color,
+        borderRadius: BorderRadius.circular(16),
+      ),
+      child: Column(
+        mainAxisAlignment: MainAxisAlignment.center,
+        children: [
+          Text(
+            label,
+            maxLines: 1,
+            overflow: TextOverflow.ellipsis,
+            style: TextStyle(
+              fontSize: 11,
+              fontWeight: FontWeight.w700,
+              color: textColor.withValues(alpha: 0.76),
             ),
           ),
-        ),
-        const Gap(16),
-        // Completos
-        Expanded(
-          child: Container(
-            padding: const EdgeInsets.symmetric(vertical: 20),
-            decoration: BoxDecoration(
-              color: AppColors.tertiaryFixed,
-              borderRadius: BorderRadius.circular(16),
-            ),
-            child: Column(
-              children: [
-                const Text(
-                  'Completos',
-                  style: TextStyle(
-                    fontSize: 11,
-                    fontWeight: FontWeight.w700,
-                    letterSpacing: -0.3,
-                  ),
-                ),
-                const Gap(4),
-                Text(
-                  '${user.totalServices > 4 ? user.totalServices - 4 : 0}',
-                  style: const TextStyle(
-                    fontSize: 24,
-                    fontWeight: FontWeight.w900,
-                  ),
-                ),
-              ],
+          const Gap(5),
+          Text(
+            '$value',
+            style: TextStyle(
+              fontSize: 24,
+              fontWeight: FontWeight.w900,
+              color: textColor,
             ),
           ),
-        ),
-        const Gap(16),
-        // Pendientes
-        Expanded(
-          child: Container(
-            padding: const EdgeInsets.symmetric(vertical: 20),
-            decoration: BoxDecoration(
-              color: AppColors.primaryFixed,
-              borderRadius: BorderRadius.circular(16),
-            ),
-            child: const Column(
-              children: [
-                Text(
-                  'Pendientes',
-                  style: TextStyle(
-                    fontSize: 11,
-                    fontWeight: FontWeight.w700,
-                    letterSpacing: -0.3,
-                  ),
-                ),
-                Gap(4),
-                Text(
-                  '4',
-                  style: TextStyle(
-                    fontSize: 24,
-                    fontWeight: FontWeight.w900,
-                  ),
-                ),
-              ],
-            ),
-          ),
-        ),
-      ],
+        ],
+      ),
     );
   }
 }
@@ -499,7 +684,7 @@ class _VehicleSection extends ConsumerWidget {
                 color: AppColors.surfaceContainerLow,
                 borderRadius: BorderRadius.circular(16),
                 border: Border.all(
-                    color: AppColors.primary.withOpacity(0.15),
+                    color: AppColors.primary.withValues(alpha: 0.15),
                     style: BorderStyle.solid),
               ),
               child: Row(
@@ -508,7 +693,7 @@ class _VehicleSection extends ConsumerWidget {
                     width: 52,
                     height: 52,
                     decoration: BoxDecoration(
-                      color: AppColors.primary.withOpacity(0.08),
+                      color: AppColors.primary.withValues(alpha: 0.08),
                       borderRadius: BorderRadius.circular(12),
                     ),
                     child: const Icon(Icons.add_rounded,
@@ -555,10 +740,10 @@ class _VehicleSection extends ConsumerWidget {
                 color: AppColors.surfaceContainerLowest,
                 borderRadius: BorderRadius.circular(16),
                 border: Border.all(
-                    color: AppColors.outlineVariant.withOpacity(0.1)),
+                    color: AppColors.outlineVariant.withValues(alpha: 0.1)),
                 boxShadow: [
                   BoxShadow(
-                    color: AppColors.onSurface.withOpacity(0.04),
+                    color: AppColors.onSurface.withValues(alpha: 0.04),
                     blurRadius: 40,
                     offset: const Offset(0, 20),
                   ),
@@ -682,7 +867,7 @@ class _TechnicianModeItem extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     // Técnico registrado: solo alterna la vista activa
-    if (user.isTechnician) {
+    if (user.isTechnician && user.isApproved) {
       final activeRole = ref.watch(activeRoleProvider);
       final goingToDriver =
           (activeRole ?? user.role) != AppConstants.roleDriver;
@@ -720,7 +905,7 @@ class _TechnicianModeItem extends ConsumerWidget {
         label: 'Solicitar ser Técnico',
         trailing: Icons.sync_alt,
         isProminent: true,
-        onTap: () => _openSheet(context),
+        onTap: () => _openSheet(context, ref),
       ),
       data: (status) {
         if (status.aprobado) {
@@ -748,16 +933,25 @@ class _TechnicianModeItem extends ConsumerWidget {
               : 'Solicitar ser Técnico',
           trailing: Icons.sync_alt,
           isProminent: true,
-          onTap: () => _openSheet(context),
+          onTap: () => _openSheet(context, ref),
         );
       },
     );
   }
 
-  void _openSheet(BuildContext context) {
+  void _openSheet(BuildContext context, WidgetRef ref) {
     showTechnicianRequestSheet(context, user.id).then((submitted) {
       if (submitted == true && context.mounted) {
-        context.go(AppRoutes.technicianPending);
+        ref.invalidate(tecnicoStatusProvider);
+        ref.read(activeRoleProvider.notifier).switchTo(AppConstants.roleDriver);
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text(
+              'Solicitud enviada. Puedes seguir usando AutoResQ como conductor.',
+            ),
+          ),
+        );
+        context.go(AppRoutes.driverHome);
       }
     });
   }
@@ -773,9 +967,9 @@ class _PendingTechnicianSettingsTile extends StatelessWidget {
     return Container(
       padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
-        color: AppColors.warning.withOpacity(0.07),
+        color: AppColors.warning.withValues(alpha: 0.07),
         borderRadius: BorderRadius.circular(16),
-        border: Border.all(color: AppColors.warning.withOpacity(0.2)),
+        border: Border.all(color: AppColors.warning.withValues(alpha: 0.2)),
       ),
       child: Row(
         children: [
@@ -783,7 +977,7 @@ class _PendingTechnicianSettingsTile extends StatelessWidget {
             width: 40,
             height: 40,
             decoration: BoxDecoration(
-              color: AppColors.warning.withOpacity(0.12),
+              color: AppColors.warning.withValues(alpha: 0.12),
               shape: BoxShape.circle,
             ),
             child: const Icon(Icons.engineering_outlined,
@@ -811,10 +1005,9 @@ class _PendingTechnicianSettingsTile extends StatelessWidget {
             ),
           ),
           Container(
-            padding:
-                const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+            padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
             decoration: BoxDecoration(
-              color: AppColors.warning.withOpacity(0.15),
+              color: AppColors.warning.withValues(alpha: 0.15),
               borderRadius: BorderRadius.circular(20),
             ),
             child: const Text(
@@ -865,13 +1058,14 @@ class _SettingsItem extends StatelessWidget {
               width: 40,
               height: 40,
               decoration: BoxDecoration(
-                color:
-                    isProminent ? Colors.white.withOpacity(0.2) : Colors.white,
+                color: isProminent
+                    ? Colors.white.withValues(alpha: 0.2)
+                    : Colors.white,
                 shape: BoxShape.circle,
                 boxShadow: [
                   if (!isProminent)
                     BoxShadow(
-                      color: AppColors.onSurface.withOpacity(0.04),
+                      color: AppColors.onSurface.withValues(alpha: 0.04),
                       blurRadius: 4,
                     ),
                 ],

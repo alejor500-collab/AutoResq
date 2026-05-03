@@ -4,10 +4,6 @@ abstract class AppConstants {
   static const String supabaseAnonKey = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InNzZXFzbWd2b3ZwcHV6a3RvY2hkIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzYyNTU2MDUsImV4cCI6MjA5MTgzMTYwNX0.NZeeBH5Djmm6TO4ZNK2Hda-TbYaVWTrDzqf9LJcF37Y';
 
   // ─── OpenAI ────────────────────────────────────────────────────────────────
-  static const String openAiApiKey = 'TU_OPENAI_API_KEY';
-  static const String openAiBaseUrl = 'https://api.openai.com/v1';
-  static const String openAiModel = 'gpt-4o-mini';
-
   // ─── App ───────────────────────────────────────────────────────────────────
   static const String appName = 'AutoResQ';
   static const String appVersion = '1.0.0';
@@ -64,6 +60,10 @@ abstract class AppConstants {
   static const String tableHistorial = 'historial';
   static const String tableNotificaciones = 'notificaciones';
   static const String tableUbicacionesTecnico = 'ubicaciones_tecnico';
+  static const String tableServiceTariffs = 'service_tariffs';
+  static const String tableEmergencyPriceSnapshots =
+      'emergency_price_snapshots';
+  static const String tableEmergencyExtraCharges = 'emergency_extra_charges';
 
   // ─── Backwards compat aliases ──────────────────────────────────────────────
   static const String tableProfiles = tableUsuarios;

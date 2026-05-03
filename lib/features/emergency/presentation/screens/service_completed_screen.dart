@@ -48,11 +48,11 @@ class ServiceCompletedScreen extends StatelessWidget {
                       width: 80,
                       height: 80,
                       decoration: BoxDecoration(
-                        color: const Color(0xFF22C55E).withOpacity(0.12),
+                        color: const Color(0xFF22C55E).withValues(alpha: 0.12),
                         shape: BoxShape.circle,
                         boxShadow: [
                           BoxShadow(
-                            color: const Color(0xFF22C55E).withOpacity(0.20),
+                            color: const Color(0xFF22C55E).withValues(alpha: 0.20),
                             blurRadius: 20,
                             offset: const Offset(0, 4),
                           ),
@@ -98,7 +98,7 @@ class ServiceCompletedScreen extends StatelessWidget {
                             Border.all(color: AppColors.surfaceContainerHigh),
                         boxShadow: [
                           BoxShadow(
-                            color: AppColors.onSurface.withOpacity(0.08),
+                            color: AppColors.onSurface.withValues(alpha: 0.08),
                             blurRadius: 12,
                             offset: const Offset(0, 2),
                           ),

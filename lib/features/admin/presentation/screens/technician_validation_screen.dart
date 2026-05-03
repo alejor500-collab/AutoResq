@@ -282,7 +282,7 @@ class _ValidationTabBar extends StatelessWidget {
                                 fontSize: 10,
                                 fontWeight: FontWeight.w600,
                                 color: isActive
-                                    ? Colors.white.withOpacity(0.85)
+                                    ? Colors.white.withValues(alpha: 0.85)
                                     : AppColors.textSecondary,
                               ),
                             ),
@@ -383,7 +383,7 @@ class _TechCard extends StatelessWidget {
         border: Border.all(color: AppColors.border),
         boxShadow: [
           BoxShadow(
-            color: AppColors.onSurface.withOpacity(0.04),
+            color: AppColors.onSurface.withValues(alpha: 0.04),
             blurRadius: 10,
             offset: const Offset(0, 2),
           ),
@@ -510,7 +510,7 @@ class _StatusBadge extends StatelessWidget {
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
       decoration: BoxDecoration(
-        color: color.withOpacity(0.1),
+        color: color.withValues(alpha: 0.1),
         borderRadius: BorderRadius.circular(20),
       ),
       child: Text(
@@ -672,7 +672,7 @@ class _CredentialRow extends StatelessWidget {
               padding: const EdgeInsets.all(7),
               decoration: BoxDecoration(
                 color: (hasDoc ? AppColors.info : AppColors.textHint)
-                    .withOpacity(0.1),
+                    .withValues(alpha: 0.1),
                 borderRadius: BorderRadius.circular(8),
               ),
               child: Icon(
@@ -862,7 +862,7 @@ class _ApproveSheet extends StatelessWidget {
             width: 68,
             height: 68,
             decoration: BoxDecoration(
-              color: _green.withOpacity(0.1),
+              color: _green.withValues(alpha: 0.1),
               shape: BoxShape.circle,
             ),
             child: const Icon(
@@ -982,7 +982,7 @@ class _RejectSheetState extends State<_RejectSheet> {
               Container(
                 padding: const EdgeInsets.all(9),
                 decoration: BoxDecoration(
-                  color: AppColors.error.withOpacity(0.1),
+                  color: AppColors.error.withValues(alpha: 0.1),
                   borderRadius: BorderRadius.circular(10),
                 ),
                 child: const Icon(
@@ -1038,7 +1038,7 @@ class _RejectSheetState extends State<_RejectSheet> {
                       const EdgeInsets.symmetric(horizontal: 14, vertical: 7),
                   decoration: BoxDecoration(
                     color: isSelected
-                        ? AppColors.error.withOpacity(0.08)
+                        ? AppColors.error.withValues(alpha: 0.08)
                         : Colors.transparent,
                     borderRadius: BorderRadius.circular(20),
                     border: Border.all(

@@ -44,7 +44,7 @@ class MapNotifier extends StateNotifier<MapState> {
       if (!serviceEnabled) {
         state = state.copyWith(
           isLoading: false,
-          error: 'El servicio de ubicación está desactivado',
+          error: 'Activa la ubicacion del telefono para usar tu posicion real',
         );
         return;
       }
@@ -55,7 +55,7 @@ class MapNotifier extends StateNotifier<MapState> {
         if (permission == LocationPermission.denied) {
           state = state.copyWith(
             isLoading: false,
-            error: 'Permiso de ubicación denegado',
+            error: 'Permiso de ubicacion denegado',
           );
           return;
         }
@@ -64,7 +64,8 @@ class MapNotifier extends StateNotifier<MapState> {
       if (permission == LocationPermission.deniedForever) {
         state = state.copyWith(
           isLoading: false,
-          error: 'Permiso de ubicación denegado permanentemente',
+          error:
+              'Permiso de ubicacion bloqueado. Activalo desde ajustes de la app',
         );
         return;
       }
@@ -93,6 +94,8 @@ class MapNotifier extends StateNotifier<MapState> {
           lng: AppConstants.defaultLng,
           address: 'Ecuador',
         ),
+        error:
+            'No se pudo obtener tu ubicacion. Puedes seleccionarla manualmente',
       );
     }
   }

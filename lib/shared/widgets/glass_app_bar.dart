@@ -28,10 +28,10 @@ class GlassAppBar extends StatelessWidget implements PreferredSizeWidget {
           height: 64 + MediaQuery.of(context).padding.top,
           padding: EdgeInsets.only(top: MediaQuery.of(context).padding.top),
           decoration: BoxDecoration(
-            color: Colors.white.withOpacity(0.8),
+            color: Colors.white.withValues(alpha: 0.8),
             boxShadow: [
               BoxShadow(
-                color: AppColors.onSurface.withOpacity(0.06),
+                color: AppColors.onSurface.withValues(alpha: 0.06),
                 blurRadius: 40,
                 offset: const Offset(0, 40),
               ),

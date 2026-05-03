@@ -101,6 +101,30 @@ CREATE TABLE IF NOT EXISTS public.emergencias (
     tipo_problema_id int  REFERENCES public.tipos_problema(id),
     descripcion      text NOT NULL,
     clasificacion_ia text,
+    ai_emergency_type text
+        CHECK (
+            ai_emergency_type IS NULL
+            OR ai_emergency_type IN (
+                'battery', 'tire', 'fuel', 'engine', 'overheating',
+                'accident', 'lockout', 'electrical', 'brakes',
+                'unknown', 'not_emergency'
+            )
+        ),
+    ai_priority text
+        CHECK (
+            ai_priority IS NULL
+            OR ai_priority IN ('low', 'medium', 'high', 'critical')
+        ),
+    ai_user_message text,
+    ai_safety_recommendation text,
+    ai_technician_summary text,
+    ai_detected_risks text[] NOT NULL DEFAULT ARRAY['none']::text[],
+    ai_requires_immediate_attention boolean,
+    ai_confidence numeric(4,3)
+        CHECK (ai_confidence IS NULL OR (ai_confidence >= 0 AND ai_confidence <= 1)),
+    ai_analysis_status text NOT NULL DEFAULT 'pending'
+        CHECK (ai_analysis_status IN ('pending', 'completed', 'failed')),
+    ai_analyzed_at timestamp with time zone,
     estado           varchar(50) NOT NULL DEFAULT 'pendiente'
                          CHECK (estado IN ('pendiente', 'en_proceso', 'atendida', 'finalizada', 'cancelada')),
     fecha            timestamp with time zone DEFAULT now()
@@ -147,6 +171,8 @@ CREATE TABLE IF NOT EXISTS public.mensajes (
     remitente_id   uuid NOT NULL REFERENCES public.usuarios(id),
     contenido      text NOT NULL,
     leido          boolean NOT NULL DEFAULT false,
+    entregado_at   timestamp with time zone,
+    leido_at       timestamp with time zone,
     fecha_envio    timestamp with time zone DEFAULT now()
 );
 
@@ -236,6 +262,16 @@ CREATE INDEX IF NOT EXISTS idx_emergencias_usuario_id
 
 CREATE INDEX IF NOT EXISTS idx_emergencias_estado
     ON public.emergencias(estado);
+
+CREATE INDEX IF NOT EXISTS idx_emergencias_ai_emergency_type
+    ON public.emergencias(ai_emergency_type);
+
+CREATE INDEX IF NOT EXISTS idx_emergencias_ai_priority
+    ON public.emergencias(ai_priority);
+
+CREATE INDEX IF NOT EXISTS idx_emergencias_ai_requires_immediate_attention
+    ON public.emergencias(ai_requires_immediate_attention)
+    WHERE ai_requires_immediate_attention = true;
 
 CREATE INDEX IF NOT EXISTS idx_tecnicos_disponible
     ON public.tecnicos(disponible)
@@ -466,9 +502,46 @@ CREATE POLICY "asignaciones_insert_tecnico" ON public.asignaciones
 -- -----------------------------------------------------------------------
 -- mensajes
 -- -----------------------------------------------------------------------
-CREATE POLICY "mensajes_participantes" ON public.mensajes
-    FOR ALL USING (
+CREATE POLICY "mensajes_select_participantes" ON public.mensajes
+    FOR SELECT USING (
         EXISTS (
+            SELECT 1
+            FROM public.asignaciones a
+            JOIN public.emergencias  e ON e.id = a.emergencia_id
+            JOIN public.tecnicos     t ON t.id = a.tecnico_id
+            WHERE a.id = asignacion_id
+              AND (e.usuario_id = auth.uid() OR t.usuario_id = auth.uid())
+        )
+    );
+
+CREATE POLICY "mensajes_insert_participantes" ON public.mensajes
+    FOR INSERT WITH CHECK (
+        remitente_id = auth.uid()
+        AND EXISTS (
+            SELECT 1
+            FROM public.asignaciones a
+            JOIN public.emergencias  e ON e.id = a.emergencia_id
+            JOIN public.tecnicos     t ON t.id = a.tecnico_id
+            WHERE a.id = asignacion_id
+              AND (e.usuario_id = auth.uid() OR t.usuario_id = auth.uid())
+        )
+    );
+
+CREATE POLICY "mensajes_update_receptor" ON public.mensajes
+    FOR UPDATE USING (
+        remitente_id <> auth.uid()
+        AND EXISTS (
+            SELECT 1
+            FROM public.asignaciones a
+            JOIN public.emergencias  e ON e.id = a.emergencia_id
+            JOIN public.tecnicos     t ON t.id = a.tecnico_id
+            WHERE a.id = asignacion_id
+              AND (e.usuario_id = auth.uid() OR t.usuario_id = auth.uid())
+        )
+    )
+    WITH CHECK (
+        remitente_id <> auth.uid()
+        AND EXISTS (
             SELECT 1
             FROM public.asignaciones a
             JOIN public.emergencias  e ON e.id = a.emergencia_id

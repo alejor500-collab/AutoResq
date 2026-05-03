@@ -1,8 +1,10 @@
 import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:geolocator/geolocator.dart';
 import 'package:go_router/go_router.dart';
 import 'package:gap/gap.dart';
+import 'package:url_launcher/url_launcher.dart';
 import '../../../../core/constants/app_colors.dart';
 import '../../../../core/constants/app_constants.dart';
 import '../../../../core/router/app_router.dart';
@@ -12,6 +14,25 @@ import '../../../../shared/widgets/user_avatar.dart';
 import '../../../map/presentation/widgets/map_widget.dart';
 import '../providers/emergency_provider.dart';
 import '../../domain/entities/emergency_entity.dart';
+
+Future<void> _callPhone(BuildContext context, String? phone) async {
+  final digits = phone?.replaceAll(RegExp(r'[^0-9+]'), '') ?? '';
+  if (digits.isEmpty) {
+    ScaffoldMessenger.of(context).showSnackBar(
+      const SnackBar(content: Text('No hay telefono registrado para llamar')),
+    );
+    return;
+  }
+  final ok = await launchUrl(
+    Uri(scheme: 'tel', path: digits),
+    mode: LaunchMode.externalApplication,
+  );
+  if (!ok && context.mounted) {
+    ScaffoldMessenger.of(context).showSnackBar(
+      const SnackBar(content: Text('No se pudo abrir la app de telefono')),
+    );
+  }
+}
 
 // ─── Substate local para esta pantalla ───────────────────────────────────────
 final _activeSubstateProvider = StateProvider.autoDispose<String>(
@@ -56,6 +77,7 @@ class _ActiveServiceBody extends ConsumerStatefulWidget {
 
 class _ActiveServiceBodyState extends ConsumerState<_ActiveServiceBody> {
   Timer? _attendingTimer;
+  StreamSubscription<Position>? _positionSub;
   int _attendingSeconds = 0;
 
   @override
@@ -67,14 +89,85 @@ class _ActiveServiceBodyState extends ConsumerState<_ActiveServiceBody> {
             AppConstants.assignAttending;
         _startAttendingTimer();
       }
+      _startLiveLocationUpdates();
     });
+  }
+
+  @override
+  void didUpdateWidget(covariant _ActiveServiceBody oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (oldWidget.emergency.tecnicoId != widget.emergency.tecnicoId) {
+      _startLiveLocationUpdates();
+    }
+    if (oldWidget.emergency.asignacionEstado !=
+            widget.emergency.asignacionEstado &&
+        widget.emergency.asignacionEstado == AppConstants.assignAttending) {
+      ref.read(_activeSubstateProvider.notifier).state =
+          AppConstants.assignAttending;
+      _startAttendingTimer();
+    }
+  }
+
+  Future<void> _startLiveLocationUpdates() async {
+    final technicianId = widget.emergency.tecnicoId;
+    if (technicianId == null || technicianId.isEmpty) return;
+
+    final serviceEnabled = await Geolocator.isLocationServiceEnabled();
+    if (!serviceEnabled) return;
+
+    var permission = await Geolocator.checkPermission();
+    if (permission == LocationPermission.denied) {
+      permission = await Geolocator.requestPermission();
+    }
+    if (permission == LocationPermission.denied ||
+        permission == LocationPermission.deniedForever) {
+      return;
+    }
+
+    _positionSub?.cancel();
+    final current = await Geolocator.getCurrentPosition(
+      desiredAccuracy: LocationAccuracy.high,
+    );
+    await _publishLiveLocation(current);
+
+    _positionSub = Geolocator.getPositionStream(
+      locationSettings: const LocationSettings(
+        accuracy: LocationAccuracy.high,
+        distanceFilter: 10,
+      ),
+    ).listen(
+      _publishLiveLocation,
+      onError: (_) {},
+    );
+  }
+
+  Future<void> _publishLiveLocation(Position position) async {
+    final technicianId = widget.emergency.tecnicoId;
+    if (technicianId == null || technicianId.isEmpty) return;
+    try {
+      await ref.read(supabaseClientProvider).from(
+        AppConstants.tableUbicacionesTecnico,
+      ).upsert({
+        'tecnico_id': technicianId,
+        'latitud': position.latitude,
+        'longitud': position.longitude,
+        'actualizado_en': DateTime.now().toUtc().toIso8601String(),
+      }, onConflict: 'tecnico_id');
+    } catch (_) {}
   }
 
   void _startAttendingTimer() {
     _attendingTimer?.cancel();
+    if (mounted) setState(_syncAttendingSeconds);
     _attendingTimer = Timer.periodic(const Duration(seconds: 1), (_) {
-      if (mounted) setState(() => _attendingSeconds++);
+      if (mounted) setState(_syncAttendingSeconds);
     });
+  }
+
+  void _syncAttendingSeconds() {
+    final startedAt = widget.emergency.asignacionFecha ?? widget.emergency.fecha;
+    final seconds = DateTime.now().difference(startedAt).inSeconds;
+    _attendingSeconds = seconds < 0 ? 0 : seconds;
   }
 
   String _formatElapsed() {
@@ -92,6 +185,11 @@ class _ActiveServiceBodyState extends ConsumerState<_ActiveServiceBody> {
             .from(AppConstants.tableAsignaciones)
             .update({'estado': AppConstants.assignAttending})
             .eq('id', asignacionId);
+        await ref
+            .read(supabaseClientProvider)
+            .from(AppConstants.tableEmergencias)
+            .update({'estado': AppConstants.statusAttended})
+            .eq('id', widget.emergency.id);
       } catch (_) {}
     }
     if (!mounted) return;
@@ -103,6 +201,7 @@ class _ActiveServiceBodyState extends ConsumerState<_ActiveServiceBody> {
   @override
   void dispose() {
     _attendingTimer?.cancel();
+    _positionSub?.cancel();
     super.dispose();
   }
 
@@ -305,7 +404,7 @@ class _EnRoutePanel extends StatelessWidget {
                   variant: AppButtonVariant.outline,
                   prefixIcon: const Icon(Icons.phone_outlined, size: 18,
                       color: AppColors.onSurface),
-                  onPressed: () {},
+                  onPressed: () => _callPhone(context, emergency.driverPhone),
                   height: 48,
                 ),
               ),
@@ -379,11 +478,11 @@ class _AttendingPanel extends StatelessWidget {
             child: Container(
               padding: const EdgeInsets.symmetric(horizontal: 32, vertical: 18),
               decoration: BoxDecoration(
-                color: const Color(0xFFF59E0B).withOpacity(0.10),
+                color: const Color(0xFFF59E0B).withValues(alpha: 0.10),
                 borderRadius:
                     BorderRadius.circular(AppConstants.borderRadiusCard),
                 border: Border.all(
-                  color: const Color(0xFFF59E0B).withOpacity(0.35),
+                  color: const Color(0xFFF59E0B).withValues(alpha: 0.35),
                 ),
               ),
               child: Text(
@@ -425,6 +524,9 @@ class _AttendingPanel extends StatelessWidget {
                 'driverName': emergency.driverName ?? 'Conductor',
                 'clasificacionIa': emergency.clasificacionIa,
                 'duration': elapsed,
+                'amount': emergency.protectedTotal != null
+                    ? emergency.protectedTotal!.toStringAsFixed(2)
+                    : emergency.estimatedTotal?.toStringAsFixed(2),
               },
             ),
           ),
@@ -456,7 +558,7 @@ class _StatusFloatingChip extends StatelessWidget {
         borderRadius: BorderRadius.circular(9999),
         boxShadow: [
           BoxShadow(
-            color: color.withOpacity(0.40),
+            color: color.withValues(alpha: 0.40),
             blurRadius: 12,
             offset: const Offset(0, 4),
           ),

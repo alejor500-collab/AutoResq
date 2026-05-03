@@ -1,26 +1,31 @@
+import 'dart:async';
 import 'dart:ui';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:gap/gap.dart';
 import 'package:flutter_map/flutter_map.dart';
+import 'package:google_fonts/google_fonts.dart';
 import 'package:latlong2/latlong.dart';
 import '../../../../core/constants/app_colors.dart';
 import '../../../../core/constants/app_constants.dart';
 import '../../../../core/router/app_router.dart';
+import '../../../../core/utils/helpers.dart';
 import '../../../../shared/providers/auth_provider.dart';
 import '../../../../shared/providers/role_provider.dart';
 import '../../../../shared/widgets/app_drawer.dart';
 import '../../../../shared/widgets/bottom_nav_bar.dart';
 import '../../../../shared/widgets/user_avatar.dart';
 import '../../../map/presentation/providers/map_provider.dart';
-import '../../../map/presentation/providers/nearby_services_provider.dart';
 import '../../../map/presentation/widgets/map_widget.dart';
+import 'incoming_request_sheet.dart';
 import '../providers/emergency_provider.dart';
 import '../../domain/entities/emergency_entity.dart';
 
 class TechnicianHomeScreen extends ConsumerStatefulWidget {
-  const TechnicianHomeScreen({super.key});
+  final int initialTab;
+
+  const TechnicianHomeScreen({super.key, this.initialTab = 2});
 
   @override
   ConsumerState<TechnicianHomeScreen> createState() =>
@@ -30,30 +35,101 @@ class TechnicianHomeScreen extends ConsumerStatefulWidget {
 class _TechnicianHomeScreenState extends ConsumerState<TechnicianHomeScreen> {
   final _scaffoldKey = GlobalKey<ScaffoldState>();
   final _mapController = MapController();
+  ProviderSubscription<AsyncValue<List<Emergency>>>?
+      _pendingEmergenciesSubscription;
+  Timer? _bannerDismissTimer;
   int _navIndex = 0;
   bool? _isAvailable;
+  bool _activeWarningShown = false;
+  bool _pendingEmergencyFeedSeeded = false;
+  final Set<String> _knownPendingEmergencyIds = <String>{};
+  List<Emergency> _bannerEmergencies = const [];
 
   @override
   void initState() {
     super.initState();
+    _navIndex = widget.initialTab.clamp(0, 4);
+    _pendingEmergenciesSubscription =
+        ref.listenManual<AsyncValue<List<Emergency>>>(
+      technicianPendingEmergenciesProvider,
+      (previous, next) {
+        final available = _isAvailable ??
+            ref.read(authNotifierProvider).value?.isAvailable ??
+            false;
+        next.whenData(
+          (emergencies) => _handlePendingEmergencyUpdate(
+            emergencies,
+            isAvailable: available,
+          ),
+        );
+      },
+    );
     WidgetsBinding.instance.addPostFrameCallback((_) async {
-      final user = ref.read(authNotifierProvider).value;
+      final user = ref.read(authNotifierProvider).value ??
+          ref.read(authStateProvider).valueOrNull;
       if (user?.isApproved != true) return;
       await ref.read(mapNotifierProvider.notifier).getCurrentLocation();
+      final active = await ref
+          .read(emergencyNotifierProvider.notifier)
+          .loadActiveTechnicianEmergency();
+      if (!mounted) return;
+      if (active != null) {
+        _showActiveServiceDialog(active, fromStartup: true);
+        return;
+      }
       ref.read(emergencyNotifierProvider.notifier).loadPendingEmergencies();
     });
+  }
+
+  @override
+  void dispose() {
+    _bannerDismissTimer?.cancel();
+    _pendingEmergenciesSubscription?.close();
+    super.dispose();
+  }
+
+  void _showActiveServiceDialog(
+    Emergency active, {
+    bool fromStartup = false,
+  }) {
+    if (fromStartup && _activeWarningShown) return;
+    _activeWarningShown = true;
+    showDialog<void>(
+      context: context,
+      builder: (dialogContext) => AlertDialog(
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(24),
+        ),
+        title: const Text('Servicio en proceso'),
+        content: const Text(
+          'Tienes una emergencia activa. Puedes revisar el home, pero no podras aceptar otra solicitud hasta finalizar el servicio actual.',
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(dialogContext),
+            child: const Text('Entendido'),
+          ),
+          FilledButton(
+            onPressed: () {
+              Navigator.pop(dialogContext);
+              context.push(AppRoutes.activeService, extra: active.id);
+            },
+            child: const Text('Ver servicio'),
+          ),
+        ],
+      ),
+    );
   }
 
   void _onNavTap(int index) {
     switch (index) {
       case 0:
+      case 1:
       case 2:
+      case 3:
         setState(() => _navIndex = index);
         break;
-      case 1:
-        context.push(AppRoutes.emergencyHistory);
-        break;
-      case 3:
+      case 4:
         context.push(AppRoutes.profile);
         break;
     }
@@ -66,13 +142,31 @@ class _TechnicianHomeScreenState extends ConsumerState<TechnicianHomeScreen> {
     _mapController.move(LatLng(location.lat, location.lng), 15.5);
   }
 
-  void _refreshEmergencies() {
-    ref.read(emergencyNotifierProvider.notifier).loadPendingEmergencies();
+  Future<void> _refreshEmergencies() {
+    ref.invalidate(technicianPendingEmergenciesProvider);
+    return ref
+        .read(emergencyNotifierProvider.notifier)
+        .loadPendingEmergencies();
+  }
+
+  Future<void> _refreshTechnicianHistory() async {
+    ref.invalidate(technicianEmergencyHistoryProvider);
+    await _refreshEmergencies();
   }
 
   Future<void> _toggleAvailability(bool val) async {
     final user = ref.read(authNotifierProvider).value;
     if (user == null) return;
+    if (val) {
+      final pending = await ref
+          .read(emergencyNotifierProvider.notifier)
+          .getPendingRating('technician');
+      if (pending != null) {
+        if (!mounted) return;
+        _showPendingRatingDialog(pending);
+        return;
+      }
+    }
     setState(() => _isAvailable = val);
     try {
       final rows = await ref
@@ -91,13 +185,22 @@ class _TechnicianHomeScreenState extends ConsumerState<TechnicianHomeScreen> {
         }
         return;
       }
-      final persisted =
-          (rows.first as Map<String, dynamic>)['disponible'] as bool? ?? val;
+      final persisted = rows.first['disponible'] as bool? ?? val;
       setState(() => _isAvailable = persisted);
       ref.read(technicianAvailableProvider.notifier).state = persisted;
       final updated = user.copyWith(isAvailable: persisted);
       ref.read(authNotifierProvider.notifier).refreshUser(updated);
       ref.read(currentUserProvider.notifier).state = updated;
+      if (persisted) {
+        final pending =
+            ref.read(technicianPendingEmergenciesProvider).valueOrNull ??
+                const <Emergency>[];
+        if (pending.isNotEmpty) {
+          WidgetsBinding.instance.addPostFrameCallback((_) {
+            _showNewEmergencyBanner(pending);
+          });
+        }
+      }
     } catch (e) {
       debugPrint('[AutoResQ] toggleAvailability ERROR: $e');
       setState(() => _isAvailable = !val);
@@ -109,7 +212,45 @@ class _TechnicianHomeScreenState extends ConsumerState<TechnicianHomeScreen> {
     }
   }
 
+  void _showPendingRatingDialog(Map<String, dynamic> pendingRating) {
+    showDialog<void>(
+      context: context,
+      builder: (context) => AlertDialog(
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(24),
+        ),
+        title: const Text('Tienes una calificacion pendiente'),
+        content: const Text(
+          'Califica tu ultimo servicio para poder atender nuevas emergencias.',
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context),
+            child: const Text('Ahora no'),
+          ),
+          FilledButton(
+            onPressed: () {
+              Navigator.pop(context);
+              context.push(
+                AppRoutes.rateDriver,
+                extra: {
+                  'emergencyId':
+                      pendingRating['emergency_id']?.toString() ?? '',
+                  'driverId': pendingRating['rated_user_id']?.toString() ?? '',
+                  'driverName': pendingRating['rated_user_name']?.toString() ??
+                      'Conductor',
+                },
+              );
+            },
+            child: const Text('Calificar ahora'),
+          ),
+        ],
+      ),
+    );
+  }
+
   Widget _buildProfileCard({
+    required String technicianName,
     required String specialty,
     required bool isApproved,
     required bool isAvailable,
@@ -121,16 +262,16 @@ class _TechnicianHomeScreenState extends ConsumerState<TechnicianHomeScreen> {
 
     return Container(
       margin: const EdgeInsets.fromLTRB(16, 12, 16, 12),
-      padding: const EdgeInsets.all(14),
+      padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
-        color: AppColors.surface,
-        borderRadius: BorderRadius.circular(AppConstants.borderRadiusCard),
-        border: Border.all(color: AppColors.primary.withValues(alpha: 0.08)),
+        color: AppColors.surfaceContainerLowest,
+        borderRadius: BorderRadius.circular(24),
+        border: Border.all(color: Colors.white.withValues(alpha: 0.75)),
         boxShadow: [
           BoxShadow(
-            color: AppColors.onSurface.withValues(alpha: 0.06),
-            blurRadius: 18,
-            offset: const Offset(0, 8),
+            color: AppColors.onSurface.withValues(alpha: 0.08),
+            blurRadius: 24,
+            offset: const Offset(0, 12),
           ),
         ],
       ),
@@ -140,35 +281,44 @@ class _TechnicianHomeScreenState extends ConsumerState<TechnicianHomeScreen> {
           Row(
             children: [
               Container(
-                width: 42,
-                height: 42,
+                width: 48,
+                height: 48,
                 decoration: BoxDecoration(
-                  color: AppColors.primary.withValues(alpha: 0.10),
-                  borderRadius: BorderRadius.circular(12),
+                  gradient: AppColors.primaryGradient,
+                  borderRadius: BorderRadius.circular(16),
+                  boxShadow: [
+                    BoxShadow(
+                      color: AppColors.primary.withValues(alpha: 0.22),
+                      blurRadius: 18,
+                      offset: const Offset(0, 8),
+                    ),
+                  ],
                 ),
                 child: const Icon(
                   Icons.engineering_rounded,
-                  color: AppColors.primary,
-                  size: 22,
+                  color: Colors.white,
+                  size: 23,
                 ),
               ),
-              const Gap(10),
+              const Gap(12),
               Expanded(
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    const Text(
-                      'Panel tecnico',
-                      style: TextStyle(
-                        fontSize: 13,
+                    Text(
+                      technicianName,
+                      style: GoogleFonts.poppins(
+                        fontSize: 15,
                         fontWeight: FontWeight.w800,
                         color: AppColors.onSurface,
                       ),
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
                     ),
                     const Gap(2),
                     Text(
                       specialty,
-                      style: const TextStyle(
+                      style: GoogleFonts.poppins(
                         fontSize: 12,
                         fontWeight: FontWeight.w600,
                         color: AppColors.textSecondary,
@@ -188,7 +338,7 @@ class _TechnicianHomeScreenState extends ConsumerState<TechnicianHomeScreen> {
               ),
             ],
           ),
-          const Gap(12),
+          const Gap(14),
           Row(
             children: [
               Expanded(
@@ -234,8 +384,6 @@ class _TechnicianHomeScreenState extends ConsumerState<TechnicianHomeScreen> {
     required bool isAvailable,
     required bool isLoading,
   }) {
-    final preview = emergencies.take(2).toList();
-
     return Stack(
       children: [
         AppMapWidget(
@@ -244,27 +392,6 @@ class _TechnicianHomeScreenState extends ConsumerState<TechnicianHomeScreen> {
           zoom: 13.5,
           controller: _mapController,
           markers: markers,
-        ),
-        Positioned(
-          top: 12,
-          left: 16,
-          right: 16,
-          child: _TechnicianMapPanel(
-            count: emergencies.length,
-            isAvailable: isAvailable,
-            isLoading: isLoading,
-            emergencies: preview,
-            onRefresh: _refreshEmergencies,
-            onTapEmergency: (emergency) {
-              _mapController.move(
-                LatLng(
-                  emergency.lat ?? AppConstants.defaultLat,
-                  emergency.lng ?? AppConstants.defaultLng,
-                ),
-                16,
-              );
-            },
-          ),
         ),
         Positioned(
           right: 16,
@@ -291,131 +418,350 @@ class _TechnicianHomeScreenState extends ConsumerState<TechnicianHomeScreen> {
     );
   }
 
-  // ── Services tab (SERVICIOS) ──────────────────────────────────────────────
+  Widget _buildRequestsView({
+    required List<Emergency> emergencies,
+    required bool isAvailable,
+    required bool isLoading,
+  }) {
+    return RefreshIndicator(
+      color: AppColors.primary,
+      onRefresh: _refreshEmergencies,
+      child: ListView(
+        padding: EdgeInsets.fromLTRB(
+          16,
+          12,
+          16,
+          92 + MediaQuery.of(context).padding.bottom,
+        ),
+        children: [
+          Row(
+            children: [
+              Expanded(
+                child: Text(
+                  'Solicitudes activas',
+                  style: GoogleFonts.poppins(
+                    fontSize: 20,
+                    fontWeight: FontWeight.w900,
+                    color: AppColors.onSurface,
+                    letterSpacing: -0.2,
+                  ),
+                ),
+              ),
+              IconButton(
+                tooltip: 'Actualizar',
+                onPressed: isLoading ? null : _refreshEmergencies,
+                icon: isLoading
+                    ? const SizedBox(
+                        width: 18,
+                        height: 18,
+                        child: CircularProgressIndicator(
+                          strokeWidth: 2,
+                          color: AppColors.primary,
+                        ),
+                      )
+                    : const Icon(Icons.refresh_rounded),
+              ),
+            ],
+          ),
+          const Gap(4),
+          Text(
+            isAvailable
+                ? 'Acepta solo las solicitudes que puedas atender.'
+                : 'Activa tu disponibilidad para poder aceptar solicitudes.',
+            style: const TextStyle(
+              fontSize: 13,
+              color: AppColors.textSecondary,
+              height: 1.35,
+            ),
+          ),
+          const Gap(14),
+          if (emergencies.isEmpty && !isLoading)
+            const _EmptyEmergencyRequests()
+          else
+            ...emergencies.map(
+              (emergency) => Padding(
+                padding: const EdgeInsets.only(bottom: 12),
+                child: _EmergencyRequestCard(
+                  emergency: emergency,
+                  canAccept: isAvailable,
+                  isLoading: isLoading,
+                  onTap: () => _showIncomingRequest(emergency),
+                  onAccept: () => _acceptEmergencyFromList(emergency),
+                ),
+              ),
+            ),
+        ],
+      ),
+    );
+  }
 
-  Widget _buildServicesView(double lat, double lng) {
-    final nearbyAsync = ref.watch(nearbyServicesProvider((lat, lng)));
-    final selectedCat = ref.watch(selectedCategoryProvider);
-
-    return nearbyAsync.when(
+  Widget _buildTechnicianHistoryView(AsyncValue<List<Emergency>> historyAsync) {
+    return historyAsync.when(
       loading: () => const Center(
         child: CircularProgressIndicator(color: AppColors.primary),
       ),
-      error: (_, __) => Center(
-        child: Column(
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: [
-            const Icon(
-              Icons.wifi_off_rounded,
-              size: 48,
-              color: AppColors.secondary,
-            ),
-            const Gap(16),
-            const Text(
-              'Error al cargar servicios cercanos',
-              style: TextStyle(fontSize: 15, color: AppColors.secondary),
-            ),
-            const Gap(8),
-            TextButton(
-              onPressed: () =>
-                  ref.invalidate(nearbyServicesProvider((lat, lng))),
-              child: const Text('Reintentar'),
-            ),
-          ],
-        ),
+      error: (e, _) => _HistoryErrorState(
+        message: 'No se pudo cargar tu historial.',
+        detail: e.toString(),
+        onRetry: () => ref.invalidate(technicianEmergencyHistoryProvider),
       ),
-      data: (services) {
-        final availableCategories = ServiceCategory.values
-            .where((category) => services.any((s) => s.category == category))
-            .toList();
-        final filtered = selectedCat == null
-            ? services
-            : services.where((s) => s.category == selectedCat).toList();
-
-        return ListView(
+      data: (history) => RefreshIndicator(
+        color: AppColors.primary,
+        onRefresh: _refreshTechnicianHistory,
+        child: ListView(
           padding: EdgeInsets.fromLTRB(
             16,
+            12,
             16,
-            16,
-            16 + MediaQuery.of(context).padding.bottom,
+            92 + MediaQuery.of(context).padding.bottom,
           ),
           children: [
             Row(
               children: [
-                const Text(
-                  'Servicios cercanos',
-                  style: TextStyle(
-                    fontSize: 18,
-                    fontWeight: FontWeight.w800,
-                    color: AppColors.onSurface,
+                Expanded(
+                  child: Text(
+                    'Historial de solicitudes',
+                    style: GoogleFonts.poppins(
+                      fontSize: 20,
+                      fontWeight: FontWeight.w900,
+                      color: AppColors.onSurface,
+                      letterSpacing: -0.2,
+                    ),
                   ),
                 ),
-                const Spacer(),
-                Text(
-                  '${filtered.length} encontrados',
-                  style: const TextStyle(
-                    fontSize: 13,
-                    color: AppColors.secondary,
-                  ),
+                IconButton(
+                  tooltip: 'Actualizar',
+                  onPressed: () =>
+                      ref.invalidate(technicianEmergencyHistoryProvider),
+                  icon: const Icon(Icons.refresh_rounded),
                 ),
               ],
             ),
-            const Gap(12),
-            SizedBox(
-              height: 38,
-              child: ListView.separated(
-                scrollDirection: Axis.horizontal,
-                itemCount: availableCategories.length + 1,
-                separatorBuilder: (_, __) => const Gap(8),
-                itemBuilder: (_, i) {
-                  if (i == 0) {
-                    return _ServiceCategoryChip(
-                      label: 'Todos',
-                      icon: Icons.apps_rounded,
-                      color: AppColors.primary,
-                      selected: selectedCat == null,
-                      onTap: () => ref
-                          .read(selectedCategoryProvider.notifier)
-                          .state = null,
-                    );
-                  }
-                  final category = availableCategories[i - 1];
-                  return _ServiceCategoryChip(
-                    label: category.label,
-                    icon: category.icon,
-                    color: category.color,
-                    selected: selectedCat == category,
-                    onTap: () => ref
-                        .read(selectedCategoryProvider.notifier)
-                        .state = selectedCat == category ? null : category,
-                  );
-                },
+            const Gap(4),
+            const Text(
+              'Aqui veras servicios completados, rechazados y en proceso.',
+              style: TextStyle(
+                fontSize: 13,
+                color: AppColors.textSecondary,
+                height: 1.35,
               ),
             ),
-            const Gap(16),
-            if (filtered.isEmpty)
-              const _EmptyNearbyServices()
+            const Gap(14),
+            if (history.isEmpty)
+              const _EmptyTechnicianHistory()
             else
-              ...filtered.map(
-                (service) => Padding(
-                  padding: const EdgeInsets.only(bottom: 10),
-                  child: _TechnicianNearbyServiceCard(
-                    service: service,
-                    onTap: () {
-                      setState(() => _navIndex = 0);
-                      _mapController.move(
-                        LatLng(service.lat, service.lng),
-                        17,
-                      );
-                    },
-                  ),
+              ...history.map(
+                (emergency) => Padding(
+                  padding: const EdgeInsets.only(bottom: 12),
+                  child: _TechnicianHistoryCard(emergency: emergency),
                 ),
               ),
           ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildTechnicianChatHistoryView(
+    AsyncValue<List<Emergency>> historyAsync,
+  ) {
+    return historyAsync.when(
+      loading: () => const Center(
+        child: CircularProgressIndicator(color: AppColors.primary),
+      ),
+      error: (e, _) => _HistoryErrorState(
+        message: 'No se pudo cargar el historial de chats.',
+        detail: e.toString(),
+        onRetry: () => ref.invalidate(technicianEmergencyHistoryProvider),
+      ),
+      data: (history) {
+        final chats = history
+            .where((emergency) => emergency.asignacionId?.isNotEmpty == true)
+            .toList();
+        return RefreshIndicator(
+          color: AppColors.primary,
+          onRefresh: _refreshTechnicianHistory,
+          child: ListView(
+            padding: EdgeInsets.fromLTRB(
+              16,
+              12,
+              16,
+              92 + MediaQuery.of(context).padding.bottom,
+            ),
+            children: [
+              Row(
+                children: [
+                  Expanded(
+                    child: Text(
+                      'Chats de servicios',
+                      style: GoogleFonts.poppins(
+                        fontSize: 20,
+                        fontWeight: FontWeight.w900,
+                        color: AppColors.onSurface,
+                        letterSpacing: -0.2,
+                      ),
+                    ),
+                  ),
+                  IconButton(
+                    tooltip: 'Actualizar',
+                    onPressed: () =>
+                        ref.invalidate(technicianEmergencyHistoryProvider),
+                    icon: const Icon(Icons.refresh_rounded),
+                  ),
+                ],
+              ),
+              const Gap(4),
+              const Text(
+                'Puedes revisar conversaciones anteriores. Los servicios cerrados quedan en modo lectura.',
+                style: TextStyle(
+                  fontSize: 13,
+                  color: AppColors.textSecondary,
+                  height: 1.35,
+                ),
+              ),
+              const Gap(14),
+              if (chats.isEmpty)
+                const _EmptyTechnicianChats()
+              else
+                ...chats.map(
+                  (emergency) => Padding(
+                    padding: const EdgeInsets.only(bottom: 12),
+                    child: _TechnicianChatHistoryCard(
+                      emergency: emergency,
+                      onTap: () => context.push(
+                        AppRoutes.technicianChat,
+                        extra: emergency.id,
+                      ),
+                    ),
+                  ),
+                ),
+            ],
+          ),
         );
       },
     );
   }
+
+  void _showIncomingRequest(Emergency emergency) {
+    showModalBottomSheet<void>(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: Colors.transparent,
+      builder: (_) => IncomingRequestSheet(emergency: emergency),
+    );
+  }
+
+  void _handlePendingEmergencyUpdate(
+    List<Emergency> emergencies, {
+    required bool isAvailable,
+  }) {
+    final currentIds = emergencies.map((emergency) => emergency.id).toSet();
+    if (!_pendingEmergencyFeedSeeded) {
+      _pendingEmergencyFeedSeeded = true;
+      _knownPendingEmergencyIds
+        ..clear()
+        ..addAll(currentIds);
+      if (emergencies.isNotEmpty && isAvailable) {
+        WidgetsBinding.instance.addPostFrameCallback((_) {
+          _showNewEmergencyBanner(emergencies);
+        });
+      }
+      return;
+    }
+
+    final newEmergencies = emergencies
+        .where((emergency) => !_knownPendingEmergencyIds.contains(emergency.id))
+        .toList();
+    _knownPendingEmergencyIds
+      ..clear()
+      ..addAll(currentIds);
+
+    if (newEmergencies.isEmpty || !isAvailable) return;
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      _showNewEmergencyBanner(newEmergencies);
+    });
+  }
+
+  void _showNewEmergencyBanner(List<Emergency> emergencies) {
+    if (!mounted || emergencies.isEmpty) return;
+    if (ref.read(emergencyNotifierProvider).activeEmergency != null) return;
+
+    _bannerDismissTimer?.cancel();
+    setState(
+        () => _bannerEmergencies = List<Emergency>.unmodifiable(emergencies));
+    _bannerDismissTimer = Timer(const Duration(seconds: 9), () {
+      if (mounted) {
+        setState(() => _bannerEmergencies = const []);
+      }
+    });
+  }
+
+  void _openBannerEmergency() {
+    if (_bannerEmergencies.isEmpty) return;
+    final first = _bannerEmergencies.first;
+    _bannerDismissTimer?.cancel();
+    setState(() => _bannerEmergencies = const []);
+    _showIncomingRequest(first);
+  }
+
+  void _openRequestsTabFromBanner() {
+    _bannerDismissTimer?.cancel();
+    setState(() {
+      _bannerEmergencies = const [];
+      _navIndex = 1;
+    });
+  }
+
+  Future<void> _acceptEmergencyFromList(Emergency emergency) async {
+    final isAvailable = _isAvailable ??
+        ref.read(authNotifierProvider).value?.isAvailable ??
+        false;
+    if (!isAvailable) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Activa tu disponibilidad para aceptar solicitudes'),
+        ),
+      );
+      return;
+    }
+
+    final ok = await ref
+        .read(emergencyNotifierProvider.notifier)
+        .acceptEmergency(emergency.id);
+    if (!mounted) return;
+    if (ok) {
+      ref.invalidate(technicianPendingEmergenciesProvider);
+      ref.invalidate(technicianEmergencyHistoryProvider);
+      context.push(AppRoutes.activeService, extra: emergency.id);
+      return;
+    }
+
+    final pending =
+        await ref.read(emergencyNotifierProvider.notifier).getPendingRating(
+              'technician',
+            );
+    if (!mounted) return;
+    if (pending != null) {
+      _showPendingRatingDialog(pending);
+    } else {
+      final active = await ref
+          .read(emergencyNotifierProvider.notifier)
+          .loadActiveTechnicianEmergency();
+      if (!mounted) return;
+      if (active != null) {
+        _showActiveServiceDialog(active);
+        return;
+      }
+      AppHelpers.showSnackBar(
+        context,
+        ref.read(emergencyNotifierProvider).error ??
+            'No se pudo aceptar la solicitud',
+        isError: true,
+      );
+    }
+  }
+
+  // ── Services tab (SERVICIOS) ──────────────────────────────────────────────
 
   // ── Pending approval UI ───────────────────────────────────────────────────
 
@@ -528,6 +874,9 @@ class _TechnicianHomeScreenState extends ConsumerState<TechnicianHomeScreen> {
   Widget build(BuildContext context) {
     final mapState = ref.watch(mapNotifierProvider);
     final emergencyState = ref.watch(emergencyNotifierProvider);
+    final technicianHistory = ref.watch(technicianEmergencyHistoryProvider);
+    final pendingEmergenciesAsync =
+        ref.watch(technicianPendingEmergenciesProvider);
     final user = ref.watch(authNotifierProvider).value;
     final isAvailable = _isAvailable ?? user?.isAvailable ?? false;
 
@@ -547,10 +896,15 @@ class _TechnicianHomeScreenState extends ConsumerState<TechnicianHomeScreen> {
     // ── Approved: dashboard normal ────────────────────────────────────────
     final lat = mapState.currentLocation?.lat ?? AppConstants.defaultLat;
     final lng = mapState.currentLocation?.lng ?? AppConstants.defaultLng;
+    final pendingEmergencies =
+        pendingEmergenciesAsync.valueOrNull ?? emergencyState.emergencies;
+    final isPendingLoading =
+        (pendingEmergenciesAsync.isLoading && pendingEmergencies.isEmpty) ||
+            emergencyState.isLoading;
 
     final markers = <MapMarker>[
       technicianMarker(lat, lng, name: 'Tú'),
-      ...emergencyState.emergencies.map(
+      ...pendingEmergencies.map(
         (e) => emergencyMarker(
           e.lat ?? AppConstants.defaultLat,
           e.lng ?? AppConstants.defaultLng,
@@ -574,24 +928,40 @@ class _TechnicianHomeScreenState extends ConsumerState<TechnicianHomeScreen> {
             children: [
               SizedBox(height: 64 + MediaQuery.of(context).padding.top),
               _buildProfileCard(
+                technicianName: user?.name ?? 'Tecnico',
                 specialty: user?.specialty ?? 'Sin especialidad',
                 isApproved: user?.isApproved ?? false,
                 isAvailable: isAvailable,
                 rating: user?.rating ?? 0.0,
                 totalServices: user?.totalServices ?? 0,
-                pendingCount: emergencyState.emergencies.length,
+                pendingCount: pendingEmergencies.length,
               ),
               Expanded(
-                child: _navIndex == 2
-                    ? _buildServicesView(lat, lng)
-                    : _buildMapView(
-                        lat: lat,
-                        lng: lng,
-                        markers: markers,
-                        emergencies: emergencyState.emergencies,
-                        isAvailable: isAvailable,
-                        isLoading: emergencyState.isLoading,
-                      ),
+                child: switch (_navIndex) {
+                  0 => _buildTechnicianHistoryView(technicianHistory),
+                  1 => _buildRequestsView(
+                      emergencies: pendingEmergencies,
+                      isAvailable: isAvailable,
+                      isLoading: isPendingLoading,
+                    ),
+                  2 => _buildMapView(
+                      lat: lat,
+                      lng: lng,
+                      markers: markers,
+                      emergencies: pendingEmergencies,
+                      isAvailable: isAvailable,
+                      isLoading: isPendingLoading,
+                    ),
+                  3 => _buildTechnicianChatHistoryView(technicianHistory),
+                  _ => _buildMapView(
+                      lat: lat,
+                      lng: lng,
+                      markers: markers,
+                      emergencies: pendingEmergencies,
+                      isAvailable: isAvailable,
+                      isLoading: isPendingLoading,
+                    ),
+                },
               ),
             ],
           ),
@@ -606,10 +976,15 @@ class _TechnicianHomeScreenState extends ConsumerState<TechnicianHomeScreen> {
                 filter: ImageFilter.blur(sigmaX: 20, sigmaY: 20),
                 child: Container(
                   height: 64 + MediaQuery.of(context).padding.top,
-                  padding: EdgeInsets.only(
-                      top: MediaQuery.of(context).padding.top),
+                  padding:
+                      EdgeInsets.only(top: MediaQuery.of(context).padding.top),
                   decoration: BoxDecoration(
-                    color: Colors.white.withValues(alpha: 0.8),
+                    color: Colors.white.withValues(alpha: 0.82),
+                    border: Border(
+                      bottom: BorderSide(
+                        color: Colors.white.withValues(alpha: 0.65),
+                      ),
+                    ),
                     boxShadow: [
                       BoxShadow(
                         color: AppColors.onSurface.withValues(alpha: 0.06),
@@ -640,9 +1015,9 @@ class _TechnicianHomeScreenState extends ConsumerState<TechnicianHomeScreen> {
                           ),
                         ),
                         const Spacer(),
-                        const Text(
+                        Text(
                           'AutoResQ',
-                          style: TextStyle(
+                          style: GoogleFonts.poppins(
                             fontSize: 20,
                             fontWeight: FontWeight.w900,
                             color: AppColors.onSurface,
@@ -685,6 +1060,21 @@ class _TechnicianHomeScreenState extends ConsumerState<TechnicianHomeScreen> {
               ),
             ),
           ),
+          if (_bannerEmergencies.isNotEmpty)
+            Positioned(
+              top: 72 + MediaQuery.of(context).padding.top,
+              left: 16,
+              right: 16,
+              child: _NewEmergencyBanner(
+                emergencies: _bannerEmergencies,
+                onOpen: _openBannerEmergency,
+                onOpenList: _openRequestsTabFromBanner,
+                onDismiss: () {
+                  _bannerDismissTimer?.cancel();
+                  setState(() => _bannerEmergencies = const []);
+                },
+              ),
+            ),
         ],
       ),
     );
@@ -694,6 +1084,760 @@ class _TechnicianHomeScreenState extends ConsumerState<TechnicianHomeScreen> {
 // ── Helper widget ─────────────────────────────────────────────────────────────
 
 // ── Emergency card for SERVICIOS tab ─────────────────────────────────────────
+
+class _TechnicianHistoryCard extends StatelessWidget {
+  final Emergency emergency;
+
+  const _TechnicianHistoryCard({required this.emergency});
+
+  @override
+  Widget build(BuildContext context) {
+    final serviceName = emergency.pricingServiceName ??
+        emergency.aiEmergencyType ??
+        emergency.clasificacionIa ??
+        'Emergencia';
+    final status = _statusLabel(emergency);
+    final statusColor = _statusColor(emergency);
+    final amount = emergency.protectedTotal ?? emergency.estimatedTotal;
+
+    return Container(
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        color: AppColors.surfaceContainerLowest,
+        borderRadius: BorderRadius.circular(18),
+        border: Border.all(color: AppColors.outlineVariant),
+        boxShadow: [
+          BoxShadow(
+            color: AppColors.onSurface.withValues(alpha: 0.05),
+            blurRadius: 18,
+            offset: const Offset(0, 8),
+          ),
+        ],
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              Container(
+                width: 42,
+                height: 42,
+                decoration: BoxDecoration(
+                  color: statusColor.withValues(alpha: 0.10),
+                  borderRadius: BorderRadius.circular(13),
+                ),
+                child: Icon(
+                  _statusIcon(emergency),
+                  color: statusColor,
+                  size: 21,
+                ),
+              ),
+              const Gap(12),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      serviceName,
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: const TextStyle(
+                        fontSize: 15,
+                        fontWeight: FontWeight.w800,
+                        color: AppColors.onSurface,
+                      ),
+                    ),
+                    const Gap(2),
+                    Text(
+                      emergency.driverName ?? 'Conductor',
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: const TextStyle(
+                        fontSize: 12,
+                        color: AppColors.textSecondary,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+              const Gap(8),
+              Container(
+                padding:
+                    const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+                decoration: BoxDecoration(
+                  color: statusColor.withValues(alpha: 0.10),
+                  borderRadius: BorderRadius.circular(9999),
+                ),
+                child: Text(
+                  status,
+                  style: TextStyle(
+                    fontSize: 11,
+                    fontWeight: FontWeight.w800,
+                    color: statusColor,
+                  ),
+                ),
+              ),
+            ],
+          ),
+          const Gap(12),
+          Row(
+            children: [
+              const Icon(
+                Icons.schedule_rounded,
+                size: 15,
+                color: AppColors.secondary,
+              ),
+              const Gap(6),
+              Text(
+                AppHelpers.formatDate(emergency.fecha),
+                style: const TextStyle(
+                  fontSize: 12,
+                  color: AppColors.textSecondary,
+                ),
+              ),
+              const Spacer(),
+              Text(
+                amount == null
+                    ? 'Revision pendiente'
+                    : AppHelpers.formatCurrency(amount),
+                style: const TextStyle(
+                  fontSize: 13,
+                  fontWeight: FontWeight.w900,
+                  color: AppColors.primary,
+                ),
+              ),
+            ],
+          ),
+          const Gap(10),
+          Row(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              const Icon(
+                Icons.location_on_outlined,
+                size: 15,
+                color: AppColors.secondary,
+              ),
+              const Gap(6),
+              Expanded(
+                child: Text(
+                  emergency.direccion?.trim().isNotEmpty == true
+                      ? emergency.direccion!
+                      : 'Ubicacion del conductor',
+                  maxLines: 2,
+                  overflow: TextOverflow.ellipsis,
+                  style: const TextStyle(
+                    fontSize: 12,
+                    color: AppColors.textSecondary,
+                    height: 1.35,
+                  ),
+                ),
+              ),
+            ],
+          ),
+        ],
+      ),
+    );
+  }
+
+  static String _statusLabel(Emergency emergency) {
+    if (emergency.estado == AppConstants.statusCompleted ||
+        emergency.asignacionEstado == AppConstants.assignFinished) {
+      return 'Completada';
+    }
+    if (emergency.estado == AppConstants.statusCancelled) return 'Cancelada';
+    if (emergency.asignacionEstado == AppConstants.assignRejected) {
+      return 'Rechazada';
+    }
+    if (emergency.asignacionEstado == AppConstants.assignAttending) {
+      return 'Atendiendo';
+    }
+    if (emergency.asignacionEstado == AppConstants.assignEnRoute) {
+      return 'En ruta';
+    }
+    if (emergency.asignacionEstado == AppConstants.assignAccepted ||
+        emergency.estado == AppConstants.statusInProgress) {
+      return 'Aceptada';
+    }
+    return 'Pendiente';
+  }
+
+  static Color _statusColor(Emergency emergency) {
+    if (emergency.estado == AppConstants.statusCompleted ||
+        emergency.asignacionEstado == AppConstants.assignFinished) {
+      return AppColors.success;
+    }
+    if (emergency.estado == AppConstants.statusCancelled ||
+        emergency.asignacionEstado == AppConstants.assignRejected) {
+      return AppColors.secondary;
+    }
+    if (emergency.asignacionEstado == AppConstants.assignAttending) {
+      return AppColors.warning;
+    }
+    return AppColors.primary;
+  }
+
+  static IconData _statusIcon(Emergency emergency) {
+    if (emergency.estado == AppConstants.statusCompleted ||
+        emergency.asignacionEstado == AppConstants.assignFinished) {
+      return Icons.check_circle_rounded;
+    }
+    if (emergency.estado == AppConstants.statusCancelled ||
+        emergency.asignacionEstado == AppConstants.assignRejected) {
+      return Icons.block_rounded;
+    }
+    if (emergency.asignacionEstado == AppConstants.assignAttending) {
+      return Icons.build_rounded;
+    }
+    return Icons.assignment_rounded;
+  }
+}
+
+class _TechnicianChatHistoryCard extends StatelessWidget {
+  final Emergency emergency;
+  final VoidCallback onTap;
+
+  const _TechnicianChatHistoryCard({
+    required this.emergency,
+    required this.onTap,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final closed = emergency.estado == AppConstants.statusCompleted ||
+        emergency.estado == AppConstants.statusCancelled ||
+        emergency.asignacionEstado == AppConstants.assignFinished ||
+        emergency.asignacionEstado == AppConstants.assignRejected;
+    final serviceName = emergency.pricingServiceName ??
+        emergency.aiEmergencyType ??
+        emergency.clasificacionIa ??
+        'Servicio';
+
+    return Material(
+      color: AppColors.surfaceContainerLowest,
+      borderRadius: BorderRadius.circular(18),
+      child: InkWell(
+        onTap: onTap,
+        borderRadius: BorderRadius.circular(18),
+        child: Container(
+          padding: const EdgeInsets.all(16),
+          decoration: BoxDecoration(
+            borderRadius: BorderRadius.circular(18),
+            border: Border.all(color: AppColors.outlineVariant),
+          ),
+          child: Row(
+            children: [
+              UserAvatar(
+                name: emergency.driverName ?? 'Conductor',
+                radius: 24,
+                backgroundColor: AppColors.surfaceContainerHigh,
+              ),
+              const Gap(12),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      emergency.driverName ?? 'Conductor',
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: const TextStyle(
+                        fontSize: 15,
+                        fontWeight: FontWeight.w800,
+                        color: AppColors.onSurface,
+                      ),
+                    ),
+                    const Gap(3),
+                    Text(
+                      closed
+                          ? '$serviceName - solo lectura'
+                          : '$serviceName - chat activo',
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: const TextStyle(
+                        fontSize: 12,
+                        color: AppColors.textSecondary,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+              const Gap(8),
+              Icon(
+                closed ? Icons.lock_outline_rounded : Icons.chat_bubble,
+                size: 20,
+                color: closed ? AppColors.secondary : AppColors.primary,
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+class _HistoryErrorState extends StatelessWidget {
+  final String message;
+  final String detail;
+  final VoidCallback onRetry;
+
+  const _HistoryErrorState({
+    required this.message,
+    required this.detail,
+    required this.onRetry,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return Center(
+      child: Padding(
+        padding: const EdgeInsets.all(24),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            const Icon(
+              Icons.error_outline_rounded,
+              color: AppColors.secondary,
+              size: 34,
+            ),
+            const Gap(10),
+            Text(
+              message,
+              textAlign: TextAlign.center,
+              style: const TextStyle(
+                fontSize: 14,
+                fontWeight: FontWeight.w800,
+                color: AppColors.onSurface,
+              ),
+            ),
+            const Gap(6),
+            Text(
+              detail,
+              maxLines: 3,
+              overflow: TextOverflow.ellipsis,
+              textAlign: TextAlign.center,
+              style: const TextStyle(
+                fontSize: 11,
+                color: AppColors.textSecondary,
+              ),
+            ),
+            const Gap(14),
+            OutlinedButton(
+              onPressed: onRetry,
+              child: const Text('Reintentar'),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+class _EmptyTechnicianHistory extends StatelessWidget {
+  const _EmptyTechnicianHistory();
+
+  @override
+  Widget build(BuildContext context) {
+    return const _EmptyPanel(
+      icon: Icons.history_rounded,
+      title: 'Aun no tienes historial',
+      message: 'Cuando aceptes o completes solicitudes apareceran aqui.',
+    );
+  }
+}
+
+class _EmptyTechnicianChats extends StatelessWidget {
+  const _EmptyTechnicianChats();
+
+  @override
+  Widget build(BuildContext context) {
+    return const _EmptyPanel(
+      icon: Icons.chat_bubble_outline_rounded,
+      title: 'Sin chats todavia',
+      message: 'Las conversaciones de servicios aceptados se guardaran aqui.',
+    );
+  }
+}
+
+class _EmptyPanel extends StatelessWidget {
+  final IconData icon;
+  final String title;
+  final String message;
+
+  const _EmptyPanel({
+    required this.icon,
+    required this.title,
+    required this.message,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.all(22),
+      decoration: BoxDecoration(
+        color: AppColors.surfaceContainerLow,
+        borderRadius: BorderRadius.circular(AppConstants.borderRadiusCard),
+      ),
+      child: Column(
+        children: [
+          Icon(icon, size: 34, color: AppColors.secondary),
+          const Gap(10),
+          Text(
+            title,
+            textAlign: TextAlign.center,
+            style: const TextStyle(
+              fontSize: 14,
+              fontWeight: FontWeight.w700,
+              color: AppColors.onSurface,
+            ),
+          ),
+          const Gap(4),
+          Text(
+            message,
+            textAlign: TextAlign.center,
+            style: const TextStyle(
+              fontSize: 12,
+              color: AppColors.textSecondary,
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _NewEmergencyBanner extends StatelessWidget {
+  final List<Emergency> emergencies;
+  final VoidCallback onOpen;
+  final VoidCallback onOpenList;
+  final VoidCallback onDismiss;
+
+  const _NewEmergencyBanner({
+    required this.emergencies,
+    required this.onOpen,
+    required this.onOpenList,
+    required this.onDismiss,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final first = emergencies.first;
+    final count = emergencies.length;
+    final serviceName = first.pricingServiceName ??
+        first.aiEmergencyType ??
+        first.clasificacionIa ??
+        'Emergencia';
+    final address = first.direccion?.trim().isNotEmpty == true
+        ? first.direccion!.trim()
+        : 'Ubicacion del conductor';
+    final title = count == 1 ? 'Nueva solicitud' : '$count nuevas solicitudes';
+
+    return Material(
+      color: Colors.transparent,
+      child: Container(
+        padding: const EdgeInsets.all(14),
+        decoration: BoxDecoration(
+          color: AppColors.surfaceContainerLowest,
+          borderRadius: BorderRadius.circular(20),
+          border: Border.all(color: AppColors.primary.withValues(alpha: 0.18)),
+          boxShadow: [
+            BoxShadow(
+              color: AppColors.onSurface.withValues(alpha: 0.16),
+              blurRadius: 26,
+              offset: const Offset(0, 14),
+            ),
+          ],
+        ),
+        child: Row(
+          children: [
+            Container(
+              width: 42,
+              height: 42,
+              decoration: BoxDecoration(
+                color: AppColors.primary.withValues(alpha: 0.10),
+                borderRadius: BorderRadius.circular(14),
+              ),
+              child: const Icon(
+                Icons.notifications_active_rounded,
+                color: AppColors.primary,
+                size: 22,
+              ),
+            ),
+            const Gap(12),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Text(
+                    title,
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: const TextStyle(
+                      fontSize: 14,
+                      fontWeight: FontWeight.w900,
+                      color: AppColors.onSurface,
+                    ),
+                  ),
+                  const Gap(2),
+                  Text(
+                    '$serviceName - $address',
+                    maxLines: 2,
+                    overflow: TextOverflow.ellipsis,
+                    style: const TextStyle(
+                      fontSize: 12,
+                      color: AppColors.textSecondary,
+                      height: 1.25,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+            const Gap(8),
+            IconButton(
+              tooltip: 'Ver lista',
+              onPressed: onOpenList,
+              icon: const Icon(Icons.list_alt_rounded),
+              color: AppColors.secondary,
+            ),
+            FilledButton(
+              onPressed: onOpen,
+              style: FilledButton.styleFrom(
+                backgroundColor: AppColors.primary,
+                foregroundColor: Colors.white,
+                minimumSize: const Size(56, 40),
+                padding: const EdgeInsets.symmetric(horizontal: 14),
+              ),
+              child: const Text('Ver'),
+            ),
+            IconButton(
+              tooltip: 'Cerrar',
+              onPressed: onDismiss,
+              icon: const Icon(Icons.close_rounded),
+              color: AppColors.secondary,
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+class _EmergencyRequestCard extends StatelessWidget {
+  final Emergency emergency;
+  final bool canAccept;
+  final bool isLoading;
+  final VoidCallback onTap;
+  final VoidCallback onAccept;
+
+  const _EmergencyRequestCard({
+    required this.emergency,
+    required this.canAccept,
+    required this.isLoading,
+    required this.onTap,
+    required this.onAccept,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final serviceName = emergency.pricingServiceName ??
+        emergency.aiEmergencyType ??
+        emergency.clasificacionIa ??
+        'Emergencia';
+    final amount = emergency.protectedTotal ?? emergency.estimatedTotal;
+    final amountText = amount == null
+        ? 'Revision pendiente'
+        : AppHelpers.formatCurrency(amount);
+    final address = emergency.direccion?.trim().isNotEmpty == true
+        ? emergency.direccion!
+        : 'Ubicacion del conductor';
+    final description = emergency.aiTechnicianSummary?.trim().isNotEmpty == true
+        ? emergency.aiTechnicianSummary!.trim()
+        : emergency.descripcion.trim();
+
+    return Material(
+      color: AppColors.surfaceContainerLowest,
+      borderRadius: BorderRadius.circular(18),
+      child: InkWell(
+        onTap: onTap,
+        borderRadius: BorderRadius.circular(18),
+        child: Container(
+          padding: const EdgeInsets.all(16),
+          decoration: BoxDecoration(
+            borderRadius: BorderRadius.circular(18),
+            border: Border.all(color: AppColors.outlineVariant),
+            boxShadow: [
+              BoxShadow(
+                color: AppColors.onSurface.withValues(alpha: 0.05),
+                blurRadius: 18,
+                offset: const Offset(0, 8),
+              ),
+            ],
+          ),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Row(
+                children: [
+                  Container(
+                    width: 42,
+                    height: 42,
+                    decoration: BoxDecoration(
+                      color: AppColors.primary.withValues(alpha: 0.09),
+                      borderRadius: BorderRadius.circular(13),
+                    ),
+                    child: const Icon(
+                      Icons.car_repair_rounded,
+                      color: AppColors.primary,
+                      size: 22,
+                    ),
+                  ),
+                  const Gap(12),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          serviceName,
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                          style: const TextStyle(
+                            fontSize: 15,
+                            fontWeight: FontWeight.w800,
+                            color: AppColors.onSurface,
+                          ),
+                        ),
+                        const Gap(2),
+                        Text(
+                          emergency.driverName ?? 'Conductor',
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                          style: const TextStyle(
+                            fontSize: 12,
+                            color: AppColors.textSecondary,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                  const Gap(8),
+                  Text(
+                    amountText,
+                    style: const TextStyle(
+                      fontSize: 14,
+                      fontWeight: FontWeight.w900,
+                      color: AppColors.primary,
+                    ),
+                  ),
+                ],
+              ),
+              const Gap(12),
+              if (description.isNotEmpty) ...[
+                Text(
+                  description,
+                  maxLines: 2,
+                  overflow: TextOverflow.ellipsis,
+                  style: const TextStyle(
+                    fontSize: 13,
+                    color: AppColors.onSurface,
+                    height: 1.35,
+                  ),
+                ),
+                const Gap(10),
+              ],
+              Row(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  const Icon(
+                    Icons.location_on_outlined,
+                    size: 16,
+                    color: AppColors.secondary,
+                  ),
+                  const Gap(6),
+                  Expanded(
+                    child: Text(
+                      address,
+                      maxLines: 2,
+                      overflow: TextOverflow.ellipsis,
+                      style: const TextStyle(
+                        fontSize: 12,
+                        color: AppColors.textSecondary,
+                        height: 1.35,
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+              const Gap(14),
+              Row(
+                children: [
+                  Expanded(
+                    child: OutlinedButton(
+                      onPressed: onTap,
+                      child: const Text('Ver detalle'),
+                    ),
+                  ),
+                  const Gap(10),
+                  Expanded(
+                    child: FilledButton(
+                      onPressed: !canAccept || isLoading ? null : onAccept,
+                      style: FilledButton.styleFrom(
+                        backgroundColor: AppColors.primary,
+                        foregroundColor: Colors.white,
+                      ),
+                      child: const Text('Aceptar'),
+                    ),
+                  ),
+                ],
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+class _EmptyEmergencyRequests extends StatelessWidget {
+  const _EmptyEmergencyRequests();
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.all(22),
+      decoration: BoxDecoration(
+        color: AppColors.surfaceContainerLow,
+        borderRadius: BorderRadius.circular(AppConstants.borderRadiusCard),
+      ),
+      child: const Column(
+        children: [
+          Icon(
+            Icons.assignment_turned_in_outlined,
+            size: 34,
+            color: AppColors.secondary,
+          ),
+          Gap(10),
+          Text(
+            'No hay solicitudes activas',
+            textAlign: TextAlign.center,
+            style: TextStyle(
+              fontSize: 14,
+              fontWeight: FontWeight.w700,
+              color: AppColors.onSurface,
+            ),
+          ),
+          Gap(4),
+          Text(
+            'Cuando un conductor reporte una emergencia aparecera aqui.',
+            textAlign: TextAlign.center,
+            style: TextStyle(fontSize: 12, color: AppColors.textSecondary),
+          ),
+        ],
+      ),
+    );
+  }
+}
 
 class _TechnicianMetricPill extends StatelessWidget {
   final IconData icon;
@@ -715,7 +1859,7 @@ class _TechnicianMetricPill extends StatelessWidget {
       padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 9),
       decoration: BoxDecoration(
         color: color.withValues(alpha: 0.08),
-        borderRadius: BorderRadius.circular(12),
+        borderRadius: BorderRadius.circular(14),
         border: Border.all(color: color.withValues(alpha: 0.16)),
       ),
       child: Row(
@@ -731,7 +1875,7 @@ class _TechnicianMetricPill extends StatelessWidget {
                   label,
                   maxLines: 1,
                   overflow: TextOverflow.ellipsis,
-                  style: TextStyle(
+                  style: GoogleFonts.poppins(
                     fontSize: 10,
                     fontWeight: FontWeight.w800,
                     color: color,
@@ -742,7 +1886,7 @@ class _TechnicianMetricPill extends StatelessWidget {
                   value,
                   maxLines: 1,
                   overflow: TextOverflow.ellipsis,
-                  style: const TextStyle(
+                  style: GoogleFonts.poppins(
                     fontSize: 11,
                     fontWeight: FontWeight.w700,
                     color: AppColors.onSurface,
@@ -752,234 +1896,6 @@ class _TechnicianMetricPill extends StatelessWidget {
             ),
           ),
         ],
-      ),
-    );
-  }
-}
-
-class _TechnicianMapPanel extends StatelessWidget {
-  final int count;
-  final bool isAvailable;
-  final bool isLoading;
-  final List<Emergency> emergencies;
-  final VoidCallback onRefresh;
-  final ValueChanged<Emergency> onTapEmergency;
-
-  const _TechnicianMapPanel({
-    required this.count,
-    required this.isAvailable,
-    required this.isLoading,
-    required this.emergencies,
-    required this.onRefresh,
-    required this.onTapEmergency,
-  });
-
-  @override
-  Widget build(BuildContext context) {
-    return ClipRRect(
-      borderRadius: BorderRadius.circular(AppConstants.borderRadiusCard),
-      child: BackdropFilter(
-        filter: ImageFilter.blur(sigmaX: 14, sigmaY: 14),
-        child: Container(
-          padding: const EdgeInsets.all(14),
-          decoration: BoxDecoration(
-            color: Colors.white.withValues(alpha: 0.88),
-            borderRadius: BorderRadius.circular(AppConstants.borderRadiusCard),
-            border: Border.all(
-              color: AppColors.onSurface.withValues(alpha: 0.06),
-            ),
-            boxShadow: [
-              BoxShadow(
-                color: AppColors.onSurface.withValues(alpha: 0.08),
-                blurRadius: 22,
-                offset: const Offset(0, 10),
-              ),
-            ],
-          ),
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              Row(
-                children: [
-                  Container(
-                    width: 38,
-                    height: 38,
-                    decoration: BoxDecoration(
-                      color: AppColors.primary.withValues(alpha: 0.10),
-                      borderRadius: BorderRadius.circular(11),
-                    ),
-                    child: const Icon(
-                      Icons.map_outlined,
-                      color: AppColors.primary,
-                      size: 20,
-                    ),
-                  ),
-                  const Gap(10),
-                  Expanded(
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        const Text(
-                          'Mapa operativo',
-                          style: TextStyle(
-                            fontSize: 14,
-                            fontWeight: FontWeight.w900,
-                            color: AppColors.onSurface,
-                          ),
-                        ),
-                        const Gap(2),
-                        Text(
-                          isAvailable
-                              ? '$count solicitudes cerca'
-                              : 'Activa disponibilidad para recibir alertas',
-                          maxLines: 1,
-                          overflow: TextOverflow.ellipsis,
-                          style: const TextStyle(
-                            fontSize: 12,
-                            fontWeight: FontWeight.w600,
-                            color: AppColors.textSecondary,
-                          ),
-                        ),
-                      ],
-                    ),
-                  ),
-                  IconButton(
-                    tooltip: 'Actualizar emergencias',
-                    onPressed: onRefresh,
-                    icon: isLoading
-                        ? const SizedBox(
-                            width: 18,
-                            height: 18,
-                            child: CircularProgressIndicator(
-                              strokeWidth: 2,
-                              color: AppColors.primary,
-                            ),
-                          )
-                        : const Icon(Icons.refresh_rounded),
-                    color: AppColors.primary,
-                    visualDensity: VisualDensity.compact,
-                  ),
-                ],
-              ),
-              if (emergencies.isNotEmpty) ...[
-                const Gap(12),
-                ...emergencies.map(
-                  (emergency) => Padding(
-                    padding: const EdgeInsets.only(bottom: 8),
-                    child: _EmergencyPreviewTile(
-                      emergency: emergency,
-                      onTap: () => onTapEmergency(emergency),
-                    ),
-                  ),
-                ),
-              ],
-            ],
-          ),
-        ),
-      ),
-    );
-  }
-}
-
-class _EmergencyPreviewTile extends StatelessWidget {
-  final Emergency emergency;
-  final VoidCallback onTap;
-
-  const _EmergencyPreviewTile({
-    required this.emergency,
-    required this.onTap,
-  });
-
-  String _timeAgo(DateTime dt) {
-    final diff = DateTime.now().difference(dt);
-    if (diff.inMinutes < 1) return 'ahora';
-    if (diff.inMinutes < 60) return '${diff.inMinutes} min';
-    if (diff.inHours < 24) return '${diff.inHours} h';
-    return '${diff.inDays} d';
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    final label = emergency.clasificacionIa?.isNotEmpty == true
-        ? emergency.clasificacionIa!
-        : 'Emergencia';
-
-    return Material(
-      color: AppColors.surfaceContainerLow,
-      borderRadius: BorderRadius.circular(12),
-      child: InkWell(
-        onTap: onTap,
-        borderRadius: BorderRadius.circular(12),
-        child: Padding(
-          padding: const EdgeInsets.all(10),
-          child: Row(
-            children: [
-              Container(
-                width: 34,
-                height: 34,
-                decoration: BoxDecoration(
-                  color: AppColors.primary.withValues(alpha: 0.10),
-                  borderRadius: BorderRadius.circular(10),
-                ),
-                child: const Icon(
-                  Icons.warning_amber_rounded,
-                  color: AppColors.primary,
-                  size: 18,
-                ),
-              ),
-              const Gap(10),
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Row(
-                      children: [
-                        Expanded(
-                          child: Text(
-                            label,
-                            maxLines: 1,
-                            overflow: TextOverflow.ellipsis,
-                            style: const TextStyle(
-                              fontSize: 12,
-                              fontWeight: FontWeight.w800,
-                              color: AppColors.onSurface,
-                            ),
-                          ),
-                        ),
-                        Text(
-                          _timeAgo(emergency.fecha),
-                          style: const TextStyle(
-                            fontSize: 11,
-                            fontWeight: FontWeight.w700,
-                            color: AppColors.textSecondary,
-                          ),
-                        ),
-                      ],
-                    ),
-                    const Gap(2),
-                    Text(
-                      emergency.direccion ??
-                          emergency.driverName ??
-                          emergency.descripcion,
-                      maxLines: 1,
-                      overflow: TextOverflow.ellipsis,
-                      style: const TextStyle(
-                        fontSize: 11,
-                        color: AppColors.textSecondary,
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-              const Gap(6),
-              const Icon(
-                Icons.center_focus_strong_rounded,
-                color: AppColors.secondary,
-                size: 18,
-              ),
-            ],
-          ),
-        ),
       ),
     );
   }
@@ -1027,291 +1943,6 @@ class _MapActionButton extends StatelessWidget {
             ),
           ),
         ),
-      ),
-    );
-  }
-}
-
-class _EmergencyServiceCard extends StatelessWidget {
-  final Emergency emergency;
-
-  const _EmergencyServiceCard({required this.emergency});
-
-  String _timeAgo(DateTime dt) {
-    final diff = DateTime.now().difference(dt);
-    if (diff.inMinutes < 1) return 'ahora mismo';
-    if (diff.inMinutes < 60) return 'hace ${diff.inMinutes} min';
-    if (diff.inHours < 24) return 'hace ${diff.inHours} h';
-    return 'hace ${diff.inDays} d';
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    final label = emergency.clasificacionIa?.isNotEmpty == true
-        ? emergency.clasificacionIa!
-        : 'Emergencia';
-
-    return Container(
-      decoration: BoxDecoration(
-        color: AppColors.surface,
-        borderRadius: BorderRadius.circular(AppConstants.borderRadiusCard),
-        border: Border.all(color: AppColors.primary.withValues(alpha: 0.12)),
-        boxShadow: [
-          BoxShadow(
-            color: AppColors.onSurface.withValues(alpha: 0.04),
-            blurRadius: 12,
-            offset: const Offset(0, 4),
-          ),
-        ],
-      ),
-      child: Padding(
-        padding: const EdgeInsets.all(14),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            // Header row
-            Row(
-              children: [
-                Container(
-                  padding:
-                      const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
-                  decoration: BoxDecoration(
-                    color: AppColors.primary.withValues(alpha: 0.10),
-                    borderRadius: BorderRadius.circular(6),
-                  ),
-                  child: Text(
-                    label,
-                    style: const TextStyle(
-                      fontSize: 11,
-                      fontWeight: FontWeight.w700,
-                      color: AppColors.primary,
-                    ),
-                  ),
-                ),
-                const Spacer(),
-                Text(
-                  _timeAgo(emergency.fecha),
-                  style: const TextStyle(
-                    fontSize: 11,
-                    color: AppColors.textSecondary,
-                  ),
-                ),
-              ],
-            ),
-            const Gap(8),
-            // Driver name
-            if (emergency.driverName != null) ...[
-              Row(
-                children: [
-                  const Icon(Icons.person_outline,
-                      size: 14, color: AppColors.secondary),
-                  const Gap(4),
-                  Expanded(
-                    child: Text(
-                      emergency.driverName!,
-                      style: const TextStyle(
-                        fontSize: 13,
-                        fontWeight: FontWeight.w600,
-                        color: AppColors.onSurface,
-                      ),
-                      maxLines: 1,
-                      overflow: TextOverflow.ellipsis,
-                    ),
-                  ),
-                ],
-              ),
-              const Gap(4),
-            ],
-            // Description
-            Text(
-              emergency.descripcion,
-              style: const TextStyle(
-                fontSize: 13,
-                color: AppColors.onSurface,
-                height: 1.4,
-              ),
-              maxLines: 2,
-              overflow: TextOverflow.ellipsis,
-            ),
-            // Address
-            if (emergency.direccion != null) ...[
-              const Gap(6),
-              Row(
-                children: [
-                  const Icon(Icons.location_on_outlined,
-                      size: 14, color: AppColors.secondary),
-                  const Gap(4),
-                  Expanded(
-                    child: Text(
-                      emergency.direccion!,
-                      style: const TextStyle(
-                        fontSize: 12,
-                        color: AppColors.secondary,
-                      ),
-                      maxLines: 1,
-                      overflow: TextOverflow.ellipsis,
-                    ),
-                  ),
-                ],
-              ),
-            ],
-          ],
-        ),
-      ),
-    );
-  }
-}
-
-// ── Helper widget ─────────────────────────────────────────────────────────────
-
-class _ServiceCategoryChip extends StatelessWidget {
-  final String label;
-  final IconData icon;
-  final Color color;
-  final bool selected;
-  final VoidCallback onTap;
-
-  const _ServiceCategoryChip({
-    required this.label,
-    required this.icon,
-    required this.color,
-    required this.selected,
-    required this.onTap,
-  });
-
-  @override
-  Widget build(BuildContext context) {
-    return GestureDetector(
-      onTap: onTap,
-      child: AnimatedContainer(
-        duration: const Duration(milliseconds: 180),
-        padding: const EdgeInsets.symmetric(horizontal: 13, vertical: 7),
-        decoration: BoxDecoration(
-          color: selected ? color : Colors.white,
-          borderRadius: BorderRadius.circular(20),
-          border: Border.all(
-            color: selected ? color : color.withValues(alpha: 0.30),
-          ),
-        ),
-        child: Row(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            Icon(icon, size: 14, color: selected ? Colors.white : color),
-            const Gap(6),
-            Text(
-              label,
-              style: TextStyle(
-                fontSize: 12,
-                fontWeight: FontWeight.w700,
-                color: selected ? Colors.white : color,
-              ),
-            ),
-          ],
-        ),
-      ),
-    );
-  }
-}
-
-class _TechnicianNearbyServiceCard extends StatelessWidget {
-  final NearbyService service;
-  final VoidCallback onTap;
-
-  const _TechnicianNearbyServiceCard({
-    required this.service,
-    required this.onTap,
-  });
-
-  @override
-  Widget build(BuildContext context) {
-    return Material(
-      color: AppColors.surface,
-      borderRadius: BorderRadius.circular(AppConstants.borderRadiusCard),
-      child: InkWell(
-        onTap: onTap,
-        borderRadius: BorderRadius.circular(AppConstants.borderRadiusCard),
-        child: Container(
-          padding: const EdgeInsets.all(14),
-          decoration: BoxDecoration(
-            borderRadius: BorderRadius.circular(AppConstants.borderRadiusCard),
-            border: Border.all(color: service.color.withValues(alpha: 0.14)),
-          ),
-          child: Row(
-            children: [
-              Container(
-                width: 46,
-                height: 46,
-                decoration: BoxDecoration(
-                  color: service.color.withValues(alpha: 0.12),
-                  borderRadius: BorderRadius.circular(12),
-                ),
-                child: Icon(service.icon, color: service.color, size: 22),
-              ),
-              const Gap(12),
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(
-                      service.name,
-                      maxLines: 1,
-                      overflow: TextOverflow.ellipsis,
-                      style: const TextStyle(
-                        fontSize: 14,
-                        fontWeight: FontWeight.w800,
-                        color: AppColors.onSurface,
-                      ),
-                    ),
-                    const Gap(3),
-                    Text(
-                      service.typeLabel,
-                      style: TextStyle(
-                        fontSize: 12,
-                        fontWeight: FontWeight.w700,
-                        color: service.color,
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-              const Gap(8),
-              Text(
-                service.distanceLabel,
-                style: const TextStyle(
-                  fontSize: 12,
-                  fontWeight: FontWeight.w700,
-                  color: AppColors.secondary,
-                ),
-              ),
-              const Icon(
-                Icons.chevron_right_rounded,
-                color: AppColors.secondary,
-                size: 20,
-              ),
-            ],
-          ),
-        ),
-      ),
-    );
-  }
-}
-
-class _EmptyNearbyServices extends StatelessWidget {
-  const _EmptyNearbyServices();
-
-  @override
-  Widget build(BuildContext context) {
-    return Container(
-      width: double.infinity,
-      padding: const EdgeInsets.all(20),
-      decoration: BoxDecoration(
-        color: AppColors.surfaceContainerLow,
-        borderRadius: BorderRadius.circular(AppConstants.borderRadiusCard),
-      ),
-      child: const Text(
-        'Sin servicios cercanos en 5km',
-        textAlign: TextAlign.center,
-        style: TextStyle(fontSize: 13, color: AppColors.secondary),
       ),
     );
   }

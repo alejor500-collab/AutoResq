@@ -1,5 +1,3 @@
-import 'dart:typed_data';
-
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -154,7 +152,6 @@ class _TechnicianRequestSheetState
       await supabase.from(AppConstants.tableUsuarios).update({
         'nombre': name,
         'telefono': phone,
-        'rol': AppConstants.roleTechnician,
       }).eq('id', widget.userId);
 
       await supabase.from(AppConstants.tableTecnicos).upsert({
@@ -168,33 +165,24 @@ class _TechnicianRequestSheetState
 
       final current = ref.read(authNotifierProvider).value;
       if (current != null) {
-        final refreshed = widget.isResubmission
-            ? AppUser(
-                id: current.id,
-                email: current.email,
-                name: name,
-                phone: phone,
-                role: AppConstants.roleTechnician,
-                avatarUrl: current.avatarUrl,
-                rating: current.rating,
-                totalServices: current.totalServices,
-                isAvailable: false,
-                isApproved: false,
-                specialty: specialty,
-                lat: current.lat,
-                lng: current.lng,
-                createdAt: current.createdAt,
-                verificationStatus: AppConstants.verificationPending,
-                rejectionReason: null,
-              )
-            : current.copyWith(
-                name: name,
-                phone: phone,
-                role: AppConstants.roleTechnician,
-                isApproved: false,
-                specialty: specialty,
-                verificationStatus: AppConstants.verificationPending,
-              );
+        final refreshed = AppUser(
+          id: current.id,
+          email: current.email,
+          name: name,
+          phone: phone,
+          role: current.role,
+          avatarUrl: current.avatarUrl,
+          rating: current.rating,
+          totalServices: current.totalServices,
+          isAvailable: false,
+          isApproved: current.isApproved,
+          specialty: specialty,
+          lat: current.lat,
+          lng: current.lng,
+          createdAt: current.createdAt,
+          verificationStatus: AppConstants.verificationPending,
+          rejectionReason: null,
+        );
         ref.read(authNotifierProvider.notifier).refreshUser(refreshed);
         ref.read(currentUserProvider.notifier).state = refreshed;
       }
@@ -310,12 +298,12 @@ class _TechnicianRequestSheetState
                   padding: const EdgeInsets.all(16),
                   decoration: BoxDecoration(
                     color: _cedulaBytes != null
-                        ? AppColors.primary.withOpacity(0.06)
+                        ? AppColors.primary.withValues(alpha: 0.06)
                         : AppColors.surfaceContainerLow,
                     borderRadius: BorderRadius.circular(16),
                     border: Border.all(
                       color: _cedulaBytes != null
-                          ? AppColors.primary.withOpacity(0.3)
+                          ? AppColors.primary.withValues(alpha: 0.3)
                           : AppColors.border,
                     ),
                   ),
@@ -328,7 +316,7 @@ class _TechnicianRequestSheetState
                           color: (_cedulaBytes != null
                                   ? AppColors.primary
                                   : AppColors.textHint)
-                              .withOpacity(0.1),
+                              .withValues(alpha: 0.1),
                           borderRadius: BorderRadius.circular(10),
                         ),
                         child: Icon(
@@ -388,7 +376,7 @@ class _TechnicianRequestSheetState
                   style: ElevatedButton.styleFrom(
                     backgroundColor: AppColors.primary,
                     foregroundColor: Colors.white,
-                    disabledBackgroundColor: AppColors.primary.withOpacity(0.5),
+                    disabledBackgroundColor: AppColors.primary.withValues(alpha: 0.5),
                     shape: RoundedRectangleBorder(
                       borderRadius: BorderRadius.circular(
                         AppConstants.borderRadiusButton,

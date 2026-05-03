@@ -18,7 +18,7 @@ AutoResQ es una aplicación móvil Flutter que conecta conductores con problemas
 | Arquitectura | Clean Architecture + Riverpod |
 | Backend | Supabase (Auth + Realtime + PostgreSQL) |
 | Mapa | flutter_map + OpenStreetMap + Nominatim |
-| IA | OpenAI GPT-4o-mini |
+| IA | OpenAI Responses API via Supabase Edge Functions |
 | Navegación | go_router |
 | HTTP | dio |
 | Fuente | Poppins (Google Fonts) |
@@ -38,7 +38,7 @@ lib/
 │   │   ├── failures.dart         # Fallas del dominio (Either)
 │   │   └── exceptions.dart       # Excepciones de infraestructura
 │   ├── network/
-│   │   └── dio_client.dart       # Cliente HTTP (OpenAI + Nominatim)
+│   │   └── dio_client.dart       # Cliente HTTP (Nominatim + servicios cercanos)
 │   ├── router/
 │   │   └── app_router.dart       # GoRouter + guardias de rol
 │   └── utils/
@@ -125,8 +125,7 @@ Edita **`lib/core/constants/app_constants.dart`**:
 static const String supabaseUrl = 'https://xxxx.supabase.co';
 static const String supabaseAnonKey = 'eyJhbGci...';
 
-// ─── OpenAI ──────────────────────────────────────────────────────────────────
-static const String openAiApiKey = 'sk-...';
+// OpenAI se configura solo como secreto de Supabase, nunca en Flutter.
 ```
 
 ---
@@ -214,6 +213,22 @@ flutter run
 | Radio botones | 8px |
 | Grilla base | 8px |
 | Touch target mínimo | 44px |
+
+---
+
+## IA de emergencias
+
+La integracion usa la arquitectura `Flutter -> Supabase Edge Function -> OpenAI Responses API`. Flutter invoca `analyze-emergency` y nunca llama directamente a OpenAI.
+
+Variables/secretos de Supabase:
+
+```bash
+supabase secrets set OPENAI_API_KEY="tu_clave_rotada" --project-ref <project-ref>
+supabase secrets set OPENAI_MODEL="gpt-5.4-mini" --project-ref <project-ref>
+supabase functions deploy analyze-emergency --project-ref <project-ref>
+```
+
+Aplica `supabase/migrations/202605020001_add_emergency_ai_analysis.sql` antes de probar. Si el analisis falla, la emergencia se crea igual y queda con `ai_analysis_status = failed`.
 
 ---
 

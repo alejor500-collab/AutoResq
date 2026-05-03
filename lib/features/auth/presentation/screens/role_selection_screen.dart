@@ -107,7 +107,7 @@ class _RoleSelectionScreenState extends State<RoleSelectionScreen>
               height: 380,
               decoration: BoxDecoration(
                 shape: BoxShape.circle,
-                color: _kConductorColor.withOpacity(0.04),
+                color: _kConductorColor.withValues(alpha: 0.04),
               ),
             ),
           ),
@@ -119,7 +119,7 @@ class _RoleSelectionScreenState extends State<RoleSelectionScreen>
               height: 280,
               decoration: BoxDecoration(
                 shape: BoxShape.circle,
-                color: _kTechnicianColor.withOpacity(0.04),
+                color: _kTechnicianColor.withValues(alpha: 0.04),
               ),
             ),
           ),
@@ -243,7 +243,7 @@ class _RoleSelectionScreenState extends State<RoleSelectionScreen>
                           'Podrás cambiar tu rol desde tu perfil',
                           style: TextStyle(
                             fontSize: 13,
-                            color: AppColors.secondary.withOpacity(0.55),
+                            color: AppColors.secondary.withValues(alpha: 0.55),
                           ),
                         ),
                       ),
@@ -337,18 +337,18 @@ class _RoleCardState extends State<_RoleCard>
             borderRadius: BorderRadius.circular(20),
             border: Border.all(
               color: _isPressed
-                  ? widget.color.withOpacity(0.4)
-                  : widget.color.withOpacity(0.15),
+                  ? widget.color.withValues(alpha: 0.4)
+                  : widget.color.withValues(alpha: 0.15),
               width: 1.5,
             ),
             boxShadow: [
               BoxShadow(
-                color: widget.color.withOpacity(0.1),
+                color: widget.color.withValues(alpha: 0.1),
                 blurRadius: 24,
                 offset: const Offset(0, 8),
               ),
               BoxShadow(
-                color: AppColors.onSurface.withOpacity(0.04),
+                color: AppColors.onSurface.withValues(alpha: 0.04),
                 blurRadius: 8,
                 offset: const Offset(0, 2),
               ),
@@ -363,7 +363,7 @@ class _RoleCardState extends State<_RoleCard>
                   width: 56,
                   height: 56,
                   decoration: BoxDecoration(
-                    color: widget.color.withOpacity(0.12),
+                    color: widget.color.withValues(alpha: 0.12),
                     borderRadius: BorderRadius.circular(16),
                   ),
                   child: Icon(widget.icon, color: widget.color, size: 28),
@@ -394,7 +394,7 @@ class _RoleCardState extends State<_RoleCard>
                 child: Container(
                   padding: const EdgeInsets.all(6),
                   decoration: BoxDecoration(
-                    color: widget.color.withOpacity(0.1),
+                    color: widget.color.withValues(alpha: 0.1),
                     borderRadius: BorderRadius.circular(8),
                   ),
                   child: Icon(

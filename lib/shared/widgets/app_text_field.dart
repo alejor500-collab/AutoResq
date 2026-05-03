@@ -103,9 +103,9 @@ class _AppTextFieldState extends State<AppTextField>
   Color get _fillColor {
     switch (_fieldState) {
       case _FieldState.valid:
-        return AppColors.success.withOpacity(0.07);
+        return AppColors.success.withValues(alpha: 0.07);
       case _FieldState.invalid:
-        return AppColors.error.withOpacity(0.05);
+        return AppColors.error.withValues(alpha: 0.05);
       case _FieldState.idle:
         return _hasFocus
             ? AppColors.surfaceContainerLowest
@@ -118,7 +118,7 @@ class _AppTextFieldState extends State<AppTextField>
       return OutlineInputBorder(
         borderRadius: BorderRadius.circular(24),
         borderSide: BorderSide(
-          color: AppColors.success.withOpacity(0.4),
+          color: AppColors.success.withValues(alpha: 0.4),
           width: 1.5,
         ),
       );
@@ -222,7 +222,7 @@ class _AppTextFieldState extends State<AppTextField>
               decoration: InputDecoration(
                 hintText: widget.hint,
                 hintStyle: TextStyle(
-                  color: AppColors.secondary.withOpacity(0.5),
+                  color: AppColors.secondary.withValues(alpha: 0.5),
                   fontSize: 15,
                   fontWeight: FontWeight.w400,
                 ),
@@ -252,8 +252,8 @@ class _AppTextFieldState extends State<AppTextField>
                   borderRadius: BorderRadius.circular(24),
                   borderSide: BorderSide(
                     color: _fieldState == _FieldState.valid
-                        ? AppColors.success.withOpacity(0.4)
-                        : AppColors.primary.withOpacity(0.2),
+                        ? AppColors.success.withValues(alpha: 0.4)
+                        : AppColors.primary.withValues(alpha: 0.2),
                     width: 2,
                   ),
                 ),

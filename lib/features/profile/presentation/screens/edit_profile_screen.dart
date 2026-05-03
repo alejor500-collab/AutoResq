@@ -8,8 +8,10 @@ import 'package:supabase_flutter/supabase_flutter.dart';
 import '../../../../core/constants/app_colors.dart';
 import '../../../../core/constants/app_constants.dart';
 import '../../../../core/constants/app_strings.dart';
+import '../../../../core/network/dio_client.dart';
 import '../../../../core/utils/helpers.dart';
 import '../../../../core/utils/validators.dart';
+import '../../../../features/auth/domain/entities/user_entity.dart';
 import '../../../../shared/providers/auth_provider.dart';
 import '../../../../shared/widgets/app_button.dart';
 import '../../../../shared/widgets/app_text_field.dart';
@@ -33,6 +35,8 @@ class _EditProfileScreenState extends ConsumerState<EditProfileScreen> {
 
   bool _isUploadingAvatar = false;
   bool _isUpdatingLocation = false;
+  bool _isResolvingLocationAddress = false;
+  String? _locationAddress;
 
   @override
   void initState() {
@@ -41,6 +45,9 @@ class _EditProfileScreenState extends ConsumerState<EditProfileScreen> {
     _nameCtrl = TextEditingController(text: user?.name ?? '');
     _phoneCtrl = TextEditingController(text: user?.phone ?? '');
     _specialtyCtrl = TextEditingController(text: user?.specialty ?? '');
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      _resolveSavedLocationAddress();
+    });
   }
 
   @override
@@ -60,7 +67,8 @@ class _EditProfileScreenState extends ConsumerState<EditProfileScreen> {
           ? LocationEntity(
               lat: user.lat!,
               lng: user.lng!,
-              address: ref.read(mapNotifierProvider).currentLocation?.address,
+              address: _locationAddress ??
+                  ref.read(mapNotifierProvider).currentLocation?.address,
             )
           : ref.read(mapNotifierProvider).currentLocation,
     );
@@ -82,6 +90,7 @@ class _EditProfileScreenState extends ConsumerState<EditProfileScreen> {
         lat: selected.lat,
         lng: selected.lng,
       );
+      _locationAddress = selected.address;
       ref.read(authNotifierProvider.notifier).refreshUser(updated);
       ref.read(currentUserProvider.notifier).state = updated;
       ref.read(mapNotifierProvider.notifier).setLocation(selected);
@@ -161,6 +170,42 @@ class _EditProfileScreenState extends ConsumerState<EditProfileScreen> {
     } finally {
       if (mounted) setState(() => _isUploadingAvatar = false);
     }
+  }
+
+  Future<void> _resolveSavedLocationAddress() async {
+    final user = ref.read(authNotifierProvider).value;
+    final lat = user?.lat;
+    final lng = user?.lng;
+    if (lat == null || lng == null) return;
+
+    final cached = ref.read(mapNotifierProvider).currentLocation;
+    if (cached?.address != null && cached?.lat == lat && cached?.lng == lng) {
+      setState(() => _locationAddress = cached!.address);
+      return;
+    }
+
+    setState(() => _isResolvingLocationAddress = true);
+    try {
+      final address = await DioClient().reverseGeocode(lat, lng);
+      if (!mounted) return;
+      setState(() => _locationAddress = address);
+    } finally {
+      if (mounted) setState(() => _isResolvingLocationAddress = false);
+    }
+  }
+
+  String _savedLocationLabel(AppUser? user) {
+    if (user?.lat == null || user?.lng == null) {
+      return 'Sin ubicacion guardada';
+    }
+    if (_isResolvingLocationAddress) {
+      return 'Resolviendo direccion...';
+    }
+    final address = _locationAddress?.trim();
+    if (address != null && address.isNotEmpty) {
+      return address;
+    }
+    return 'Ubicacion guardada en Ecuador';
   }
 
   Future<void> _save() async {
@@ -354,10 +399,7 @@ class _EditProfileScreenState extends ConsumerState<EditProfileScreen> {
                     const SizedBox(width: 12),
                     Expanded(
                       child: Text(
-                        user?.lat != null
-                            ? '${user!.lat!.toStringAsFixed(5)}, '
-                                '${user.lng!.toStringAsFixed(5)}'
-                            : 'Sin ubicación guardada',
+                        _savedLocationLabel(user),
                         style: TextStyle(
                           fontSize: 13,
                           color: user?.lat != null

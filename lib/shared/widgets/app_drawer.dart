@@ -118,7 +118,7 @@ class AppDrawer extends ConsumerWidget {
                 'AutoResQ v1.0.0',
                 style: TextStyle(
                   fontSize: 11,
-                  color: AppColors.secondary.withOpacity(0.5),
+                  color: AppColors.secondary.withValues(alpha: 0.5),
                 ),
               ),
             ),
@@ -274,7 +274,7 @@ class _DrawerHeader extends StatelessWidget {
         borderRadius: BorderRadius.circular(20),
         boxShadow: [
           BoxShadow(
-            color: AppColors.primary.withOpacity(0.25),
+            color: AppColors.primary.withValues(alpha: 0.25),
             blurRadius: 16,
             offset: const Offset(0, 6),
           ),
@@ -362,7 +362,7 @@ class _SectionLabel extends StatelessWidget {
           fontSize: 10,
           fontWeight: FontWeight.w800,
           letterSpacing: 1.2,
-          color: AppColors.secondary.withOpacity(0.6),
+          color: AppColors.secondary.withValues(alpha: 0.6),
         ),
       ),
     );
@@ -409,8 +409,8 @@ class _DrawerItem extends StatelessWidget {
       color: Colors.transparent,
       child: InkWell(
         onTap: onTap,
-        splashColor: (color ?? AppColors.primary).withOpacity(0.06),
-        highlightColor: (color ?? AppColors.primary).withOpacity(0.04),
+        splashColor: (color ?? AppColors.primary).withValues(alpha: 0.06),
+        highlightColor: (color ?? AppColors.primary).withValues(alpha: 0.04),
         child: Padding(
           padding: EdgeInsets.symmetric(
             horizontal: 20,
@@ -422,7 +422,7 @@ class _DrawerItem extends StatelessWidget {
                 width: 36,
                 height: 36,
                 decoration: BoxDecoration(
-                  color: c.withOpacity(0.08),
+                  color: c.withValues(alpha: 0.08),
                   borderRadius: BorderRadius.circular(10),
                 ),
                 child: Icon(icon, color: c, size: 20),
@@ -450,7 +450,7 @@ class _DrawerItem extends StatelessWidget {
                         overflow: TextOverflow.ellipsis,
                         style: TextStyle(
                           fontSize: 11,
-                          color: AppColors.secondary.withOpacity(0.8),
+                          color: AppColors.secondary.withValues(alpha: 0.8),
                         ),
                       ),
                   ],
@@ -458,7 +458,7 @@ class _DrawerItem extends StatelessWidget {
               ),
               Icon(
                 Icons.chevron_right_rounded,
-                color: c.withOpacity(0.3),
+                color: c.withValues(alpha: 0.3),
                 size: 18,
               ),
             ],
@@ -580,7 +580,7 @@ class _StatusTile extends StatelessWidget {
             width: 36,
             height: 36,
             decoration: BoxDecoration(
-              color: color.withOpacity(0.12),
+              color: color.withValues(alpha: 0.12),
               borderRadius: BorderRadius.circular(10),
             ),
             child: Icon(icon, color: color, size: 20),
@@ -606,7 +606,7 @@ class _StatusTile extends StatelessWidget {
                     overflow: TextOverflow.ellipsis,
                     style: TextStyle(
                       fontSize: 11,
-                      color: AppColors.secondary.withOpacity(0.8),
+                      color: AppColors.secondary.withValues(alpha: 0.8),
                     ),
                   ),
               ],

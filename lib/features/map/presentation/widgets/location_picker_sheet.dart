@@ -187,7 +187,7 @@ class _LocationPickerSheetState extends State<_LocationPickerSheet> {
                               ),
                               boxShadow: [
                                 BoxShadow(
-                                  color: AppColors.primary.withOpacity(0.35),
+                                  color: AppColors.primary.withValues(alpha: 0.35),
                                   blurRadius: 14,
                                   spreadRadius: 2,
                                 ),

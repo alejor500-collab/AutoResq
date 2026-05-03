@@ -48,13 +48,11 @@ class AdminNotifier extends StateNotifier<AdminState> {
   Future<void> loadStats() async {
     state = state.copyWith(isLoading: true);
     try {
-      final users = await _client
-          .from(AppConstants.tableUsuarios)
-          .select('rol, activo');
+      final users =
+          await _client.from(AppConstants.tableUsuarios).select('rol, activo');
 
-      final emergencies = await _client
-          .from(AppConstants.tableEmergencias)
-          .select('estado');
+      final emergencies =
+          await _client.from(AppConstants.tableEmergencias).select('estado');
 
       final tecnicos = await _client
           .from(AppConstants.tableTecnicos)
@@ -149,11 +147,24 @@ class AdminNotifier extends StateNotifier<AdminState> {
   Future<bool> approveTechnician(String tecnicoId) async {
     try {
       final uid = _client.auth.currentUser?.id;
+      final technicianRow = await _client
+          .from(AppConstants.tableTecnicos)
+          .select('usuario_id')
+          .eq('id', tecnicoId)
+          .single();
+      final userId = technicianRow['usuario_id'] as String?;
+
       await _client.from(AppConstants.tableTecnicos).update({
         'estado_verificacion': AppConstants.verificationApproved,
         'verificado_por': uid,
         'fecha_verificacion': DateTime.now().toIso8601String(),
       }).eq('id', tecnicoId);
+
+      if (userId != null) {
+        await _client
+            .from(AppConstants.tableUsuarios)
+            .update({'rol': AppConstants.roleTechnician}).eq('id', userId);
+      }
 
       await loadPendingTechnicians();
       await loadStats();
@@ -167,6 +178,13 @@ class AdminNotifier extends StateNotifier<AdminState> {
     try {
       final uid = _client.auth.currentUser?.id;
       final rejectionReason = motivo?.trim();
+      final technicianRow = await _client
+          .from(AppConstants.tableTecnicos)
+          .select('usuario_id')
+          .eq('id', tecnicoId)
+          .single();
+      final userId = technicianRow['usuario_id'] as String?;
+
       await _client.from(AppConstants.tableTecnicos).update({
         'estado_verificacion': AppConstants.verificationRejected,
         'verificado_por': uid,
@@ -174,6 +192,12 @@ class AdminNotifier extends StateNotifier<AdminState> {
         if (rejectionReason != null && rejectionReason.isNotEmpty)
           'motivo_rechazo': rejectionReason,
       }).eq('id', tecnicoId);
+
+      if (userId != null) {
+        await _client
+            .from(AppConstants.tableUsuarios)
+            .update({'rol': AppConstants.roleDriver}).eq('id', userId);
+      }
 
       // Enviar correo de rechazo. Si falla no revierte el rechazo en DB.
       try {
@@ -212,8 +236,7 @@ class AdminNotifier extends StateNotifier<AdminState> {
     try {
       await _client
           .from(AppConstants.tableUsuarios)
-          .update({'activo': activo})
-          .eq('id', userId);
+          .update({'activo': activo}).eq('id', userId);
       await loadUsers();
       return true;
     } catch (_) {

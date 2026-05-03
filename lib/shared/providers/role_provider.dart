@@ -1,5 +1,6 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../core/constants/app_constants.dart';
+import '../../features/auth/domain/entities/user_entity.dart';
 import 'auth_provider.dart';
 
 // Derives the current user's role from auth state
@@ -9,11 +10,13 @@ final userRoleProvider = Provider<String?>((ref) {
 });
 
 final isDriverProvider = Provider<bool>((ref) {
-  return ref.watch(userRoleProvider) == AppConstants.roleDriver;
+  final user = ref.watch(authNotifierProvider).value;
+  return _defaultActiveRole(user) == AppConstants.roleDriver;
 });
 
 final isTechnicianProvider = Provider<bool>((ref) {
-  return ref.watch(userRoleProvider) == AppConstants.roleTechnician;
+  final user = ref.watch(authNotifierProvider).value;
+  return user?.isTechnician == true && user?.isApproved == true;
 });
 
 final isAdminProvider = Provider<bool>((ref) {
@@ -26,16 +29,24 @@ final isAdminProvider = Provider<bool>((ref) {
 class ActiveRoleNotifier extends StateNotifier<String?> {
   ActiveRoleNotifier(super.initialRole);
 
-  void updateFromAuth(String? role) => state = role;
+  void updateFromAuth(AppUser? user) => state = _defaultActiveRole(user);
   void switchTo(String role) => state = role;
+}
+
+String? _defaultActiveRole(AppUser? user) {
+  if (user == null) return null;
+  if (user.isAdmin) return AppConstants.roleAdmin;
+  if (user.isTechnician && user.isApproved) return AppConstants.roleTechnician;
+  return AppConstants.roleDriver;
 }
 
 final activeRoleProvider =
     StateNotifierProvider<ActiveRoleNotifier, String?>((ref) {
-  final notifier = ActiveRoleNotifier(ref.read(userRoleProvider));
+  final notifier =
+      ActiveRoleNotifier(_defaultActiveRole(ref.read(authNotifierProvider).value));
   // Sync on logout/login without re-creating the notifier
-  ref.listen<String?>(userRoleProvider, (_, next) {
-    notifier.updateFromAuth(next);
+  ref.listen(authNotifierProvider, (_, next) {
+    notifier.updateFromAuth(next.value);
   });
   return notifier;
 });

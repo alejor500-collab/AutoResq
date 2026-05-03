@@ -195,7 +195,7 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
               height: 380,
               decoration: BoxDecoration(
                 shape: BoxShape.circle,
-                color: AppColors.primary.withOpacity(0.05),
+                color: AppColors.primary.withValues(alpha: 0.05),
               ),
             ),
           ),
@@ -207,7 +207,7 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
               height: 280,
               decoration: BoxDecoration(
                 shape: BoxShape.circle,
-                color: AppColors.tertiary.withOpacity(0.05),
+                color: AppColors.tertiary.withValues(alpha: 0.05),
               ),
             ),
           ),
@@ -271,7 +271,7 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
                       children: [
                         Expanded(
                             child: Divider(
-                                color: AppColors.outline.withOpacity(0.4))),
+                                color: AppColors.outline.withValues(alpha: 0.4))),
                         Padding(
                           padding: const EdgeInsets.symmetric(horizontal: 12),
                           child: Text(
@@ -279,13 +279,13 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
                             style: TextStyle(
                               fontSize: 13,
                               fontWeight: FontWeight.w500,
-                              color: AppColors.secondary.withOpacity(0.6),
+                              color: AppColors.secondary.withValues(alpha: 0.6),
                             ),
                           ),
                         ),
                         Expanded(
                             child: Divider(
-                                color: AppColors.outline.withOpacity(0.4))),
+                                color: AppColors.outline.withValues(alpha: 0.4))),
                       ],
                     ),
                     const SizedBox(height: 20),
@@ -331,7 +331,7 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
   InputDecoration _inputDecoration(String hint) {
     return InputDecoration(
       hintText: hint,
-      hintStyle: TextStyle(color: AppColors.secondary.withOpacity(0.5)),
+      hintStyle: TextStyle(color: AppColors.secondary.withValues(alpha: 0.5)),
       filled: true,
       fillColor: AppColors.surfaceContainerLow,
       border: OutlineInputBorder(
@@ -341,7 +341,7 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
       focusedBorder: OutlineInputBorder(
         borderRadius: BorderRadius.circular(24),
         borderSide: BorderSide(
-          color: AppColors.primary.withOpacity(0.2),
+          color: AppColors.primary.withValues(alpha: 0.2),
           width: 2,
         ),
       ),
@@ -395,10 +395,10 @@ class _GoogleSignInButton extends StatelessWidget {
             decoration: BoxDecoration(
               color: Colors.white,
               borderRadius: BorderRadius.circular(9999),
-              border: Border.all(color: AppColors.outline.withOpacity(0.3)),
+              border: Border.all(color: AppColors.outline.withValues(alpha: 0.3)),
               boxShadow: [
                 BoxShadow(
-                  color: AppColors.onSurface.withOpacity(0.04),
+                  color: AppColors.onSurface.withValues(alpha: 0.04),
                   blurRadius: 8,
                   offset: const Offset(0, 2),
                 ),

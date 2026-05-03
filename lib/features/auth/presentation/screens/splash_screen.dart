@@ -81,7 +81,7 @@ class _SplashScreenState extends ConsumerState<SplashScreen>
       case AppConstants.roleTechnician:
         context.go(user.isApproved
             ? AppRoutes.technicianHome
-            : AppRoutes.technicianPending);
+            : AppRoutes.driverHome);
       case AppConstants.roleAdmin:
         context.go(AppRoutes.adminDashboard);
       default:
@@ -110,7 +110,7 @@ class _SplashScreenState extends ConsumerState<SplashScreen>
               height: 400,
               decoration: BoxDecoration(
                 shape: BoxShape.circle,
-                color: AppColors.primaryFixed.withOpacity(0.3),
+                color: AppColors.primaryFixed.withValues(alpha: 0.3),
               ),
             ),
           ),
@@ -122,7 +122,7 @@ class _SplashScreenState extends ConsumerState<SplashScreen>
               height: 300,
               decoration: BoxDecoration(
                 shape: BoxShape.circle,
-                color: AppColors.tertiaryFixed.withOpacity(0.2),
+                color: AppColors.tertiaryFixed.withValues(alpha: 0.2),
               ),
             ),
           ),
@@ -150,7 +150,7 @@ class _SplashScreenState extends ConsumerState<SplashScreen>
                               borderRadius: BorderRadius.circular(24),
                               boxShadow: [
                                 BoxShadow(
-                                  color: AppColors.onSurface.withOpacity(0.08),
+                                  color: AppColors.onSurface.withValues(alpha: 0.08),
                                   blurRadius: 50,
                                   offset: const Offset(0, 20),
                                 ),
@@ -222,7 +222,7 @@ class _SplashScreenState extends ConsumerState<SplashScreen>
                                 fontSize: 12,
                                 fontWeight: FontWeight.w700,
                                 letterSpacing: 1,
-                                color: AppColors.onSurface.withOpacity(0.8),
+                                color: AppColors.onSurface.withValues(alpha: 0.8),
                               ),
                             ),
                           ],
@@ -241,7 +241,7 @@ class _SplashScreenState extends ConsumerState<SplashScreen>
                       height: 24,
                       child: CircularProgressIndicator(
                         strokeWidth: 2.5,
-                        color: AppColors.primary.withOpacity(0.5),
+                        color: AppColors.primary.withValues(alpha: 0.5),
                       ),
                     ),
                   ),

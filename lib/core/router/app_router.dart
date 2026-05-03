@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
+import '../constants/app_constants.dart';
 import '../../features/auth/presentation/screens/splash_screen.dart';
 import '../../features/auth/presentation/screens/welcome_screen.dart';
 import '../../features/auth/presentation/screens/login_screen.dart';
@@ -87,6 +88,14 @@ final appRouterProvider = Provider<GoRouter>((ref) {
         AppRoutes.forgotPassword,
         AppRoutes.roleSelect,
       ].contains(path);
+      final isTechnicianRoute = [
+        AppRoutes.technicianHome,
+        AppRoutes.activeService,
+        AppRoutes.technicianChat,
+        AppRoutes.rateDriver,
+        AppRoutes.serviceClosure,
+        AppRoutes.serviceCompleted,
+      ].contains(path);
 
       if (isSplash) return null;
 
@@ -99,15 +108,20 @@ final appRouterProvider = Provider<GoRouter>((ref) {
       if (!isLoggedIn && !isAuthRoute) return AppRoutes.welcome;
 
       // Técnico pendiente: bloqueado en pantalla de espera hasta ser aprobado
-      if (isLoggedIn && user.isTechnician && !user.isApproved) {
-        return path == AppRoutes.technicianPending
-            ? null
-            : AppRoutes.technicianPending;
+      if (isLoggedIn &&
+          user.isTechnician &&
+          !user.isApproved &&
+          (user.verificationStatus == AppConstants.verificationPending ||
+              user.verificationStatus == AppConstants.verificationRejected) &&
+          isTechnicianRoute) {
+        return AppRoutes.technicianPending;
       }
 
       if (isLoggedIn && isAuthRoute) {
         if (user.isAdmin) return AppRoutes.adminDashboard;
-        if (user.isTechnician) return AppRoutes.technicianHome;
+        if (user.isTechnician && user.isApproved) {
+          return AppRoutes.technicianHome;
+        }
         return AppRoutes.driverHome;
       }
       return null;
@@ -187,7 +201,10 @@ final appRouterProvider = Provider<GoRouter>((ref) {
       ),
       GoRoute(
         path: AppRoutes.technicianHome,
-        builder: (context, state) => const TechnicianHomeScreen(),
+        builder: (context, state) {
+          final initialTab = state.extra as int?;
+          return TechnicianHomeScreen(initialTab: initialTab ?? 2);
+        },
       ),
       GoRoute(
         path: AppRoutes.activeService,

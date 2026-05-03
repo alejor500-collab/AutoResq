@@ -204,7 +204,7 @@ class _HeroBanner extends StatelessWidget {
             width: 52,
             height: 52,
             decoration: BoxDecoration(
-              color: Colors.white.withOpacity(0.18),
+              color: Colors.white.withValues(alpha: 0.18),
               borderRadius: BorderRadius.circular(16),
             ),
             child: const Icon(
@@ -221,7 +221,7 @@ class _HeroBanner extends StatelessWidget {
                 Text(
                   'Bienvenido,',
                   style: GoogleFonts.poppins(
-                    color: Colors.white.withOpacity(0.72),
+                    color: Colors.white.withValues(alpha: 0.72),
                     fontSize: 12,
                     fontWeight: FontWeight.w400,
                   ),
@@ -241,7 +241,7 @@ class _HeroBanner extends StatelessWidget {
           Container(
             padding: const EdgeInsets.all(10),
             decoration: BoxDecoration(
-              color: Colors.white.withOpacity(0.14),
+              color: Colors.white.withValues(alpha: 0.14),
               shape: BoxShape.circle,
             ),
             child: const Icon(
@@ -380,7 +380,7 @@ class _StatCard extends StatelessWidget {
         borderRadius: BorderRadius.circular(16),
         boxShadow: [
           BoxShadow(
-            color: AppColors.onSurface.withOpacity(0.05),
+            color: AppColors.onSurface.withValues(alpha: 0.05),
             blurRadius: 10,
             offset: const Offset(0, 2),
           ),
@@ -392,7 +392,7 @@ class _StatCard extends StatelessWidget {
           Container(
             padding: const EdgeInsets.all(8),
             decoration: BoxDecoration(
-              color: item.color.withOpacity(0.1),
+              color: item.color.withValues(alpha: 0.1),
               borderRadius: BorderRadius.circular(10),
             ),
             child: Icon(item.icon, color: item.color, size: 20),
@@ -443,7 +443,7 @@ class _PendingTechniciansSection extends StatelessWidget {
           borderRadius: BorderRadius.circular(16),
           boxShadow: [
             BoxShadow(
-              color: AppColors.onSurface.withOpacity(0.04),
+              color: AppColors.onSurface.withValues(alpha: 0.04),
               blurRadius: 8,
             ),
           ],
@@ -487,7 +487,7 @@ class _PendingTechniciansSection extends StatelessWidget {
               width: double.infinity,
               padding: const EdgeInsets.symmetric(vertical: 12),
               decoration: BoxDecoration(
-                color: AppColors.primary.withOpacity(0.06),
+                color: AppColors.primary.withValues(alpha: 0.06),
                 borderRadius: BorderRadius.circular(12),
               ),
               child: Text(
@@ -525,7 +525,7 @@ class _TechnicianCard extends StatelessWidget {
         borderRadius: BorderRadius.circular(14),
         boxShadow: [
           BoxShadow(
-            color: AppColors.onSurface.withOpacity(0.04),
+            color: AppColors.onSurface.withValues(alpha: 0.04),
             blurRadius: 8,
           ),
         ],
@@ -536,7 +536,7 @@ class _TechnicianCard extends StatelessWidget {
             width: 44,
             height: 44,
             decoration: BoxDecoration(
-              color: AppColors.warning.withOpacity(0.12),
+              color: AppColors.warning.withValues(alpha: 0.12),
               shape: BoxShape.circle,
             ),
             child: Center(
@@ -581,7 +581,7 @@ class _TechnicianCard extends StatelessWidget {
           Container(
             padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
             decoration: BoxDecoration(
-              color: AppColors.warning.withOpacity(0.12),
+              color: AppColors.warning.withValues(alpha: 0.12),
               borderRadius: BorderRadius.circular(20),
             ),
             child: Text(
@@ -621,11 +621,11 @@ class _RecentEmergenciesSection extends StatelessWidget {
             begin: Alignment.topLeft,
             end: Alignment.bottomRight,
             colors: [
-              AppColors.error.withOpacity(0.08),
-              AppColors.error.withOpacity(0.02),
+              AppColors.error.withValues(alpha: 0.08),
+              AppColors.error.withValues(alpha: 0.02),
             ],
           ),
-          border: Border.all(color: AppColors.error.withOpacity(0.15)),
+          border: Border.all(color: AppColors.error.withValues(alpha: 0.15)),
           borderRadius: BorderRadius.circular(16),
         ),
         child: Row(
@@ -634,7 +634,7 @@ class _RecentEmergenciesSection extends StatelessWidget {
               width: 52,
               height: 52,
               decoration: BoxDecoration(
-                color: AppColors.error.withOpacity(0.12),
+                color: AppColors.error.withValues(alpha: 0.12),
                 borderRadius: BorderRadius.circular(14),
               ),
               child: const Icon(
@@ -673,7 +673,7 @@ class _RecentEmergenciesSection extends StatelessWidget {
             const Gap(8),
             Icon(
               Icons.chevron_right_rounded,
-              color: AppColors.error.withOpacity(0.6),
+              color: AppColors.error.withValues(alpha: 0.6),
               size: 22,
             ),
           ],

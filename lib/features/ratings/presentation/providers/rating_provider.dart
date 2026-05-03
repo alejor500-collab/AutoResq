@@ -13,9 +13,11 @@ class RatingNotifier extends StateNotifier<AsyncValue<void>> {
     required String emergenciaId,
     required String calificadoId,
     required int puntuacion,
+    required String raterRole,
     String? comentario,
   }) async {
-    final user = _ref.read(authNotifierProvider).value;
+    final user = _ref.read(authNotifierProvider).value ??
+        _ref.read(authStateProvider).valueOrNull;
     if (user == null) return false;
 
     state = const AsyncValue.loading();
@@ -25,6 +27,7 @@ class RatingNotifier extends StateNotifier<AsyncValue<void>> {
         'calificador_id': user.id,
         'calificado_id': calificadoId,
         'puntuacion': puntuacion,
+        'rater_role': raterRole,
         if (comentario != null) 'comentario': comentario,
       });
 
@@ -33,6 +36,14 @@ class RatingNotifier extends StateNotifier<AsyncValue<void>> {
 
       state = const AsyncValue.data(null);
       return true;
+    } on PostgrestException catch (e, s) {
+      if (e.code == '23505' ||
+          e.message.toLowerCase().contains('duplicate key')) {
+        state = const AsyncValue.data(null);
+        return true;
+      }
+      state = AsyncValue.error(e.message, s);
+      return false;
     } catch (e, s) {
       state = AsyncValue.error(e, s);
       return false;

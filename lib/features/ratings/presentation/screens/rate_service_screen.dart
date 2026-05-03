@@ -6,6 +6,7 @@ import '../../../../core/constants/app_colors.dart';
 import '../../../../core/constants/app_constants.dart';
 import '../../../../core/router/app_router.dart';
 import '../../../../core/utils/helpers.dart';
+import '../../../../shared/providers/auth_provider.dart';
 import '../../../../shared/widgets/app_button.dart';
 import '../../../../shared/widgets/app_text_field.dart';
 import '../../../../shared/widgets/star_rating.dart';
@@ -50,10 +51,22 @@ class _RateServiceScreenState extends ConsumerState<RateServiceScreen> {
       return;
     }
 
+    final technicianUserId = await _resolveTechnicianUserId();
+    if (!mounted) return;
+    if (technicianUserId.isEmpty) {
+      AppHelpers.showSnackBar(
+        context,
+        'No se encontro el tecnico de este servicio.',
+        isError: true,
+      );
+      return;
+    }
+
     final ok = await ref.read(ratingNotifierProvider.notifier).submitRating(
           emergenciaId: widget.emergencyId,
-          calificadoId: widget.technicianId,
+          calificadoId: technicianUserId,
           puntuacion: _stars,
+          raterRole: 'driver',
           comentario: _reviewCtrl.text.trim().isEmpty
               ? null
               : _reviewCtrl.text.trim(),
@@ -66,9 +79,26 @@ class _RateServiceScreenState extends ConsumerState<RateServiceScreen> {
     } else {
       AppHelpers.showSnackBar(
         context,
-        'No se pudo enviar la calificación',
+        'No se pudo enviar la calificacion: ${ref.read(ratingNotifierProvider).error ?? 'intenta nuevamente'}',
         isError: true,
       );
+    }
+  }
+
+  Future<String> _resolveTechnicianUserId() async {
+    final id = widget.technicianId;
+    if (id.isEmpty) return id;
+
+    try {
+      final row = await ref
+          .read(supabaseClientProvider)
+          .from(AppConstants.tableTecnicos)
+          .select('usuario_id')
+          .eq('id', id)
+          .maybeSingle();
+      return row?['usuario_id']?.toString() ?? id;
+    } catch (_) {
+      return id;
     }
   }
 
@@ -156,12 +186,6 @@ class _RateServiceScreenState extends ConsumerState<RateServiceScreen> {
               isLoading: ratingState.isLoading,
               height: 52,
               prefixIcon: const Icon(Icons.star, color: Colors.white, size: 18),
-            ),
-            const Gap(12),
-            AppButton(
-              label: 'Omitir',
-              onPressed: () => context.go(AppRoutes.driverHome),
-              variant: AppButtonVariant.ghost,
             ),
           ],
         ),

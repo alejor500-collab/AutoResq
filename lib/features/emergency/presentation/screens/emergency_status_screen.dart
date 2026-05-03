@@ -5,6 +5,7 @@ import 'package:flutter_map/flutter_map.dart';
 import 'package:go_router/go_router.dart';
 import 'package:gap/gap.dart';
 import 'package:latlong2/latlong.dart';
+import 'package:url_launcher/url_launcher.dart';
 import '../../../../core/constants/app_colors.dart';
 import '../../../../core/constants/app_constants.dart';
 import '../../../../core/router/app_router.dart';
@@ -35,15 +36,174 @@ class EmergencyStatusScreen extends ConsumerWidget {
   }
 }
 
-class _StatusBody extends ConsumerWidget {
+Future<void> _callPhone(BuildContext context, String? phone) async {
+  final digits = phone?.replaceAll(RegExp(r'[^0-9+]'), '') ?? '';
+  if (digits.isEmpty) {
+    AppHelpers.showSnackBar(
+      context,
+      'No hay telefono registrado para llamar',
+      isError: true,
+    );
+    return;
+  }
+  final uri = Uri(scheme: 'tel', path: digits);
+  final ok = await launchUrl(uri, mode: LaunchMode.externalApplication);
+  if (!ok && context.mounted) {
+    AppHelpers.showSnackBar(
+      context,
+      'No se pudo abrir la app de telefono',
+      isError: true,
+    );
+  }
+}
+
+class _StatusBody extends ConsumerStatefulWidget {
   final Emergency emergency;
 
   const _StatusBody({required this.emergency});
 
   @override
-  Widget build(BuildContext context, WidgetRef ref) {
+  ConsumerState<_StatusBody> createState() => _StatusBodyState();
+}
+
+class _StatusBodyState extends ConsumerState<_StatusBody> {
+  bool _ratingDialogShown = false;
+
+  void _showDriverRatingDialog(Emergency emergency) {
+    if (_ratingDialogShown) return;
+    _ratingDialogShown = true;
+
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!mounted) return;
+      final technicianName = emergency.tecnicoNombre?.trim().isNotEmpty == true
+          ? emergency.tecnicoNombre!.trim()
+          : 'tu tecnico';
+      final technicianId =
+          emergency.tecnicoUsuarioId ?? emergency.tecnicoId ?? '';
+
+      showDialog<void>(
+        context: context,
+        barrierDismissible: false,
+        builder: (dialogContext) => AlertDialog(
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(24),
+          ),
+          title: const Text('Califica tu servicio'),
+          content: Text(
+            'El servicio finalizo. Califica a $technicianName para cerrar la solicitud y poder pedir una nueva emergencia.',
+          ),
+          actions: [
+            FilledButton(
+              onPressed: technicianId.isEmpty
+                  ? null
+                  : () {
+                      Navigator.pop(dialogContext);
+                      context.push(
+                        AppRoutes.rateService,
+                        extra: {
+                          'emergencyId': emergency.id,
+                          'technicianId': technicianId,
+                          'technicianName': technicianName,
+                        },
+                      );
+                    },
+              style: FilledButton.styleFrom(
+                backgroundColor: AppColors.primary,
+                foregroundColor: Colors.white,
+              ),
+              child: const Text('Calificar ahora'),
+            ),
+          ],
+        ),
+      );
+    });
+  }
+
+  Future<void> _cancelService(BuildContext context, WidgetRef ref) async {
+    final emergency = widget.emergency;
+    final isPendingSearch =
+        emergency.estado == AppConstants.statusPending && !emergency.hasTechnician;
+    final cancelMessage = isPendingSearch
+        ? 'Se cancelara la busqueda de tecnico. No se generara ningun cargo.'
+        : emergency.hasTechnician
+            ? 'El servicio ya fue aceptado por un tecnico. Se marcara como cancelado y quedara registrado en tu historial.'
+            : 'Se cancelara esta solicitud de emergencia.';
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (dialogContext) => AlertDialog(
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(24),
+        ),
+        title: const Text('Cancelar servicio'),
+        content: Text(cancelMessage),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(dialogContext, false),
+            child: const Text('Volver'),
+          ),
+          FilledButton(
+            onPressed: () => Navigator.pop(dialogContext, true),
+            style: FilledButton.styleFrom(
+              backgroundColor: AppColors.primary,
+              foregroundColor: Colors.white,
+            ),
+            child: const Text('Cancelar servicio'),
+          ),
+        ],
+      ),
+    );
+    if (confirmed != true) return;
+
+    final ok = await ref
+        .read(emergencyNotifierProvider.notifier)
+        .updateStatus(emergency.id, AppConstants.statusCancelled);
+    if (!context.mounted) return;
+    if (ok) {
+      ref.read(emergencyNotifierProvider.notifier).clearActiveEmergency();
+      AppHelpers.showSnackBar(
+        context,
+        isPendingSearch ? 'Solicitud cancelada.' : 'Servicio cancelado.',
+        isSuccess: true,
+      );
+      context.go(AppRoutes.driverHome);
+      return;
+    }
+
+    AppHelpers.showSnackBar(
+      context,
+      ref.read(emergencyNotifierProvider).error ??
+          'No se pudo cancelar el servicio.',
+      isError: true,
+    );
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final emergency = widget.emergency;
+    final emergencyState = ref.watch(emergencyNotifierProvider);
     final lat = emergency.lat ?? AppConstants.defaultLat;
     final lng = emergency.lng ?? AppConstants.defaultLng;
+    final technicianLocation = emergency.tecnicoId == null
+        ? const AsyncValue<TechnicianLiveLocation?>.data(null)
+        : ref.watch(technicianLiveLocationProvider(emergency.tecnicoId!));
+    final tech = technicianLocation.valueOrNull;
+    final routeEstimate = tech == null
+        ? null
+        : ref.watch(
+            technicianRouteEstimateProvider(
+              (
+                originLat: tech.lat,
+                originLng: tech.lng,
+                destinationLat: lat,
+                destinationLng: lng,
+              ),
+            ),
+          );
+    final isCompleted = emergency.estado == AppConstants.statusCompleted ||
+        emergency.asignacionEstado == AppConstants.assignFinished;
+    if (isCompleted) {
+      _showDriverRatingDialog(emergency);
+    }
 
     return Scaffold(
       backgroundColor: AppColors.surface,
@@ -62,10 +222,10 @@ class _StatusBody extends ConsumerWidget {
                   padding:
                       EdgeInsets.only(top: MediaQuery.of(context).padding.top),
                   decoration: BoxDecoration(
-                    color: Colors.white.withOpacity(0.8),
+                    color: Colors.white.withValues(alpha: 0.8),
                     boxShadow: [
                       BoxShadow(
-                        color: AppColors.onSurface.withOpacity(0.06),
+                        color: AppColors.onSurface.withValues(alpha: 0.06),
                         blurRadius: 40,
                         offset: const Offset(0, 40),
                       ),
@@ -132,19 +292,42 @@ class _StatusBody extends ConsumerWidget {
               child: Column(
                 children: [
                   // ETA Hero
-                  _ETAHero(emergency: emergency),
+                  _ETAHero(
+                    emergency: emergency,
+                    route: routeEstimate?.valueOrNull,
+                    hasTechnicianLocation: tech != null,
+                    isRouteLoading: routeEstimate?.isLoading ?? false,
+                  ),
                   const Gap(24),
 
                   // Live Map
-                  _LiveMap(lat: lat, lng: lng),
+                  _LiveMap(
+                    lat: lat,
+                    lng: lng,
+                    address: emergency.direccion,
+                    technicianLocation: tech,
+                    route: routeEstimate?.valueOrNull,
+                  ),
                   const Gap(24),
 
                   // Technician Card
                   if (emergency.hasTechnician)
-                    _TechnicianCard(emergency: emergency)
+                    _TechnicianCard(
+                      emergency: emergency,
+                      route: routeEstimate?.valueOrNull,
+                      onCancel: () => _cancelService(context, ref),
+                    )
                   else
-                    _SearchingCard(),
+                    _SearchingCard(
+                      onCancel: () => _cancelService(context, ref),
+                      isCancelling: emergencyState.isLoading,
+                    ),
                   const Gap(24),
+
+                  if (isCompleted) ...[
+                    _DriverRatingPrompt(emergency: emergency),
+                    const Gap(24),
+                  ],
 
                   // Timeline
                   _TimelineStepper(emergency: emergency),
@@ -182,14 +365,121 @@ class _StatusBody extends ConsumerWidget {
 
 // ─── ETA Hero ─────────────────────────────────────────────────────────────────
 
-class _ETAHero extends StatelessWidget {
+class _DriverRatingPrompt extends StatelessWidget {
   final Emergency emergency;
 
-  const _ETAHero({required this.emergency});
+  const _DriverRatingPrompt({required this.emergency});
 
   @override
   Widget build(BuildContext context) {
-    final (etaText, subtitle) = _getETAInfo(emergency.asignacionEstado);
+    final technicianName = emergency.tecnicoNombre?.trim().isNotEmpty == true
+        ? emergency.tecnicoNombre!.trim()
+        : 'tu tecnico';
+    final technicianId = emergency.tecnicoUsuarioId ?? emergency.tecnicoId ?? '';
+
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.all(20),
+      decoration: BoxDecoration(
+        color: AppColors.surfaceContainerLowest,
+        borderRadius: BorderRadius.circular(18),
+        border: Border.all(color: AppColors.primary.withValues(alpha: 0.18)),
+        boxShadow: [
+          BoxShadow(
+            color: AppColors.onSurface.withValues(alpha: 0.06),
+            blurRadius: 18,
+            offset: const Offset(0, 8),
+          ),
+        ],
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              Container(
+                width: 40,
+                height: 40,
+                decoration: BoxDecoration(
+                  color: AppColors.primary.withValues(alpha: 0.10),
+                  shape: BoxShape.circle,
+                ),
+                child: const Icon(
+                  Icons.verified_rounded,
+                  color: AppColors.primary,
+                  size: 22,
+                ),
+              ),
+              const Gap(12),
+              const Expanded(
+                child: Text(
+                  'Servicio finalizado',
+                  style: TextStyle(
+                    fontSize: 18,
+                    fontWeight: FontWeight.w800,
+                    color: AppColors.onSurface,
+                  ),
+                ),
+              ),
+            ],
+          ),
+          const Gap(12),
+          Text(
+            'Califica a $technicianName para cerrar este servicio y poder solicitar una nueva emergencia.',
+            style: const TextStyle(
+              fontSize: 13,
+              height: 1.35,
+              color: AppColors.secondary,
+            ),
+          ),
+          const Gap(16),
+          SizedBox(
+            width: double.infinity,
+            child: FilledButton.icon(
+              onPressed: technicianId.isEmpty
+                  ? null
+                  : () => context.push(
+                        AppRoutes.rateService,
+                        extra: {
+                          'emergencyId': emergency.id,
+                          'technicianId': technicianId,
+                          'technicianName': technicianName,
+                        },
+                      ),
+              style: FilledButton.styleFrom(
+                backgroundColor: AppColors.primary,
+                foregroundColor: Colors.white,
+                minimumSize: const Size.fromHeight(52),
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(9999),
+                ),
+              ),
+              icon: const Icon(Icons.star_rounded, size: 18),
+              label: const Text('Calificar servicio'),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _ETAHero extends StatelessWidget {
+  final Emergency emergency;
+  final RouteEstimate? route;
+  final bool hasTechnicianLocation;
+  final bool isRouteLoading;
+
+  const _ETAHero({
+    required this.emergency,
+    required this.route,
+    required this.hasTechnicianLocation,
+    required this.isRouteLoading,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final (etaText, subtitle) = _getETAInfo();
 
     return Column(
       children: [
@@ -223,12 +513,35 @@ class _ETAHero extends StatelessWidget {
     );
   }
 
-  (String, String) _getETAInfo(String? status) {
-    switch (status) {
+  (String, String) _getETAInfo() {
+    if (emergency.estado == AppConstants.statusCompleted) {
+      return ('Listo', 'Servicio completado');
+    }
+    switch (emergency.asignacionEstado) {
       case AppConstants.assignAccepted:
-        return ('8 mins', 'El tecnico esta preparandose');
+        if (!hasTechnicianLocation) {
+          return ('...', 'Esperando ubicacion del tecnico');
+        }
+        if (isRouteLoading || route == null) {
+          return ('...', 'Calculando llegada del tecnico');
+        }
+        final approx = route!.isApproximate ? ' aprox.' : '';
+        return (
+          '${route!.durationMinutes} min',
+          'A ${route!.distanceLabel} de tu ubicacion$approx',
+        );
       case AppConstants.assignEnRoute:
-        return ('8 mins', 'El tecnico esta en camino a tu ubicacion');
+        if (!hasTechnicianLocation) {
+          return ('...', 'Esperando ubicacion del tecnico');
+        }
+        if (isRouteLoading || route == null) {
+          return ('...', 'Calculando ruta del tecnico');
+        }
+        final approx = route!.isApproximate ? ' aprox.' : '';
+        return (
+          '${route!.durationMinutes} min',
+          'El tecnico esta a ${route!.distanceLabel}$approx',
+        );
       case AppConstants.assignAttending:
         return ('--', 'El tecnico esta atendiendo tu vehiculo');
       case AppConstants.assignFinished:
@@ -244,11 +557,43 @@ class _ETAHero extends StatelessWidget {
 class _LiveMap extends StatelessWidget {
   final double lat;
   final double lng;
+  final String? address;
+  final TechnicianLiveLocation? technicianLocation;
+  final RouteEstimate? route;
 
-  const _LiveMap({required this.lat, required this.lng});
+  const _LiveMap({
+    required this.lat,
+    required this.lng,
+    this.address,
+    this.technicianLocation,
+    this.route,
+  });
 
   @override
   Widget build(BuildContext context) {
+    final tech = technicianLocation;
+    final center = tech == null
+        ? LatLng(lat, lng)
+        : LatLng((lat + tech.lat) / 2, (lng + tech.lng) / 2);
+    final routePoints = route?.points ??
+        (tech == null
+            ? <LatLng>[]
+            : [LatLng(tech.lat, tech.lng), LatLng(lat, lng)]);
+    final boundsPoints = [
+      LatLng(lat, lng),
+      if (tech != null) LatLng(tech.lat, tech.lng),
+      ...routePoints,
+    ];
+    final initialZoom = tech == null
+        ? 14.0
+        : route != null && route!.distanceKm > 20
+            ? 10.0
+            : route != null && route!.distanceKm > 10
+                ? 11.0
+                : route != null && route!.distanceKm > 5
+                    ? 12.0
+                    : 13.0;
+
     return Container(
       height: 256,
       decoration: BoxDecoration(
@@ -256,7 +601,7 @@ class _LiveMap extends StatelessWidget {
         border: Border.all(color: AppColors.surfaceVariant),
         boxShadow: [
           BoxShadow(
-            color: AppColors.onSurface.withOpacity(0.08),
+            color: AppColors.onSurface.withValues(alpha: 0.08),
             blurRadius: 20,
             offset: const Offset(0, 8),
           ),
@@ -266,9 +611,19 @@ class _LiveMap extends StatelessWidget {
       child: Stack(
         children: [
           FlutterMap(
+            key: ValueKey(
+              '${lat.toStringAsFixed(5)},${lng.toStringAsFixed(5)},'
+              '${tech?.lat.toStringAsFixed(5)},${tech?.lng.toStringAsFixed(5)}',
+            ),
             options: MapOptions(
-              initialCenter: LatLng(lat, lng),
-              initialZoom: 14,
+              initialCenter: center,
+              initialZoom: initialZoom,
+              initialCameraFit: boundsPoints.length >= 2
+                  ? CameraFit.bounds(
+                      bounds: LatLngBounds.fromPoints(boundsPoints),
+                      padding: const EdgeInsets.all(48),
+                    )
+                  : null,
               interactionOptions: const InteractionOptions(
                 flags: InteractiveFlag.pinchZoom | InteractiveFlag.drag,
               ),
@@ -277,6 +632,16 @@ class _LiveMap extends StatelessWidget {
               TileLayer(
                 urlTemplate: 'https://tile.openstreetmap.org/{z}/{x}/{y}.png',
               ),
+              if (routePoints.length >= 2)
+                PolylineLayer(
+                  polylines: [
+                    Polyline(
+                      points: routePoints,
+                      color: AppColors.primary.withValues(alpha: 0.55),
+                      strokeWidth: 3,
+                    ),
+                  ],
+                ),
               MarkerLayer(
                 markers: [
                   Marker(
@@ -295,6 +660,32 @@ class _LiveMap extends StatelessWidget {
                       ),
                     ),
                   ),
+                  if (tech != null)
+                    Marker(
+                      point: LatLng(tech.lat, tech.lng),
+                      width: 40,
+                      height: 40,
+                      child: Container(
+                        decoration: BoxDecoration(
+                          color: AppColors.technicianMarker,
+                          shape: BoxShape.circle,
+                          border: Border.all(color: Colors.white, width: 3),
+                          boxShadow: [
+                            BoxShadow(
+                              color: AppColors.technicianMarker
+                                  .withValues(alpha: 0.35),
+                              blurRadius: 14,
+                              spreadRadius: 3,
+                            ),
+                          ],
+                        ),
+                        child: const Icon(
+                          Icons.build_rounded,
+                          color: Colors.white,
+                          size: 18,
+                        ),
+                      ),
+                    ),
                 ],
               ),
             ],
@@ -312,52 +703,139 @@ class _LiveMap extends StatelessWidget {
                   end: Alignment.bottomCenter,
                   colors: [
                     Colors.transparent,
-                    Colors.black.withOpacity(0.4),
+                    Colors.black.withValues(alpha: 0.4),
                   ],
                 ),
               ),
             ),
           ),
-          // Address badge
-          Positioned(
-            bottom: 16,
-            left: 16,
-            child: Container(
-              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-              decoration: BoxDecoration(
-                color: Colors.white.withOpacity(0.95),
-                borderRadius: BorderRadius.circular(8),
-                boxShadow: [
-                  BoxShadow(
-                    color: Colors.black.withOpacity(0.1),
-                    blurRadius: 8,
-                  ),
-                ],
-              ),
-              child: Row(
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  Container(
-                    width: 8,
-                    height: 8,
-                    decoration: const BoxDecoration(
-                      color: AppColors.primary,
-                      shape: BoxShape.circle,
+          if (address?.trim().isNotEmpty == true)
+            Positioned(
+              bottom: tech == null ? 16 : 54,
+              left: 16,
+              right: 64,
+              child: Container(
+                padding:
+                    const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                decoration: BoxDecoration(
+                  color: Colors.white.withValues(alpha: 0.95),
+                  borderRadius: BorderRadius.circular(8),
+                  boxShadow: [
+                    BoxShadow(
+                      color: Colors.black.withValues(alpha: 0.1),
+                      blurRadius: 8,
                     ),
+                  ],
+                ),
+                child: Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Container(
+                      width: 8,
+                      height: 8,
+                      decoration: const BoxDecoration(
+                        color: AppColors.primary,
+                        shape: BoxShape.circle,
+                      ),
+                    ),
+                    const Gap(8),
+                    Flexible(
+                      child: Text(
+                        address!,
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                        style: const TextStyle(
+                          fontSize: 11,
+                          fontWeight: FontWeight.w700,
+                          color: AppColors.onSurface,
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ),
+          if (tech != null)
+            Positioned(
+              bottom: 16,
+              left: 16,
+              right: 64,
+              child: Container(
+                padding:
+                    const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                decoration: BoxDecoration(
+                  color: Colors.white.withValues(alpha: 0.95),
+                  borderRadius: BorderRadius.circular(8),
+                  boxShadow: [
+                    BoxShadow(
+                      color: Colors.black.withValues(alpha: 0.1),
+                      blurRadius: 8,
+                    ),
+                  ],
+                ),
+                child: Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Container(
+                      width: 8,
+                      height: 8,
+                      decoration: const BoxDecoration(
+                        color: AppColors.technicianMarker,
+                        shape: BoxShape.circle,
+                      ),
+                    ),
+                    const Gap(8),
+                    Flexible(
+                      child: Text(
+                        'Tecnico en camino - actualizado ${AppHelpers.formatTime(tech.updatedAt.toLocal())}',
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                        style: const TextStyle(
+                          fontSize: 11,
+                          fontWeight: FontWeight.w700,
+                          color: AppColors.onSurface,
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ),
+          if (route != null)
+            Positioned(
+              top: 16,
+              left: 16,
+              right: 16,
+              child: Align(
+                alignment: Alignment.topLeft,
+                child: Container(
+                  padding:
+                      const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                  decoration: BoxDecoration(
+                    color: Colors.white.withValues(alpha: 0.95),
+                    borderRadius: BorderRadius.circular(8),
+                    boxShadow: [
+                      BoxShadow(
+                        color: Colors.black.withValues(alpha: 0.1),
+                        blurRadius: 8,
+                      ),
+                    ],
                   ),
-                  const Gap(8),
-                  const Text(
-                    'AV. DANIEL LEON BORJA',
-                    style: TextStyle(
+                  child: Text(
+                    route!.isApproximate
+                        ? 'Ruta estimada: ${route!.distanceLabel}'
+                        : 'Ruta por carretera: ${route!.distanceLabel}',
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: const TextStyle(
                       fontSize: 11,
                       fontWeight: FontWeight.w700,
                       color: AppColors.onSurface,
                     ),
                   ),
-                ],
+                ),
               ),
             ),
-          ),
           // My location button
           Positioned(
             bottom: 16,
@@ -370,7 +848,7 @@ class _LiveMap extends StatelessWidget {
                 shape: BoxShape.circle,
                 boxShadow: [
                   BoxShadow(
-                    color: Colors.black.withOpacity(0.15),
+                    color: Colors.black.withValues(alpha: 0.15),
                     blurRadius: 12,
                   ),
                 ],
@@ -389,11 +867,28 @@ class _LiveMap extends StatelessWidget {
 
 class _TechnicianCard extends StatelessWidget {
   final Emergency emergency;
+  final RouteEstimate? route;
+  final VoidCallback onCancel;
 
-  const _TechnicianCard({required this.emergency});
+  const _TechnicianCard({
+    required this.emergency,
+    required this.route,
+    required this.onCancel,
+  });
 
   @override
   Widget build(BuildContext context) {
+    final technicianName = emergency.tecnicoNombre?.trim().isNotEmpty == true
+        ? emergency.tecnicoNombre!.trim()
+        : 'Tecnico asignado';
+    final rating = emergency.tecnicoRating;
+    final ratingText =
+        rating == null || rating <= 0 ? 'Sin calificacion' : rating.toStringAsFixed(1);
+    final specialty = emergency.tecnicoSpecialty?.trim().isNotEmpty == true
+        ? emergency.tecnicoSpecialty!.trim()
+        : emergency.pricingServiceName ?? 'Tecnico verificado';
+    final etaText = route == null ? 'ETA' : '${route!.durationMinutes} min';
+
     return ClipRRect(
       borderRadius: BorderRadius.circular(16),
       child: BackdropFilter(
@@ -401,12 +896,12 @@ class _TechnicianCard extends StatelessWidget {
         child: Container(
           padding: const EdgeInsets.all(24),
           decoration: BoxDecoration(
-            color: AppColors.surfaceContainerLowest.withOpacity(0.7),
+            color: AppColors.surfaceContainerLowest.withValues(alpha: 0.7),
             borderRadius: BorderRadius.circular(16),
-            border: Border.all(color: Colors.white.withOpacity(0.2)),
+            border: Border.all(color: Colors.white.withValues(alpha: 0.2)),
             boxShadow: [
               BoxShadow(
-                color: AppColors.onSurface.withOpacity(0.04),
+                color: AppColors.onSurface.withValues(alpha: 0.04),
                 blurRadius: 40,
                 offset: const Offset(0, 20),
               ),
@@ -424,8 +919,7 @@ class _TechnicianCard extends StatelessWidget {
                         radius: 32,
                         backgroundColor: AppColors.surfaceContainerHigh,
                         child: Text(
-                          AppHelpers.getInitials(
-                              emergency.tecnicoNombre ?? 'T'),
+                          AppHelpers.getInitials(technicianName),
                           style: const TextStyle(
                             fontSize: 20,
                             fontWeight: FontWeight.w700,
@@ -455,7 +949,7 @@ class _TechnicianCard extends StatelessWidget {
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
                         Text(
-                          emergency.tecnicoNombre ?? 'Tecnico',
+                          technicianName,
                           style: const TextStyle(
                             fontSize: 18,
                             fontWeight: FontWeight.w700,
@@ -467,9 +961,9 @@ class _TechnicianCard extends StatelessWidget {
                             const Icon(Icons.star,
                                 size: 14, color: Color(0xFFFACC15)),
                             const Gap(4),
-                            const Text(
-                              '4.9',
-                              style: TextStyle(
+                            Text(
+                              ratingText,
+                              style: const TextStyle(
                                 fontSize: 12,
                                 fontWeight: FontWeight.w700,
                                 color: AppColors.onSurface,
@@ -478,14 +972,18 @@ class _TechnicianCard extends StatelessWidget {
                             Text(
                               ' \u2022 ',
                               style: TextStyle(
-                                color: AppColors.secondary.withOpacity(0.5),
+                                color: AppColors.secondary.withValues(alpha: 0.5),
                               ),
                             ),
-                            Text(
-                              emergency.clasificacionIa ?? 'Especialista',
-                              style: const TextStyle(
-                                fontSize: 12,
-                                color: AppColors.secondary,
+                            Flexible(
+                              child: Text(
+                                specialty,
+                                maxLines: 1,
+                                overflow: TextOverflow.ellipsis,
+                                style: const TextStyle(
+                                  fontSize: 12,
+                                  color: AppColors.secondary,
+                                ),
                               ),
                             ),
                           ],
@@ -498,17 +996,18 @@ class _TechnicianCard extends StatelessWidget {
                     padding:
                         const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
                     decoration: BoxDecoration(
-                      color: AppColors.primary.withOpacity(0.1),
+                      color: AppColors.primary.withValues(alpha: 0.1),
                       borderRadius: BorderRadius.circular(9999),
                     ),
-                    child: const Row(
+                    child: Row(
                       mainAxisSize: MainAxisSize.min,
                       children: [
-                        Icon(Icons.near_me, size: 14, color: AppColors.primary),
-                        Gap(4),
+                        const Icon(Icons.near_me,
+                            size: 14, color: AppColors.primary),
+                        const Gap(4),
                         Text(
-                          'ETA',
-                          style: TextStyle(
+                          etaText,
+                          style: const TextStyle(
                             fontSize: 10,
                             fontWeight: FontWeight.w900,
                             letterSpacing: 1.5,
@@ -529,7 +1028,7 @@ class _TechnicianCard extends StatelessWidget {
                     child: _ActionButton(
                       icon: Icons.call,
                       label: 'Llamar',
-                      onTap: () {},
+                      onTap: () => _callPhone(context, emergency.tecnicoPhone),
                     ),
                   ),
                   const Gap(16),
@@ -549,7 +1048,10 @@ class _TechnicianCard extends StatelessWidget {
 
               // Cancel button
               TextButton(
-                onPressed: () {},
+                onPressed: emergency.estado == AppConstants.statusCancelled ||
+                        emergency.estado == AppConstants.statusCompleted
+                    ? null
+                    : onCancel,
                 child: const Text(
                   'Cancelar servicio',
                   style: TextStyle(
@@ -611,6 +1113,14 @@ class _ActionButton extends StatelessWidget {
 // ─── Searching Card ───────────────────────────────────────────────────────────
 
 class _SearchingCard extends StatefulWidget {
+  final VoidCallback onCancel;
+  final bool isCancelling;
+
+  const _SearchingCard({
+    required this.onCancel,
+    required this.isCancelling,
+  });
+
   @override
   State<_SearchingCard> createState() => _SearchingCardState();
 }
@@ -664,6 +1174,46 @@ class _SearchingCardState extends State<_SearchingCard>
               color: AppColors.secondary,
             ),
           ),
+          const Gap(24),
+          SizedBox(
+            width: double.infinity,
+            child: OutlinedButton.icon(
+              onPressed: widget.isCancelling ? null : widget.onCancel,
+              style: OutlinedButton.styleFrom(
+                foregroundColor: AppColors.primary,
+                side: BorderSide(
+                  color: AppColors.primary.withValues(alpha: 0.28),
+                ),
+                minimumSize: const Size.fromHeight(52),
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(9999),
+                ),
+              ),
+              icon: widget.isCancelling
+                  ? const SizedBox(
+                      width: 16,
+                      height: 16,
+                      child: CircularProgressIndicator(
+                        strokeWidth: 2,
+                        color: AppColors.primary,
+                      ),
+                    )
+                  : const Icon(Icons.close_rounded, size: 18),
+              label: Text(
+                widget.isCancelling ? 'Cancelando...' : 'Cancelar solicitud',
+              ),
+            ),
+          ),
+          const Gap(8),
+          const Text(
+            'Puedes cancelar sin cargo mientras ningun tecnico haya aceptado.',
+            textAlign: TextAlign.center,
+            style: TextStyle(
+              fontSize: 12,
+              color: AppColors.textSecondary,
+              height: 1.35,
+            ),
+          ),
         ],
       ),
     );
@@ -679,7 +1229,9 @@ class _TimelineStepper extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final currentStatus = emergency.asignacionEstado ?? '';
+    final currentStatus = emergency.estado == AppConstants.statusCompleted
+        ? AppConstants.assignFinished
+        : emergency.asignacionEstado ?? '';
     final steps = [
       _TimelineStep(
         title: 'Solicitud enviada',
@@ -827,7 +1379,7 @@ class _TimelineStepWidget extends StatelessWidget {
                     color: step.status == _StepStatus.active
                         ? AppColors.primary
                         : step.status == _StepStatus.pending
-                            ? AppColors.secondary.withOpacity(0.5)
+                            ? AppColors.secondary.withValues(alpha: 0.5)
                             : AppColors.onSurface,
                   ),
                 ),
@@ -836,7 +1388,7 @@ class _TimelineStepWidget extends StatelessWidget {
                   style: TextStyle(
                     fontSize: 13,
                     color: step.status == _StepStatus.pending
-                        ? AppColors.secondary.withOpacity(0.5)
+                        ? AppColors.secondary.withValues(alpha: 0.5)
                         : AppColors.secondary,
                   ),
                 ),

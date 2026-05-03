@@ -71,6 +71,19 @@ abstract class AppHelpers {
     return '${(meters / 1000).toStringAsFixed(1)} km';
   }
 
+  static String formatCurrency(
+    num amount, {
+    String locale = 'es_EC',
+    String currency = 'USD',
+  }) {
+    return NumberFormat.currency(
+      locale: locale,
+      symbol: '\$',
+      decimalDigits: 2,
+      name: currency,
+    ).format(amount);
+  }
+
   // ─── Rating ───────────────────────────────────────────────────────────────
   static String formatRating(double rating) {
     return rating.toStringAsFixed(1);

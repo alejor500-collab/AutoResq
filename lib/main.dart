@@ -2,10 +2,15 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:google_fonts/google_fonts.dart';
+import 'package:intl/date_symbol_data_local.dart';
+import 'package:intl/intl.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import 'core/constants/app_colors.dart';
 import 'core/constants/app_constants.dart';
 import 'core/router/app_router.dart';
+import 'features/auth/domain/entities/user_entity.dart';
+import 'shared/providers/auth_provider.dart';
+import 'shared/services/push_notification_service.dart';
 
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -22,6 +27,9 @@ Future<void> main() async {
     DeviceOrientation.portraitDown,
   ]);
 
+  Intl.defaultLocale = 'es_EC';
+  await initializeDateFormatting('es_EC');
+
   await Supabase.initialize(
     url: AppConstants.supabaseUrl,
     anonKey: AppConstants.supabaseAnonKey,
@@ -29,6 +37,7 @@ Future<void> main() async {
       authFlowType: AuthFlowType.pkce,
     ),
   );
+  await PushNotificationService.initialize();
 
   runApp(
     const ProviderScope(
@@ -37,11 +46,34 @@ Future<void> main() async {
   );
 }
 
-class AutoResQApp extends ConsumerWidget {
+class AutoResQApp extends ConsumerStatefulWidget {
   const AutoResQApp({super.key});
 
   @override
-  Widget build(BuildContext context, WidgetRef ref) {
+  ConsumerState<AutoResQApp> createState() => _AutoResQAppState();
+}
+
+class _AutoResQAppState extends ConsumerState<AutoResQApp> {
+  ProviderSubscription<AsyncValue<AppUser?>>? _authSubscription;
+
+  @override
+  void initState() {
+    super.initState();
+    _authSubscription = ref.listenManual<AsyncValue<AppUser?>>(
+      authNotifierProvider,
+      (_, next) => PushNotificationService.syncUser(next.valueOrNull),
+      fireImmediately: true,
+    );
+  }
+
+  @override
+  void dispose() {
+    _authSubscription?.close();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
     final router = ref.watch(appRouterProvider);
 
     return MaterialApp.router(
@@ -214,7 +246,7 @@ class AutoResQApp extends ConsumerWidget {
         focusedBorder: OutlineInputBorder(
           borderRadius: BorderRadius.circular(AppConstants.borderRadiusInput),
           borderSide: BorderSide(
-            color: AppColors.primary.withOpacity(0.2),
+            color: AppColors.primary.withValues(alpha: 0.2),
             width: 2,
           ),
         ),

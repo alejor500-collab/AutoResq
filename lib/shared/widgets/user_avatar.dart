@@ -29,7 +29,7 @@ class UserAvatar extends StatelessWidget {
 
     return CircleAvatar(
       radius: radius,
-      backgroundColor: backgroundColor ?? AppColors.primary.withOpacity(0.1),
+      backgroundColor: backgroundColor ?? AppColors.primary.withValues(alpha: 0.1),
       child: Text(
         AppHelpers.getInitials(name),
         style: TextStyle(

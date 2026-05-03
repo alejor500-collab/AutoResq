@@ -86,23 +86,23 @@ class AuthRemoteDataSourceImpl implements AuthRemoteDataSource {
     bool isAvailable = false;
     bool isApproved = data['activo'] as bool? ?? true;
 
+    final tecnico = await _client
+        .from(AppConstants.tableTecnicos)
+        .select(
+            'especialidad, disponible, estado_verificacion, motivo_rechazo, ubicacion_lat, ubicacion_lng')
+        .eq('usuario_id', userId)
+        .maybeSingle();
+    specialty = tecnico?['especialidad'] as String?;
+    isAvailable = tecnico?['disponible'] as bool? ?? false;
+    verificationStatus = tecnico?['estado_verificacion'] as String?;
+    rejectionReason = tecnico?['motivo_rechazo'] as String?;
+    lat = (tecnico?['ubicacion_lat'] as num?)?.toDouble();
+    lng = (tecnico?['ubicacion_lng'] as num?)?.toDouble();
+
     if (data['rol'] == AppConstants.roleTechnician) {
-      final tecnico = await _client
-          .from(AppConstants.tableTecnicos)
-          .select(
-              'especialidad, disponible, estado_verificacion, motivo_rechazo, ubicacion_lat, ubicacion_lng')
-          .eq('usuario_id', userId)
-          .maybeSingle();
-      specialty = tecnico?['especialidad'] as String?;
-      isAvailable = tecnico?['disponible'] as bool? ?? false;
-      // Sin fila, estado != aprobado, o cuenta desactivada → no aprobado
-      isApproved = (tecnico?['estado_verificacion'] ==
-              AppConstants.verificationApproved) &&
-          (data['activo'] as bool? ?? true);
-      verificationStatus = tecnico?['estado_verificacion'] as String?;
-      rejectionReason = tecnico?['motivo_rechazo'] as String?;
-      lat = (tecnico?['ubicacion_lat'] as num?)?.toDouble();
-      lng = (tecnico?['ubicacion_lng'] as num?)?.toDouble();
+      // Un tecnico solo opera como tecnico cuando el administrador lo aprobo.
+      isApproved =
+          verificationStatus == AppConstants.verificationApproved && isApproved;
     }
 
     return UserModel.fromJson({
@@ -177,20 +177,27 @@ class AuthRemoteDataSourceImpl implements AuthRemoteDataSource {
       }
 
       final userId = response.user!.id;
+      final profileRole = role == AppConstants.roleTechnician
+          ? AppConstants.roleDriver
+          : role;
 
-      await _client.from(AppConstants.tableProfiles).update({
+      await _client.from(AppConstants.tableProfiles).upsert({
+        'id': userId,
+        'email': email,
         'nombre': name,
         'telefono': phone,
-        'rol': role,
-      }).eq('id', userId);
+        'rol': profileRole,
+        'activo': true,
+      }, onConflict: 'id');
 
       if (role == AppConstants.roleTechnician) {
-        await _client.from(AppConstants.tableTecnicos).insert({
+        await _client.from(AppConstants.tableTecnicos).upsert({
           'usuario_id': userId,
           'especialidad': specialty ?? '',
           'estado_verificacion': AppConstants.verificationPending,
           'disponible': false,
-        });
+          'motivo_rechazo': null,
+        }, onConflict: 'usuario_id');
       }
 
       return UserModel(
@@ -198,13 +205,16 @@ class AuthRemoteDataSourceImpl implements AuthRemoteDataSource {
         email: email,
         name: name,
         phone: phone,
-        role: role,
+        role: profileRole,
         specialty: specialty,
         rating: 0.0,
         totalServices: 0,
         isAvailable: false,
-        isApproved: role != AppConstants.roleTechnician,
+        isApproved: true,
         createdAt: DateTime.now(),
+        verificationStatus: role == AppConstants.roleTechnician
+            ? AppConstants.verificationPending
+            : null,
       );
     } on core_exceptions.AuthException {
       rethrow;
