@@ -155,6 +155,7 @@ CREATE TABLE IF NOT EXISTS public.asignaciones (
     emergencia_id    uuid NOT NULL REFERENCES public.emergencias(id),
     tecnico_id       uuid NOT NULL REFERENCES public.tecnicos(id),
     fecha_asignacion timestamp with time zone DEFAULT now(),
+    fecha_llegada    timestamp with time zone,
     estado           varchar(50) NOT NULL DEFAULT 'aceptada'
                          CHECK (estado IN ('aceptada', 'en_ruta', 'atendiendo', 'finalizada', 'rechazada'))
 );

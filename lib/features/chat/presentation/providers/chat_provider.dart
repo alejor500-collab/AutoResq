@@ -20,6 +20,29 @@ final messagesStreamProvider =
 });
 
 // ─── Chat Notifier ────────────────────────────────────────────────────────────
+final unreadChatCountProvider = StreamProvider.autoDispose<int>((ref) async* {
+  final user = ref.watch(authNotifierProvider).valueOrNull ??
+      ref.watch(authStateProvider).valueOrNull;
+  if (user == null) {
+    yield 0;
+    return;
+  }
+
+  final ds = ref.read(chatDataSourceProvider);
+  Future<int> loadCount() async {
+    try {
+      return await ds.getUnreadMessageCount(user.id);
+    } catch (_) {
+      return 0;
+    }
+  }
+
+  yield await loadCount();
+  yield* Stream.periodic(const Duration(seconds: 2)).asyncMap(
+    (_) => loadCount(),
+  );
+});
+
 class ChatNotifier extends StateNotifier<AsyncValue<List<ChatMessage>>> {
   final ChatRemoteDataSource _dataSource;
   final Ref _ref;

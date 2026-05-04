@@ -34,6 +34,7 @@ class EmergencyModel extends Emergency {
     super.asignacionEstado,
     super.asignacionId,
     super.asignacionFecha,
+    super.asignacionLlegadaFecha,
     super.priceSnapshot,
   });
 
@@ -67,6 +68,7 @@ class EmergencyModel extends Emergency {
     String? asignacionEstado;
     String? asignacionId;
     DateTime? asignacionFecha;
+    DateTime? asignacionLlegadaFecha;
     if (json['asignaciones'] != null) {
       final assign = _pickAssignment(json['asignaciones']);
       if (assign != null) {
@@ -74,6 +76,7 @@ class EmergencyModel extends Emergency {
         asignacionEstado = assign['estado'] as String?;
         tecnicoId = assign['tecnico_id'] as String?;
         asignacionFecha = _parseDate(assign['fecha_asignacion']);
+        asignacionLlegadaFecha = _parseDate(assign['fecha_llegada']);
         // Nested tecnico join
         if (assign['tecnicos'] != null) {
           final tech = _firstMap(assign['tecnicos']);
@@ -137,6 +140,7 @@ class EmergencyModel extends Emergency {
       asignacionEstado: asignacionEstado,
       asignacionId: asignacionId,
       asignacionFecha: asignacionFecha,
+      asignacionLlegadaFecha: asignacionLlegadaFecha,
       priceSnapshot: priceSnapshot,
     );
   }

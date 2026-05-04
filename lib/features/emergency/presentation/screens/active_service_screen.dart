@@ -10,7 +10,10 @@ import '../../../../core/constants/app_constants.dart';
 import '../../../../core/router/app_router.dart';
 import '../../../../shared/providers/auth_provider.dart';
 import '../../../../shared/widgets/app_button.dart';
+import '../../../../shared/widgets/app_drawer.dart';
 import '../../../../shared/widgets/user_avatar.dart';
+import '../../../chat/presentation/providers/chat_provider.dart';
+import '../../../chat/presentation/widgets/chat_notification_bell.dart';
 import '../../../map/presentation/widgets/map_widget.dart';
 import '../providers/emergency_provider.dart';
 import '../../domain/entities/emergency_entity.dart';
@@ -76,21 +79,60 @@ class _ActiveServiceBody extends ConsumerStatefulWidget {
 }
 
 class _ActiveServiceBodyState extends ConsumerState<_ActiveServiceBody> {
+  final _scaffoldKey = GlobalKey<ScaffoldState>();
   Timer? _attendingTimer;
   StreamSubscription<Position>? _positionSub;
+  ProviderSubscription<AsyncValue<int>>? _unreadChatSubscription;
+  DateTime? _arrivalStartedAt;
+  int _lastUnreadChatCount = 0;
   int _attendingSeconds = 0;
 
   @override
   void initState() {
     super.initState();
+    _unreadChatSubscription = ref.listenManual<AsyncValue<int>>(
+      unreadChatCountProvider,
+      _handleUnreadChatCount,
+      fireImmediately: true,
+    );
     WidgetsBinding.instance.addPostFrameCallback((_) {
       if (widget.emergency.asignacionEstado == AppConstants.assignAttending) {
         ref.read(_activeSubstateProvider.notifier).state =
             AppConstants.assignAttending;
+        _arrivalStartedAt =
+            widget.emergency.asignacionLlegadaFecha ?? DateTime.now();
         _startAttendingTimer();
       }
       _startLiveLocationUpdates();
     });
+  }
+
+  void _handleUnreadChatCount(
+    AsyncValue<int>? previous,
+    AsyncValue<int> next,
+  ) {
+    final count = next.valueOrNull ?? _lastUnreadChatCount;
+    final previousCount = previous?.valueOrNull ?? _lastUnreadChatCount;
+    final isInitialValue = previous == null && _lastUnreadChatCount == 0;
+    _lastUnreadChatCount = count;
+
+    if (isInitialValue || count <= previousCount || !mounted) return;
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: const Text('Tienes un nuevo mensaje'),
+        action: SnackBarAction(
+          label: 'Ver',
+          onPressed: _openChat,
+        ),
+      ),
+    );
+  }
+
+  void _openChat() {
+    context.push(
+      AppRoutes.technicianChat,
+      extra: widget.emergency.id,
+    );
   }
 
   @override
@@ -99,11 +141,20 @@ class _ActiveServiceBodyState extends ConsumerState<_ActiveServiceBody> {
     if (oldWidget.emergency.tecnicoId != widget.emergency.tecnicoId) {
       _startLiveLocationUpdates();
     }
+    if (oldWidget.emergency.asignacionLlegadaFecha !=
+        widget.emergency.asignacionLlegadaFecha) {
+      _arrivalStartedAt = widget.emergency.asignacionLlegadaFecha;
+      if (widget.emergency.asignacionEstado == AppConstants.assignAttending) {
+        _startAttendingTimer();
+      }
+    }
     if (oldWidget.emergency.asignacionEstado !=
             widget.emergency.asignacionEstado &&
         widget.emergency.asignacionEstado == AppConstants.assignAttending) {
       ref.read(_activeSubstateProvider.notifier).state =
           AppConstants.assignAttending;
+      _arrivalStartedAt =
+          widget.emergency.asignacionLlegadaFecha ?? DateTime.now();
       _startAttendingTimer();
     }
   }
@@ -165,7 +216,12 @@ class _ActiveServiceBodyState extends ConsumerState<_ActiveServiceBody> {
   }
 
   void _syncAttendingSeconds() {
-    final startedAt = widget.emergency.asignacionFecha ?? widget.emergency.fecha;
+    final startedAt =
+        widget.emergency.asignacionLlegadaFecha ?? _arrivalStartedAt;
+    if (startedAt == null) {
+      _attendingSeconds = 0;
+      return;
+    }
     final seconds = DateTime.now().difference(startedAt).inSeconds;
     _attendingSeconds = seconds < 0 ? 0 : seconds;
   }
@@ -178,12 +234,16 @@ class _ActiveServiceBodyState extends ConsumerState<_ActiveServiceBody> {
 
   Future<void> _onHeLlegado() async {
     final asignacionId = widget.emergency.asignacionId;
+    final arrivedAt = DateTime.now();
     if (asignacionId != null && asignacionId.isNotEmpty) {
       try {
         await ref
             .read(supabaseClientProvider)
             .from(AppConstants.tableAsignaciones)
-            .update({'estado': AppConstants.assignAttending})
+            .update({
+              'estado': AppConstants.assignAttending,
+              'fecha_llegada': arrivedAt.toUtc().toIso8601String(),
+            })
             .eq('id', asignacionId);
         await ref
             .read(supabaseClientProvider)
@@ -193,6 +253,7 @@ class _ActiveServiceBodyState extends ConsumerState<_ActiveServiceBody> {
       } catch (_) {}
     }
     if (!mounted) return;
+    _arrivalStartedAt = arrivedAt;
     ref.read(_activeSubstateProvider.notifier).state =
         AppConstants.assignAttending;
     _startAttendingTimer();
@@ -202,6 +263,7 @@ class _ActiveServiceBodyState extends ConsumerState<_ActiveServiceBody> {
   void dispose() {
     _attendingTimer?.cancel();
     _positionSub?.cancel();
+    _unreadChatSubscription?.close();
     super.dispose();
   }
 
@@ -209,12 +271,15 @@ class _ActiveServiceBodyState extends ConsumerState<_ActiveServiceBody> {
   Widget build(BuildContext context) {
     final substate = ref.watch(_activeSubstateProvider);
     final emergency = widget.emergency;
+    final user = ref.watch(authNotifierProvider).valueOrNull;
     final lat = emergency.lat ?? AppConstants.defaultLat;
     final lng = emergency.lng ?? AppConstants.defaultLng;
     final isEnRoute = substate == AppConstants.assignEnRoute;
 
     return Scaffold(
+      key: _scaffoldKey,
       backgroundColor: Colors.white,
+      drawer: const AppDrawer(),
       body: Column(
         children: [
           // ─── Mapa ────────────────────────────────────────────────────
@@ -238,17 +303,21 @@ class _ActiveServiceBodyState extends ConsumerState<_ActiveServiceBody> {
                       children: [
                         // Botón atrás
                         Material(
-                          color: Colors.white,
+                          color: Colors.white.withValues(alpha: 0.88),
                           shape: const CircleBorder(),
                           elevation: 2,
                           shadowColor: Colors.black12,
                           child: InkWell(
                             customBorder: const CircleBorder(),
-                            onTap: () => context.pop(),
+                            onTap: () =>
+                                _scaffoldKey.currentState?.openDrawer(),
                             child: const Padding(
                               padding: EdgeInsets.all(10),
-                              child: Icon(Icons.arrow_back_ios_new,
-                                  size: 18, color: AppColors.onSurface),
+                              child: Icon(
+                                Icons.menu_rounded,
+                                size: 22,
+                                color: AppColors.onSurface,
+                              ),
                             ),
                           ),
                         ),
@@ -264,7 +333,30 @@ class _ActiveServiceBodyState extends ConsumerState<_ActiveServiceBody> {
                               : Icons.build_rounded,
                         ),
                         const Spacer(),
-                        const SizedBox(width: 44),
+                        ChatNotificationBell(
+                          onTap: _openChat,
+                          iconColor: AppColors.secondary,
+                          backgroundColor: Colors.white.withValues(alpha: 0.88),
+                        ),
+                        const Gap(8),
+                        Material(
+                          color: Colors.white.withValues(alpha: 0.88),
+                          shape: const CircleBorder(),
+                          elevation: 2,
+                          shadowColor: Colors.black12,
+                          child: InkWell(
+                            customBorder: const CircleBorder(),
+                            onTap: () => context.push(AppRoutes.profile),
+                            child: Padding(
+                              padding: const EdgeInsets.all(3),
+                              child: UserAvatar(
+                                imageUrl: user?.avatarUrl,
+                                name: user?.name ?? 'T',
+                                radius: 17,
+                              ),
+                            ),
+                          ),
+                        ),
                       ],
                     ),
                   ),

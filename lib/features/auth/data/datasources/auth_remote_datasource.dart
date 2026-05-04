@@ -83,13 +83,15 @@ class AuthRemoteDataSourceImpl implements AuthRemoteDataSource {
     String? rejectionReason;
     double? lat;
     double? lng;
+    double rating = 0.0;
+    int totalServices = 0;
     bool isAvailable = false;
     bool isApproved = data['activo'] as bool? ?? true;
 
     final tecnico = await _client
         .from(AppConstants.tableTecnicos)
         .select(
-            'especialidad, disponible, estado_verificacion, motivo_rechazo, ubicacion_lat, ubicacion_lng')
+            'id, especialidad, disponible, estado_verificacion, motivo_rechazo, ubicacion_lat, ubicacion_lng, calificacion_promedio')
         .eq('usuario_id', userId)
         .maybeSingle();
     specialty = tecnico?['especialidad'] as String?;
@@ -98,6 +100,21 @@ class AuthRemoteDataSourceImpl implements AuthRemoteDataSource {
     rejectionReason = tecnico?['motivo_rechazo'] as String?;
     lat = (tecnico?['ubicacion_lat'] as num?)?.toDouble();
     lng = (tecnico?['ubicacion_lng'] as num?)?.toDouble();
+    rating = (tecnico?['calificacion_promedio'] as num?)?.toDouble() ?? 0.0;
+
+    final tecnicoId = tecnico?['id']?.toString();
+    if (tecnicoId != null && tecnicoId.isNotEmpty) {
+      try {
+        final finishedAssignments = await _client
+            .from(AppConstants.tableAsignaciones)
+            .select('id')
+            .eq('tecnico_id', tecnicoId)
+            .eq('estado', AppConstants.assignFinished);
+        totalServices = (finishedAssignments as List).length;
+      } catch (_) {
+        totalServices = 0;
+      }
+    }
 
     if (data['rol'] == AppConstants.roleTechnician) {
       // Un tecnico solo opera como tecnico cuando el administrador lo aprobo.
@@ -112,8 +129,8 @@ class AuthRemoteDataSourceImpl implements AuthRemoteDataSource {
       'phone': data['telefono'] ?? '',
       'role': data['rol'],
       'avatar_url': data['avatar_url'],
-      'rating': 0.0,
-      'total_services': 0,
+      'rating': rating,
+      'total_services': totalServices,
       'is_available': isAvailable,
       'is_approved': isApproved,
       'specialty': specialty,

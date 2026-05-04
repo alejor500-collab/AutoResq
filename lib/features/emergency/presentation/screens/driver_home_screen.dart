@@ -12,6 +12,8 @@ import '../../../../shared/providers/auth_provider.dart';
 import '../../../../shared/widgets/app_drawer.dart';
 import '../../../../shared/widgets/bottom_nav_bar.dart';
 import '../../../../shared/widgets/user_avatar.dart';
+import '../../../chat/presentation/providers/chat_provider.dart';
+import '../../../chat/presentation/widgets/chat_notification_bell.dart';
 import '../../../map/presentation/providers/map_provider.dart';
 import '../../../map/presentation/providers/nearby_services_provider.dart';
 import '../../../map/presentation/widgets/location_picker_sheet.dart';
@@ -29,16 +31,62 @@ class _DriverHomeScreenState extends ConsumerState<DriverHomeScreen> {
   final _scaffoldKey = GlobalKey<ScaffoldState>();
   final _mapController = MapController();
   final int _navIndex = 0;
+  ProviderSubscription<AsyncValue<int>>? _unreadChatSubscription;
+  int _lastUnreadChatCount = 0;
   bool _activeWarningShown = false;
   bool _pendingRatingWarningShown = false;
 
   @override
   void initState() {
     super.initState();
+    _unreadChatSubscription = ref.listenManual<AsyncValue<int>>(
+      unreadChatCountProvider,
+      _handleUnreadChatCount,
+      fireImmediately: true,
+    );
     WidgetsBinding.instance.addPostFrameCallback((_) {
       ref.read(mapNotifierProvider.notifier).getCurrentLocation();
       _restoreActiveEmergency();
     });
+  }
+
+  @override
+  void dispose() {
+    _unreadChatSubscription?.close();
+    super.dispose();
+  }
+
+  void _handleUnreadChatCount(
+    AsyncValue<int>? previous,
+    AsyncValue<int> next,
+  ) {
+    final count = next.valueOrNull ?? _lastUnreadChatCount;
+    final previousCount = previous?.valueOrNull ?? _lastUnreadChatCount;
+    final isInitialValue = previous == null && _lastUnreadChatCount == 0;
+    _lastUnreadChatCount = count;
+
+    if (isInitialValue || count <= previousCount || !mounted) return;
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: const Text('Tienes un nuevo mensaje'),
+        action: SnackBarAction(
+          label: 'Ver',
+          onPressed: _openLatestUnreadChat,
+        ),
+      ),
+    );
+  }
+
+  Future<void> _openLatestUnreadChat() async {
+    final active = await ref
+        .read(emergencyNotifierProvider.notifier)
+        .loadActiveDriverEmergency();
+    if (!mounted) return;
+    if (active?.asignacionId?.isNotEmpty == true) {
+      context.push(AppRoutes.driverChat, extra: active!.id);
+      return;
+    }
+    context.push(AppRoutes.emergencyHistory);
   }
 
   Future<void> _restoreActiveEmergency() async {
@@ -448,6 +496,11 @@ class _DriverHomeScreenState extends ConsumerState<DriverHomeScreen> {
                           ),
                         ),
                         const Spacer(),
+                        ChatNotificationBell(
+                          onTap: _openLatestUnreadChat,
+                          iconColor: AppColors.secondary,
+                        ),
+                        const SizedBox(width: 8),
                         Material(
                           color: Colors.transparent,
                           shape: const CircleBorder(),

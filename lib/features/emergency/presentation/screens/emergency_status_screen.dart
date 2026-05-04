@@ -10,6 +10,7 @@ import '../../../../core/constants/app_colors.dart';
 import '../../../../core/constants/app_constants.dart';
 import '../../../../core/router/app_router.dart';
 import '../../../../core/utils/helpers.dart';
+import '../../../chat/presentation/widgets/chat_notification_bell.dart';
 import '../../../../shared/widgets/bottom_nav_bar.dart';
 import '../providers/emergency_provider.dart';
 import '../../domain/entities/emergency_entity.dart';
@@ -261,6 +262,16 @@ class _StatusBodyState extends ConsumerState<_StatusBody> {
                         ),
                         const Spacer(),
                         // Profile avatar → /profile
+                        ChatNotificationBell(
+                          onTap: emergency.asignacionId?.isNotEmpty == true
+                              ? () => context.push(
+                                    AppRoutes.driverChat,
+                                    extra: emergency.id,
+                                  )
+                              : null,
+                          iconColor: AppColors.secondary,
+                        ),
+                        const SizedBox(width: 8),
                         Material(
                           color: Colors.transparent,
                           shape: const CircleBorder(),

@@ -16,6 +16,8 @@ import '../../../../shared/providers/role_provider.dart';
 import '../../../../shared/widgets/app_drawer.dart';
 import '../../../../shared/widgets/bottom_nav_bar.dart';
 import '../../../../shared/widgets/user_avatar.dart';
+import '../../../chat/presentation/providers/chat_provider.dart';
+import '../../../chat/presentation/widgets/chat_notification_bell.dart';
 import '../../../map/presentation/providers/map_provider.dart';
 import '../../../map/presentation/widgets/map_widget.dart';
 import 'incoming_request_sheet.dart';
@@ -37,8 +39,10 @@ class _TechnicianHomeScreenState extends ConsumerState<TechnicianHomeScreen> {
   final _mapController = MapController();
   ProviderSubscription<AsyncValue<List<Emergency>>>?
       _pendingEmergenciesSubscription;
+  ProviderSubscription<AsyncValue<int>>? _unreadChatSubscription;
   Timer? _bannerDismissTimer;
   int _navIndex = 0;
+  int _lastUnreadChatCount = 0;
   bool? _isAvailable;
   bool _activeWarningShown = false;
   bool _pendingEmergencyFeedSeeded = false;
@@ -64,6 +68,11 @@ class _TechnicianHomeScreenState extends ConsumerState<TechnicianHomeScreen> {
         );
       },
     );
+    _unreadChatSubscription = ref.listenManual<AsyncValue<int>>(
+      unreadChatCountProvider,
+      _handleUnreadChatCount,
+      fireImmediately: true,
+    );
     WidgetsBinding.instance.addPostFrameCallback((_) async {
       final user = ref.read(authNotifierProvider).value ??
           ref.read(authStateProvider).valueOrNull;
@@ -85,7 +94,41 @@ class _TechnicianHomeScreenState extends ConsumerState<TechnicianHomeScreen> {
   void dispose() {
     _bannerDismissTimer?.cancel();
     _pendingEmergenciesSubscription?.close();
+    _unreadChatSubscription?.close();
     super.dispose();
+  }
+
+  void _handleUnreadChatCount(
+    AsyncValue<int>? previous,
+    AsyncValue<int> next,
+  ) {
+    final count = next.valueOrNull ?? _lastUnreadChatCount;
+    final previousCount = previous?.valueOrNull ?? _lastUnreadChatCount;
+    final isInitialValue = previous == null && _lastUnreadChatCount == 0;
+    _lastUnreadChatCount = count;
+
+    if (isInitialValue || count <= previousCount || !mounted) return;
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: const Text('Tienes un nuevo mensaje'),
+        action: SnackBarAction(
+          label: 'Ver',
+          onPressed: _openLatestUnreadChat,
+        ),
+      ),
+    );
+  }
+
+  Future<void> _openLatestUnreadChat() async {
+    final active = await ref
+        .read(emergencyNotifierProvider.notifier)
+        .loadActiveTechnicianEmergency();
+    if (!mounted) return;
+    if (active?.asignacionId?.isNotEmpty == true) {
+      context.push(AppRoutes.technicianChat, extra: active!.id);
+      return;
+    }
+    setState(() => _navIndex = 3);
   }
 
   void _showActiveServiceDialog(
@@ -1025,6 +1068,11 @@ class _TechnicianHomeScreenState extends ConsumerState<TechnicianHomeScreen> {
                           ),
                         ),
                         const Spacer(),
+                        ChatNotificationBell(
+                          onTap: _openLatestUnreadChat,
+                          iconColor: AppColors.secondary,
+                        ),
+                        const Gap(8),
                         // Avatar
                         Material(
                           color: Colors.transparent,

@@ -74,6 +74,7 @@ class Emergency extends Equatable {
       asignacionEstado; // aceptada | en_ruta | atendiendo | finalizada | rechazada
   final String? asignacionId;
   final DateTime? asignacionFecha;
+  final DateTime? asignacionLlegadaFecha;
   final Map<String, dynamic>? priceSnapshot;
 
   const Emergency({
@@ -109,6 +110,7 @@ class Emergency extends Equatable {
     this.asignacionEstado,
     this.asignacionId,
     this.asignacionFecha,
+    this.asignacionLlegadaFecha,
     this.priceSnapshot,
   });
 
@@ -154,6 +156,7 @@ class Emergency extends Equatable {
     String? asignacionEstado,
     String? asignacionId,
     DateTime? asignacionFecha,
+    DateTime? asignacionLlegadaFecha,
     Map<String, dynamic>? priceSnapshot,
   }) {
     return Emergency(
@@ -191,6 +194,8 @@ class Emergency extends Equatable {
       asignacionEstado: asignacionEstado ?? this.asignacionEstado,
       asignacionId: asignacionId ?? this.asignacionId,
       asignacionFecha: asignacionFecha ?? this.asignacionFecha,
+      asignacionLlegadaFecha:
+          asignacionLlegadaFecha ?? this.asignacionLlegadaFecha,
       priceSnapshot: priceSnapshot ?? this.priceSnapshot,
     );
   }
@@ -229,6 +234,7 @@ class Emergency extends Equatable {
         asignacionEstado,
         asignacionId,
         asignacionFecha,
+        asignacionLlegadaFecha,
         priceSnapshot,
       ];
 }

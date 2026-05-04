@@ -12,6 +12,7 @@ abstract class ChatRemoteDataSource {
   });
   Future<List<MessageModel>> getMessages(String asignacionId);
   Stream<List<Map<String, dynamic>>> watchMessages(String asignacionId);
+  Future<int> getUnreadMessageCount(String userId);
   Future<void> markIncomingAsDelivered(String asignacionId, String userId);
   Future<void> markIncomingAsRead(String asignacionId, String userId);
 }
@@ -89,6 +90,20 @@ class ChatRemoteDataSourceImpl implements ChatRemoteDataSource {
         .stream(primaryKey: ['id'])
         .eq('asignacion_id', asignacionId)
         .order('fecha_envio', ascending: true);
+  }
+
+  @override
+  Future<int> getUnreadMessageCount(String userId) async {
+    try {
+      final data = await _client
+          .from(AppConstants.tableMensajes)
+          .select('id')
+          .neq('remitente_id', userId)
+          .isFilter('leido_at', null);
+      return (data as List).length;
+    } on PostgrestException catch (e) {
+      throw ServerException(message: e.message);
+    }
   }
 
   @override

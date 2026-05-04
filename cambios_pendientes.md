@@ -74,7 +74,9 @@ Correcciones antiguas, diagnósticos duplicados y prompts ya resueltos fueron co
 - [x] Se reemplazaron tiempos estimados hardcodeados por ETA basada en distancia/ruta.
 - [x] El mapa del conductor muestra ubicacion del tecnico y trazado cuando hay datos.
 - [x] Nombre, telefono, especialidad y rating del tecnico asignado se toman de Supabase y no de valores hardcodeados.
+- [x] El home tecnico ahora lee `tecnicos.calificacion_promedio` y cuenta asignaciones `finalizada` para mostrar calificacion/servicios reales.
 - [x] Se corrigio el boton de llamar usando `url_launcher` con esquema `tel:`.
+- [x] El contador de atencion del tecnico ahora inicia desde `fecha_llegada`, guardada al tocar "He llegado", no desde la aceptacion de la solicitud.
 
 ### Chat conductor-tecnico
 
@@ -89,6 +91,8 @@ Correcciones antiguas, diagnósticos duplicados y prompts ya resueltos fueron co
 - [x] Se corrigio doble visto prematuro.
 - [x] Se agrego soporte de avatar/foto de perfil por cadenas de mensajes.
 - [x] Se agrego migracion de estado de mensajes con `entregado_at`, `leido_at` y politicas RLS para participantes.
+- [x] Se agrego campana superior con contador de mensajes no leidos y aviso in-app cuando entra un mensaje nuevo.
+- [x] La pantalla de servicio activo del tecnico ahora tiene menu lateral, campana de chat con aviso de mensajes nuevos y foto de perfil en la cabecera.
 
 ### Ubicacion, permisos y perfil
 
@@ -149,6 +153,7 @@ Correcciones antiguas, diagnósticos duplicados y prompts ya resueltos fueron co
 - [x] Se corrigio recursion infinita en politicas RLS de `usuarios`.
 - [x] Se agregaron politicas para que participantes asignados puedan ver datos necesarios de conductor/tecnico.
 - [x] Se agregaron/ajustaron politicas para chat, snapshots, tarifas, extras y visibilidad de asignaciones.
+- [x] Se aplico migracion `202605040001_add_assignment_arrival_time.sql` para guardar `asignaciones.fecha_llegada`.
 - [x] Se repararon estados de migraciones aplicadas cuando fue necesario.
 - [x] Se desplego/ajusto la Edge Function `analyze-emergency`.
 - [x] Se configuro `OPENAI_MODEL` para la funcion IA.
