@@ -1,6 +1,7 @@
 import 'dart:ui';
 import 'package:flutter/material.dart';
 import '../../core/constants/app_colors.dart';
+import 'animated_pressable.dart';
 
 class AppBottomNavBar extends StatelessWidget {
   final int currentIndex;
@@ -159,9 +160,11 @@ class _NavItemWidget extends StatelessWidget {
       builder: (context, constraints) {
         final showLabel = isActive && constraints.maxWidth >= 104;
 
-        return GestureDetector(
+        return AnimatedPressable(
           onTap: onTap,
-          behavior: HitTestBehavior.opaque,
+          borderRadius: BorderRadius.circular(26),
+          pressedScale: 0.95,
+          hoverScale: 1.015,
           child: AnimatedScale(
             scale: isActive ? 1.02 : 0.98,
             duration: const Duration(milliseconds: 220),

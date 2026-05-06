@@ -12,6 +12,7 @@ type RejectionEmailBody = {
   email?: string;
   nombre?: string;
   motivo?: string;
+  kind?: 'technician_rejected' | 'account_disabled';
 };
 
 Deno.serve(async (req: Request) => {
@@ -41,6 +42,7 @@ Deno.serve(async (req: Request) => {
   const email = body.email?.trim();
   const nombre = body.nombre?.trim();
   const motivo = body.motivo?.trim();
+  const kind = body.kind ?? 'technician_rejected';
 
   if (!email) {
     return jsonResponse({ error: 'Missing required field: email' }, 400);
@@ -62,9 +64,9 @@ Deno.serve(async (req: Request) => {
     await client.send({
       from: mailFromAddress,
       to: email,
-      subject: 'AutoResQ - Solicitud de tecnico rechazada',
-      content: buildText(nombre, motivo),
-      html: buildHtml(nombre, motivo),
+      subject: buildSubject(kind),
+      content: buildText(nombre, motivo, kind),
+      html: buildHtml(nombre, motivo, kind),
     });
   } catch (error) {
     console.error('[send-rejection-email] SMTP error:', error);
@@ -88,9 +90,28 @@ function jsonResponse(payload: unknown, status: number): Response {
   });
 }
 
-function buildHtml(nombre?: string, motivo?: string): string {
-  const safeName = escapeHtml(nombre?.trim() || 'tecnico');
+function buildSubject(kind: RejectionEmailBody['kind']): string {
+  return kind === 'account_disabled'
+    ? 'AutoResQ - Cuenta desactivada'
+    : 'AutoResQ - Solicitud de tecnico rechazada';
+}
+
+function buildHtml(
+  nombre?: string,
+  motivo?: string,
+  kind: RejectionEmailBody['kind'] = 'technician_rejected',
+): string {
+  const safeName = escapeHtml(nombre?.trim() || 'usuario');
   const safeMotivo = motivo?.trim() ? escapeHtml(motivo.trim()) : '';
+  const title = kind === 'account_disabled'
+    ? 'Cuenta desactivada'
+    : 'Solicitud de tecnico rechazada';
+  const intro = kind === 'account_disabled'
+    ? 'Tu cuenta en <strong>AutoResQ</strong> ha sido <strong>desactivada</strong> por un administrador.'
+    : 'Lamentamos informarte que tu solicitud para ser tecnico en <strong>AutoResQ</strong> ha sido <strong>rechazada</strong>.';
+  const closing = kind === 'account_disabled'
+    ? 'Si consideras que se trata de un error, inicia sesion en AutoResQ y envia una solicitud de revision con tu justificacion y evidencia.'
+    : 'Si tienes dudas, puedes contactar al equipo de administracion.';
   const motivoSection = safeMotivo
     ? `<p><strong>Motivo:</strong></p>
        <blockquote style="border-left:4px solid #BB020F;padding:8px 16px;margin:16px 0;color:#444;">${safeMotivo}</blockquote>`
@@ -102,28 +123,40 @@ function buildHtml(nombre?: string, motivo?: string): string {
 <body style="font-family:sans-serif;max-width:560px;margin:auto;padding:24px;color:#1A1C1D;">
   <h2 style="color:#BB020F;">AutoResQ</h2>
   <p>Hola <strong>${safeName}</strong>,</p>
-  <p>Lamentamos informarte que tu solicitud para ser tecnico en <strong>AutoResQ</strong>
-     ha sido <strong>rechazada</strong>.</p>
+  <p><strong>${title}</strong></p>
+  <p>${intro}</p>
   ${motivoSection}
-  <p>Si tienes dudas, puedes contactar al equipo de administracion.</p>
+  <p>${closing}</p>
   <hr style="border:none;border-top:1px solid #eee;margin:24px 0;">
   <p style="font-size:12px;color:#888;">AutoResQ - Asistencia de confianza en Riobamba</p>
 </body>
 </html>`;
 }
 
-function buildText(nombre?: string, motivo?: string): string {
+function buildText(
+  nombre?: string,
+  motivo?: string,
+  kind: RejectionEmailBody['kind'] = 'technician_rejected',
+): string {
+  const isDisabled = kind === 'account_disabled';
   const lines = [
-    `Hola ${nombre?.trim() || 'tecnico'},`,
+    `Hola ${nombre?.trim() || 'usuario'},`,
     '',
-    'Lamentamos informarte que tu solicitud para ser tecnico en AutoResQ ha sido rechazada.',
+    isDisabled
+      ? 'Tu cuenta en AutoResQ ha sido desactivada por un administrador.'
+      : 'Lamentamos informarte que tu solicitud para ser tecnico en AutoResQ ha sido rechazada.',
   ];
 
   if (motivo?.trim()) {
     lines.push('', `Motivo: ${motivo.trim()}`);
   }
 
-  lines.push('', 'Si tienes dudas, puedes contactar al equipo de administracion.');
+  lines.push(
+    '',
+    isDisabled
+      ? 'Si consideras que se trata de un error, inicia sesion en AutoResQ y envia una solicitud de revision con tu justificacion y evidencia.'
+      : 'Si tienes dudas, puedes contactar al equipo de administracion.',
+  );
   return lines.join('\n');
 }
 

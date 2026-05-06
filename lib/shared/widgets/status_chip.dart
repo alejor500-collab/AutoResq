@@ -15,11 +15,13 @@ class StatusChip extends StatelessWidget {
   Widget build(BuildContext context) {
     final color = AppHelpers.statusColor(status);
     final label = AppHelpers.statusLabel(status);
-    return Container(
+    return AnimatedContainer(
+      duration: const Duration(milliseconds: 220),
+      curve: Curves.easeOutCubic,
       padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
       decoration: BoxDecoration(
         color: color.withValues(alpha: 0.12),
-        borderRadius: BorderRadius.circular(20),
+        borderRadius: BorderRadius.circular(999),
         border: Border.all(color: color.withValues(alpha: 0.3)),
       ),
       child: Text(

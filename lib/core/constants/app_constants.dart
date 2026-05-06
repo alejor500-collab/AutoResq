@@ -64,6 +64,8 @@ abstract class AppConstants {
   static const String tableEmergencyPriceSnapshots =
       'emergency_price_snapshots';
   static const String tableEmergencyExtraCharges = 'emergency_extra_charges';
+  static const String tableAccountReactivationRequests =
+      'account_reactivation_requests';
 
   // ─── Backwards compat aliases ──────────────────────────────────────────────
   static const String tableProfiles = tableUsuarios;

@@ -19,25 +19,38 @@ class UserAvatar extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final avatarKey = ValueKey('${imageUrl ?? 'initials'}-$name-$radius');
     if (imageUrl != null && imageUrl!.isNotEmpty) {
-      return CircleAvatar(
-        radius: radius,
-        backgroundImage: CachedNetworkImageProvider(imageUrl!),
-        backgroundColor: AppColors.surfaceVariant,
+      return AnimatedSwitcher(
+        duration: const Duration(milliseconds: 240),
+        switchInCurve: Curves.easeOutCubic,
+        switchOutCurve: Curves.easeInCubic,
+        child: CircleAvatar(
+          key: avatarKey,
+          radius: radius,
+          backgroundImage: CachedNetworkImageProvider(imageUrl!),
+          backgroundColor: AppColors.surfaceVariant,
+        ),
       );
     }
 
-    return CircleAvatar(
-      radius: radius,
-      backgroundColor: backgroundColor ?? AppColors.primary.withValues(alpha: 0.1),
-      child: Text(
-        AppHelpers.getInitials(name),
-        style: TextStyle(
-          fontSize: radius * 0.65,
-          fontWeight: FontWeight.w700,
-          color: backgroundColor != null
-              ? AppColors.textOnPrimary
-              : AppColors.primary,
+    return AnimatedSwitcher(
+      duration: const Duration(milliseconds: 240),
+      switchInCurve: Curves.easeOutCubic,
+      switchOutCurve: Curves.easeInCubic,
+      child: CircleAvatar(
+        key: avatarKey,
+        radius: radius,
+        backgroundColor:
+            backgroundColor ?? AppColors.primary.withValues(alpha: 0.1),
+        child: Text(
+          AppHelpers.getInitials(name),
+          style: TextStyle(
+            fontSize: radius * 0.65,
+            fontWeight: FontWeight.w700,
+            color:
+                backgroundColor != null ? AppColors.textOnPrimary : AppColors.primary,
+          ),
         ),
       ),
     );

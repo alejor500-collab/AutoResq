@@ -75,6 +75,10 @@ class _SplashScreenState extends ConsumerState<SplashScreen>
       context.go(AppRoutes.welcome);
       return;
     }
+    if (!user.isActive) {
+      context.go(AppRoutes.accountDisabled);
+      return;
+    }
     switch (user.role) {
       case AppConstants.roleDriver:
         context.go(AppRoutes.driverHome);
@@ -100,6 +104,7 @@ class _SplashScreenState extends ConsumerState<SplashScreen>
     return Scaffold(
       backgroundColor: AppColors.surface,
       body: Stack(
+        fit: StackFit.expand,
         children: [
           // Background blurs
           Positioned(

@@ -31,14 +31,22 @@ class RatingNotifier extends StateNotifier<AsyncValue<void>> {
         if (comentario != null) 'comentario': comentario,
       });
 
-      // The trigger `actualizar_calificacion_promedio` handles
-      // updating the technician's average rating automatically.
+      await _recalculateStats(calificadoId);
+      await _recalculateStats(user.id);
+      final freshUser =
+          await _ref.read(authNotifierProvider.notifier).reloadCurrentUser();
+      _ref.read(currentUserProvider.notifier).state = freshUser;
 
       state = const AsyncValue.data(null);
       return true;
     } on PostgrestException catch (e, s) {
       if (e.code == '23505' ||
           e.message.toLowerCase().contains('duplicate key')) {
+        await _recalculateStats(calificadoId);
+        await _recalculateStats(user.id);
+        final freshUser =
+            await _ref.read(authNotifierProvider.notifier).reloadCurrentUser();
+        _ref.read(currentUserProvider.notifier).state = freshUser;
         state = const AsyncValue.data(null);
         return true;
       }
@@ -47,6 +55,18 @@ class RatingNotifier extends StateNotifier<AsyncValue<void>> {
     } catch (e, s) {
       state = AsyncValue.error(e, s);
       return false;
+    }
+  }
+
+  Future<void> _recalculateStats(String userId) async {
+    if (userId.isEmpty) return;
+    try {
+      await _client.rpc(
+        'recalculate_user_rating_stats',
+        params: {'p_user_id': userId},
+      );
+    } catch (_) {
+      // The SQL migration adds this RPC. Existing triggers still handle inserts.
     }
   }
 }

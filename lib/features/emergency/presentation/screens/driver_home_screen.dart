@@ -9,8 +9,10 @@ import '../../../../core/constants/app_colors.dart';
 import '../../../../core/constants/app_constants.dart';
 import '../../../../core/router/app_router.dart';
 import '../../../../shared/providers/auth_provider.dart';
+import '../../../../shared/widgets/animated_pressable.dart';
 import '../../../../shared/widgets/app_drawer.dart';
 import '../../../../shared/widgets/bottom_nav_bar.dart';
+import '../../../../shared/widgets/in_app_message_notice.dart';
 import '../../../../shared/widgets/user_avatar.dart';
 import '../../../chat/presentation/providers/chat_provider.dart';
 import '../../../chat/presentation/widgets/chat_notification_bell.dart';
@@ -66,14 +68,11 @@ class _DriverHomeScreenState extends ConsumerState<DriverHomeScreen> {
     _lastUnreadChatCount = count;
 
     if (isInitialValue || count <= previousCount || !mounted) return;
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(
-        content: const Text('Tienes un nuevo mensaje'),
-        action: SnackBarAction(
-          label: 'Ver',
-          onPressed: _openLatestUnreadChat,
-        ),
-      ),
+    showInAppMessageNotice(
+      context,
+      message: 'Nuevo mensaje',
+      detail: 'Toca para abrir el chat',
+      onTap: _openLatestUnreadChat,
     );
   }
 
@@ -86,7 +85,7 @@ class _DriverHomeScreenState extends ConsumerState<DriverHomeScreen> {
       context.push(AppRoutes.driverChat, extra: active!.id);
       return;
     }
-    context.push(AppRoutes.emergencyHistory);
+    context.push(AppRoutes.driverChatHistory);
   }
 
   Future<void> _restoreActiveEmergency() async {
@@ -195,7 +194,7 @@ class _DriverHomeScreenState extends ConsumerState<DriverHomeScreen> {
       case 1:
         context.push(AppRoutes.emergencyHistory);
       case 2:
-        context.push(AppRoutes.emergencyHistory);
+        context.push(AppRoutes.driverChatHistory);
       case 3:
         context.push(AppRoutes.profile);
     }
@@ -387,8 +386,11 @@ class _DriverHomeScreenState extends ConsumerState<DriverHomeScreen> {
             left: 0,
             right: 0,
             child: Center(
-              child: GestureDetector(
+              child: AnimatedPressable(
                 onTap: _openCreateEmergency,
+                borderRadius: BorderRadius.circular(9999),
+                pressedScale: 0.94,
+                hoverScale: 1.02,
                 child: Container(
                   padding:
                       const EdgeInsets.symmetric(horizontal: 32, vertical: 16),
@@ -900,8 +902,10 @@ class _MapControlButton extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return GestureDetector(
+    return AnimatedPressable(
       onTap: onTap,
+      borderRadius: BorderRadius.circular(9999),
+      pressedScale: 0.92,
       child: Container(
         width: 46,
         height: 46,
@@ -939,8 +943,11 @@ class _CategoryChip extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return GestureDetector(
+    return AnimatedPressable(
       onTap: onTap,
+      borderRadius: BorderRadius.circular(22),
+      pressedScale: 0.94,
+      hoverScale: 1.025,
       child: AnimatedContainer(
         duration: const Duration(milliseconds: 200),
         padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 6),
@@ -996,8 +1003,11 @@ class _NearbyServiceCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return GestureDetector(
+    return AnimatedPressable(
       onTap: onTap,
+      borderRadius: BorderRadius.circular(22),
+      pressedScale: 0.96,
+      hoverScale: 1.025,
       child: Container(
         width: 148,
         padding: const EdgeInsets.all(14),

@@ -7,12 +7,14 @@ class ChatNotificationBell extends ConsumerWidget {
   final VoidCallback? onTap;
   final Color iconColor;
   final Color backgroundColor;
+  final String tooltip;
 
   const ChatNotificationBell({
     super.key,
     this.onTap,
     this.iconColor = AppColors.secondary,
     this.backgroundColor = Colors.transparent,
+    this.tooltip = 'Mensajes',
   });
 
   @override
@@ -20,32 +22,40 @@ class ChatNotificationBell extends ConsumerWidget {
     final unread = ref.watch(unreadChatCountProvider).valueOrNull ?? 0;
     final badgeText = unread > 99 ? '99+' : unread.toString();
 
-    return Material(
-      color: backgroundColor,
-      shape: const CircleBorder(),
-      child: InkWell(
-        customBorder: const CircleBorder(),
-        onTap: onTap,
-        child: SizedBox(
-          width: 40,
-          height: 40,
-          child: Stack(
-            clipBehavior: Clip.none,
-            children: [
-              Center(
-                child: Icon(
+    return SizedBox(
+      width: 40,
+      height: 40,
+      child: Stack(
+        clipBehavior: Clip.none,
+        children: [
+          Positioned.fill(
+            child: Material(
+              color: backgroundColor,
+              shape: const CircleBorder(),
+              child: IconButton(
+                tooltip: tooltip,
+                onPressed: onTap,
+                splashRadius: 22,
+                icon: Icon(
                   unread > 0
                       ? Icons.notifications_active_rounded
                       : Icons.notifications_none_rounded,
-                  color: unread > 0 ? AppColors.primary : iconColor,
+                  color: onTap == null
+                      ? iconColor.withValues(alpha: 0.42)
+                      : unread > 0
+                          ? AppColors.primary
+                          : iconColor,
                   size: 23,
                 ),
               ),
-              if (unread > 0)
-                Positioned(
-                  right: 3,
-                  top: 3,
-                  child: Container(
+            ),
+          ),
+          if (unread > 0)
+            Positioned(
+              right: 3,
+              top: 3,
+              child: IgnorePointer(
+                child: Container(
                     constraints: const BoxConstraints(
                       minWidth: 17,
                       minHeight: 17,
@@ -68,9 +78,8 @@ class ChatNotificationBell extends ConsumerWidget {
                     ),
                   ),
                 ),
-            ],
-          ),
-        ),
+            ),
+        ],
       ),
     );
   }

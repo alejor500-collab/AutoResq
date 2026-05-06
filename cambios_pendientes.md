@@ -93,6 +93,7 @@ Correcciones antiguas, diagnósticos duplicados y prompts ya resueltos fueron co
 - [x] Se agrego migracion de estado de mensajes con `entregado_at`, `leido_at` y politicas RLS para participantes.
 - [x] Se agrego campana superior con contador de mensajes no leidos y aviso in-app cuando entra un mensaje nuevo.
 - [x] La pantalla de servicio activo del tecnico ahora tiene menu lateral, campana de chat con aviso de mensajes nuevos y foto de perfil en la cabecera.
+- [x] Los avisos de nuevo mensaje dejaron de usar `SnackBar`; ahora son toast superior compacto, temporal y no bloquean campos ni lectura.
 
 ### Ubicacion, permisos y perfil
 
@@ -146,6 +147,8 @@ Correcciones antiguas, diagnósticos duplicados y prompts ya resueltos fueron co
 - [x] La pestaña de chat del tecnico ahora muestra historial de chats de servicios asignados, no solo el chat activo.
 - [x] Chats de servicios finalizados/cancelados/rechazados quedan disponibles en modo lectura.
 - [x] El envio de mensajes se bloquea cuando el servicio ya esta cerrado, tanto para tecnico como para conductor.
+- [x] El conductor ahora tiene pantalla `Historial de chats`; el tab `CHAT` ya no abre historial de emergencias ni solo el chat activo.
+- [x] Desde perfil, el tab `CHAT` del conductor abre historial de chats y el del tecnico abre la pestaña de chats del home tecnico.
 
 ### Supabase, RLS y migraciones aplicadas
 

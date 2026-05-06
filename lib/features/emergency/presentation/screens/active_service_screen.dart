@@ -11,6 +11,7 @@ import '../../../../core/router/app_router.dart';
 import '../../../../shared/providers/auth_provider.dart';
 import '../../../../shared/widgets/app_button.dart';
 import '../../../../shared/widgets/app_drawer.dart';
+import '../../../../shared/widgets/in_app_message_notice.dart';
 import '../../../../shared/widgets/user_avatar.dart';
 import '../../../chat/presentation/providers/chat_provider.dart';
 import '../../../chat/presentation/widgets/chat_notification_bell.dart';
@@ -117,14 +118,11 @@ class _ActiveServiceBodyState extends ConsumerState<_ActiveServiceBody> {
     _lastUnreadChatCount = count;
 
     if (isInitialValue || count <= previousCount || !mounted) return;
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(
-        content: const Text('Tienes un nuevo mensaje'),
-        action: SnackBarAction(
-          label: 'Ver',
-          onPressed: _openChat,
-        ),
-      ),
+    showInAppMessageNotice(
+      context,
+      message: 'Nuevo mensaje',
+      detail: 'Toca para abrir el chat',
+      onTap: _openChat,
     );
   }
 

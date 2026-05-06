@@ -33,11 +33,17 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
   void _navigateByRole() {
     final user = ref.read(authNotifierProvider).value;
     if (user == null) return;
+    if (!user.isActive) {
+      context.go(AppRoutes.accountDisabled);
+      return;
+    }
     switch (user.role) {
       case AppConstants.roleDriver:
         context.go(AppRoutes.driverHome);
       case AppConstants.roleTechnician:
-        context.go(AppRoutes.technicianHome);
+        context.go(
+          user.isApproved ? AppRoutes.technicianHome : AppRoutes.driverHome,
+        );
       case AppConstants.roleAdmin:
         context.go(AppRoutes.adminDashboard);
     }

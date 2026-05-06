@@ -13,7 +13,6 @@ import '../../../../shared/providers/role_provider.dart';
 import '../../../../shared/providers/tecnico_status_provider.dart';
 import '../../../../shared/widgets/bottom_nav_bar.dart';
 import '../../../../shared/widgets/technician_request_sheet.dart';
-import '../../../emergency/presentation/providers/emergency_provider.dart';
 import '../providers/vehicle_provider.dart';
 
 class ProfileServiceStats {
@@ -113,7 +112,7 @@ final profileServiceStatsProvider = FutureProvider.autoDispose
   }
 
   return ProfileServiceStats(
-    total: attended + completed,
+    total: pending + attended + completed,
     attended: attended,
     completed: completed,
     pending: pending,
@@ -237,6 +236,10 @@ class ProfileScreen extends ConsumerWidget {
                     user: user,
                     isTechnicianMode: isTechnicianMode,
                   ),
+                  if (!isTechnicianMode) ...[
+                    const Gap(12),
+                    const _DriverRequestHistoryEntry(),
+                  ],
                   const Gap(32),
 
                   // Vehicle Section
@@ -304,7 +307,7 @@ class ProfileScreen extends ConsumerWidget {
                       context.go(AppRoutes.technicianHome, extra: 2);
                       break;
                     case 3:
-                      _openTechnicianChat(context, ref);
+                      context.go(AppRoutes.technicianHome, extra: 3);
                       break;
                     case 4:
                       break;
@@ -318,7 +321,7 @@ class ProfileScreen extends ConsumerWidget {
                       context.go(AppRoutes.emergencyHistory);
                       break;
                     case 2:
-                      context.go(AppRoutes.emergencyHistory);
+                      context.go(AppRoutes.driverChatHistory);
                       break;
                     case 3:
                       break;
@@ -330,22 +333,6 @@ class ProfileScreen extends ConsumerWidget {
         ],
       ),
     );
-  }
-
-  void _openTechnicianChat(BuildContext context, WidgetRef ref) {
-    final activeEmergency = ref.read(emergencyNotifierProvider).activeEmergency;
-    final emergencyId = activeEmergency?.id;
-
-    if (emergencyId == null || emergencyId.isEmpty) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text('No tienes un chat activo en este momento'),
-        ),
-      );
-      return;
-    }
-
-    context.push(AppRoutes.technicianChat, extra: emergencyId);
   }
 
   Future<bool?> _confirmLogout(BuildContext context) {
@@ -504,50 +491,88 @@ class _StatsGrid extends ConsumerWidget {
     );
 
     return statsAsync.when(
-      data: (stats) => _StatsCards(stats: stats),
-      loading: () => const _StatsCards(stats: ProfileServiceStats.empty),
-      error: (_, __) => const _StatsCards(stats: ProfileServiceStats.empty),
+      data: (stats) => _StatsCards(
+        stats: stats,
+        isTechnicianMode: isTechnicianMode,
+      ),
+      loading: () => _StatsCards(
+        stats: ProfileServiceStats.empty,
+        isTechnicianMode: isTechnicianMode,
+      ),
+      error: (_, __) => _StatsCards(
+        stats: ProfileServiceStats.empty,
+        isTechnicianMode: isTechnicianMode,
+      ),
     );
   }
 }
 
 class _StatsCards extends StatelessWidget {
   final ProfileServiceStats stats;
+  final bool isTechnicianMode;
 
-  const _StatsCards({required this.stats});
+  const _StatsCards({
+    required this.stats,
+    required this.isTechnicianMode,
+  });
 
   @override
   Widget build(BuildContext context) {
-    final items = [
-      (
-        label: 'Total',
-        value: stats.total,
-        color: AppColors.surfaceContainerLow,
-        textColor: AppColors.onSurface,
-      ),
-      (
-        label: 'Atendidas',
-        value: stats.attended,
-        color: AppColors.success.withValues(alpha: 0.10),
-        textColor: AppColors.success,
-      ),
-      (
-        label: 'Completas',
-        value: stats.completed,
-        color: AppColors.tertiaryFixed,
-        textColor: AppColors.onSurface,
-      ),
-      (
-        label: 'Pendientes',
-        value: stats.pending,
-        color: AppColors.primaryFixed,
-        textColor: AppColors.onSurface,
-      ),
-    ];
+    final items = isTechnicianMode
+        ? [
+            (
+              label: 'Total',
+              value: stats.total,
+              color: AppColors.surfaceContainerLow,
+              textColor: AppColors.onSurface,
+            ),
+            (
+              label: 'Atendidas',
+              value: stats.attended,
+              color: AppColors.success.withValues(alpha: 0.10),
+              textColor: AppColors.success,
+            ),
+            (
+              label: 'Completas',
+              value: stats.completed,
+              color: AppColors.tertiaryFixed,
+              textColor: AppColors.onSurface,
+            ),
+            (
+              label: 'Pendientes',
+              value: stats.pending,
+              color: AppColors.primaryFixed,
+              textColor: AppColors.onSurface,
+            ),
+          ]
+        : [
+            (
+              label: 'Pendientes',
+              value: stats.pending,
+              color: AppColors.primaryFixed,
+              textColor: AppColors.onSurface,
+            ),
+            (
+              label: 'Completas',
+              value: stats.completed,
+              color: AppColors.tertiaryFixed,
+              textColor: AppColors.onSurface,
+            ),
+            (
+              label: 'Total',
+              value: stats.total,
+              color: AppColors.surfaceContainerLow,
+              textColor: AppColors.onSurface,
+            ),
+          ];
 
     return LayoutBuilder(
       builder: (context, constraints) {
-        final columns = constraints.maxWidth < 680 ? 2 : 4;
+        final columns = constraints.maxWidth < 680
+            ? 2
+            : isTechnicianMode
+                ? 4
+                : 3;
         return GridView.builder(
           itemCount: items.length,
           shrinkWrap: true,
@@ -623,6 +648,60 @@ class _StatCard extends StatelessWidget {
 }
 
 // ─── Vehicle Section ──────────────────────────────────────────────────────────
+
+class _DriverRequestHistoryEntry extends StatelessWidget {
+  const _DriverRequestHistoryEntry();
+
+  @override
+  Widget build(BuildContext context) {
+    return GestureDetector(
+      onTap: () => context.push(AppRoutes.emergencyHistory),
+      child: Container(
+        width: double.infinity,
+        padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 16),
+        decoration: BoxDecoration(
+          color: AppColors.surfaceContainerLowest,
+          borderRadius: BorderRadius.circular(18),
+          border: Border.all(
+            color: AppColors.outlineVariant.withValues(alpha: 0.35),
+          ),
+          boxShadow: [
+            BoxShadow(
+              color: AppColors.onSurface.withValues(alpha: 0.04),
+              blurRadius: 24,
+              offset: const Offset(0, 12),
+            ),
+          ],
+        ),
+        child: const Row(
+          children: [
+            Icon(
+              Icons.receipt_long_outlined,
+              color: AppColors.primary,
+              size: 22,
+            ),
+            Gap(12),
+            Expanded(
+              child: Text(
+                'Historial de solicitudes',
+                style: TextStyle(
+                  fontSize: 15,
+                  fontWeight: FontWeight.w800,
+                  color: AppColors.onSurface,
+                ),
+              ),
+            ),
+            Icon(
+              Icons.chevron_right_rounded,
+              color: AppColors.secondary,
+              size: 22,
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
 
 class _VehicleSection extends ConsumerWidget {
   const _VehicleSection();

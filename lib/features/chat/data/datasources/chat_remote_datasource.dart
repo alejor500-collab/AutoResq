@@ -51,6 +51,13 @@ class ChatRemoteDataSourceImpl implements ChatRemoteDataSource {
     required String contenido,
   }) async {
     try {
+      final canSend = await _canSendMessage(asignacionId);
+      if (!canSend) {
+        throw const ServerException(
+          message:
+              'El servicio ya esta cerrado. Solo puedes revisar la conversacion.',
+        );
+      }
       final data = await _client
           .from(AppConstants.tableMensajes)
           .insert({
@@ -65,6 +72,32 @@ class ChatRemoteDataSourceImpl implements ChatRemoteDataSource {
     } on PostgrestException catch (e) {
       throw ServerException(message: e.message);
     }
+  }
+
+  Future<bool> _canSendMessage(String asignacionId) async {
+    final assignment = await _client
+        .from(AppConstants.tableAsignaciones)
+        .select('estado, emergencia_id')
+        .eq('id', asignacionId)
+        .maybeSingle();
+    if (assignment == null) return false;
+
+    final assignmentStatus = assignment['estado']?.toString();
+    if (assignmentStatus == AppConstants.assignFinished ||
+        assignmentStatus == AppConstants.assignRejected) {
+      return false;
+    }
+
+    final emergencyId = assignment['emergencia_id']?.toString();
+    if (emergencyId == null || emergencyId.isEmpty) return false;
+    final emergency = await _client
+        .from(AppConstants.tableEmergencias)
+        .select('estado')
+        .eq('id', emergencyId)
+        .maybeSingle();
+    final emergencyStatus = emergency?['estado']?.toString();
+    return emergencyStatus != AppConstants.statusCompleted &&
+        emergencyStatus != AppConstants.statusCancelled;
   }
 
   @override

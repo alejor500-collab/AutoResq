@@ -13,8 +13,11 @@ import '../../../../core/router/app_router.dart';
 import '../../../../core/utils/helpers.dart';
 import '../../../../shared/providers/auth_provider.dart';
 import '../../../../shared/providers/role_provider.dart';
+import '../../../../shared/providers/technician_stats_provider.dart';
+import '../../../../shared/widgets/animated_pressable.dart';
 import '../../../../shared/widgets/app_drawer.dart';
 import '../../../../shared/widgets/bottom_nav_bar.dart';
+import '../../../../shared/widgets/in_app_message_notice.dart';
 import '../../../../shared/widgets/user_avatar.dart';
 import '../../../chat/presentation/providers/chat_provider.dart';
 import '../../../chat/presentation/widgets/chat_notification_bell.dart';
@@ -108,14 +111,11 @@ class _TechnicianHomeScreenState extends ConsumerState<TechnicianHomeScreen> {
     _lastUnreadChatCount = count;
 
     if (isInitialValue || count <= previousCount || !mounted) return;
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(
-        content: const Text('Tienes un nuevo mensaje'),
-        action: SnackBarAction(
-          label: 'Ver',
-          onPressed: _openLatestUnreadChat,
-        ),
-      ),
+    showInAppMessageNotice(
+      context,
+      message: 'Nuevo mensaje',
+      detail: 'Toca para abrir el chat',
+      onTap: _openLatestUnreadChat,
     );
   }
 
@@ -921,7 +921,12 @@ class _TechnicianHomeScreenState extends ConsumerState<TechnicianHomeScreen> {
     final pendingEmergenciesAsync =
         ref.watch(technicianPendingEmergenciesProvider);
     final user = ref.watch(authNotifierProvider).value;
-    final isAvailable = _isAvailable ?? user?.isAvailable ?? false;
+    final technicianStats = user == null
+        ? const AsyncValue<TechnicianStats>.data(TechnicianStats.empty())
+        : ref.watch(technicianStatsProvider(user.id));
+    final stats = technicianStats.valueOrNull;
+    final isAvailable =
+        _isAvailable ?? stats?.isAvailable ?? user?.isAvailable ?? false;
 
     // ── Pending approval gate ─────────────────────────────────────────────
     if (user?.isApproved != true) {
@@ -970,15 +975,17 @@ class _TechnicianHomeScreenState extends ConsumerState<TechnicianHomeScreen> {
           Column(
             children: [
               SizedBox(height: 64 + MediaQuery.of(context).padding.top),
-              _buildProfileCard(
-                technicianName: user?.name ?? 'Tecnico',
-                specialty: user?.specialty ?? 'Sin especialidad',
-                isApproved: user?.isApproved ?? false,
-                isAvailable: isAvailable,
-                rating: user?.rating ?? 0.0,
-                totalServices: user?.totalServices ?? 0,
-                pendingCount: pendingEmergencies.length,
-              ),
+              if (_navIndex == 2)
+                _buildProfileCard(
+                  technicianName: user?.name ?? 'Tecnico',
+                  specialty: user?.specialty ?? 'Sin especialidad',
+                  isApproved: user?.isApproved ?? false,
+                  isAvailable: isAvailable,
+                  rating: stats?.rating ?? user?.rating ?? 0.0,
+                  totalServices:
+                      stats?.totalServices ?? user?.totalServices ?? 0,
+                  pendingCount: pendingEmergencies.length,
+                ),
               Expanded(
                 child: switch (_navIndex) {
                   0 => _buildTechnicianHistoryView(technicianHistory),
@@ -1360,17 +1367,26 @@ class _TechnicianChatHistoryCard extends StatelessWidget {
         emergency.clasificacionIa ??
         'Servicio';
 
-    return Material(
-      color: AppColors.surfaceContainerLowest,
+    return AnimatedPressable(
+      onTap: onTap,
       borderRadius: BorderRadius.circular(18),
-      child: InkWell(
-        onTap: onTap,
+      pressedScale: 0.975,
+      hoverScale: 1.008,
+      child: Material(
+        color: AppColors.surfaceContainerLowest,
         borderRadius: BorderRadius.circular(18),
         child: Container(
           padding: const EdgeInsets.all(16),
           decoration: BoxDecoration(
             borderRadius: BorderRadius.circular(18),
             border: Border.all(color: AppColors.outlineVariant),
+            boxShadow: [
+              BoxShadow(
+                color: AppColors.onSurface.withValues(alpha: 0.05),
+                blurRadius: 18,
+                offset: const Offset(0, 8),
+              ),
+            ],
           ),
           child: Row(
             children: [
@@ -1703,16 +1719,18 @@ class _EmergencyRequestCard extends StatelessWidget {
         ? emergency.aiTechnicianSummary!.trim()
         : emergency.descripcion.trim();
 
-    return Material(
-      color: AppColors.surfaceContainerLowest,
-      borderRadius: BorderRadius.circular(18),
-      child: InkWell(
-        onTap: onTap,
-        borderRadius: BorderRadius.circular(18),
+    return AnimatedPressable(
+      onTap: onTap,
+      borderRadius: BorderRadius.circular(22),
+      pressedScale: 0.985,
+      hoverScale: 1.006,
+      child: Material(
+        color: AppColors.surfaceContainerLowest,
+        borderRadius: BorderRadius.circular(22),
         child: Container(
           padding: const EdgeInsets.all(16),
           decoration: BoxDecoration(
-            borderRadius: BorderRadius.circular(18),
+            borderRadius: BorderRadius.circular(22),
             border: Border.all(color: AppColors.outlineVariant),
             boxShadow: [
               BoxShadow(
@@ -1966,14 +1984,16 @@ class _MapActionButton extends StatelessWidget {
   Widget build(BuildContext context) {
     return Tooltip(
       message: tooltip,
-      child: Material(
-        color: AppColors.primary,
+      child: AnimatedPressable(
+        onTap: showProgress ? null : onTap,
         borderRadius: BorderRadius.circular(16),
-        elevation: 8,
-        shadowColor: AppColors.primary.withValues(alpha: 0.30),
-        child: InkWell(
-          onTap: showProgress ? null : onTap,
+        pressedScale: 0.92,
+        hoverScale: 1.02,
+        child: Material(
+          color: AppColors.primary,
           borderRadius: BorderRadius.circular(16),
+          elevation: 8,
+          shadowColor: AppColors.primary.withValues(alpha: 0.30),
           child: SizedBox(
             width: 52,
             height: 52,

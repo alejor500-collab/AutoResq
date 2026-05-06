@@ -389,6 +389,14 @@ final technicianEmergencyHistoryProvider =
   return ref.read(emergencyDataSourceProvider).getTechnicianEmergencies(user.id);
 });
 
+final driverEmergencyHistoryProvider =
+    FutureProvider<List<Emergency>>((ref) async {
+  final user = ref.watch(authNotifierProvider).value ??
+      ref.watch(authStateProvider).valueOrNull;
+  if (user == null) return const [];
+  return ref.read(emergencyDataSourceProvider).getDriverEmergencies(user.id);
+});
+
 class TechnicianLiveLocation {
   final double lat;
   final double lng;

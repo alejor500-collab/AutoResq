@@ -10,6 +10,7 @@ import '../../features/auth/presentation/screens/role_selection_screen.dart';
 import '../../features/auth/presentation/screens/forgot_password_screen.dart';
 import '../../features/auth/presentation/screens/reset_password_screen.dart';
 import '../../features/auth/presentation/screens/pending_approval_screen.dart';
+import '../../features/auth/presentation/screens/account_disabled_screen.dart';
 import '../../features/emergency/presentation/screens/driver_home_screen.dart';
 import '../../features/emergency/presentation/screens/create_emergency_screen.dart';
 import '../../features/emergency/presentation/screens/emergency_status_screen.dart';
@@ -18,6 +19,7 @@ import '../../features/emergency/presentation/screens/active_service_screen.dart
 import '../../features/emergency/presentation/screens/service_closure_screen.dart';
 import '../../features/emergency/presentation/screens/service_completed_screen.dart';
 import '../../features/emergency/presentation/screens/emergency_history_screen.dart';
+import '../../features/chat/presentation/screens/driver_chat_history_screen.dart';
 import '../../features/chat/presentation/screens/driver_chat_screen.dart';
 import '../../features/chat/presentation/screens/technician_chat_screen.dart';
 import '../../features/ratings/presentation/screens/rate_service_screen.dart';
@@ -39,11 +41,13 @@ abstract class AppRoutes {
   static const String forgotPassword = '/forgot-password';
   static const String resetPassword = '/reset-password';
   static const String roleSelect = '/role-select';
+  static const String accountDisabled = '/account-disabled';
 
   // Driver
   static const String driverHome = '/driver/home';
   static const String createEmergency = '/driver/emergency/create';
   static const String emergencyStatus = '/driver/emergency/status';
+  static const String driverChatHistory = '/driver/chats';
   static const String driverChat = '/driver/chat';
   static const String rateService = '/driver/rate-service';
 
@@ -71,16 +75,20 @@ abstract class AppRoutes {
 
 final appRouterProvider = Provider<GoRouter>((ref) {
   final authState = ref.watch(authStateProvider);
+  final authNotifierState = ref.watch(authNotifierProvider);
   final isRecovery = ref.watch(passwordRecoveryProvider).value == true;
 
   return GoRouter(
     initialLocation: AppRoutes.splash,
     redirect: (context, state) {
-      final user = authState.value;
+      final user = authNotifierState.valueOrNull ?? authState.valueOrNull;
       final isLoggedIn = user != null;
+      final authIsLoading =
+          authNotifierState.isLoading || authState.isLoading;
       final path = state.matchedLocation;
       final isSplash = path == AppRoutes.splash;
       final isResetRoute = path == AppRoutes.resetPassword;
+      final isAccountDisabledRoute = path == AppRoutes.accountDisabled;
       final isAuthRoute = [
         AppRoutes.welcome,
         AppRoutes.login,
@@ -105,7 +113,21 @@ final appRouterProvider = Provider<GoRouter>((ref) {
       // Reset-password route: allowed when a session exists (recovery grants one)
       if (isResetRoute) return isLoggedIn ? null : AppRoutes.welcome;
 
+      if (authIsLoading && !isLoggedIn) return null;
+
       if (!isLoggedIn && !isAuthRoute) return AppRoutes.welcome;
+
+      if (isLoggedIn && !user.isActive && !isAccountDisabledRoute) {
+        return AppRoutes.accountDisabled;
+      }
+
+      if (isLoggedIn && user.isActive && isAccountDisabledRoute) {
+        if (user.isAdmin) return AppRoutes.adminDashboard;
+        if (user.isTechnician && user.isApproved) {
+          return AppRoutes.technicianHome;
+        }
+        return AppRoutes.driverHome;
+      }
 
       // Técnico pendiente: bloqueado en pantalla de espera hasta ser aprobado
       if (isLoggedIn &&
@@ -155,6 +177,10 @@ final appRouterProvider = Provider<GoRouter>((ref) {
         builder: (context, state) => const ForgotPasswordScreen(),
       ),
       GoRoute(
+        path: AppRoutes.accountDisabled,
+        builder: (context, state) => const AccountDisabledScreen(),
+      ),
+      GoRoute(
         path: AppRoutes.resetPassword,
         builder: (context, state) => const ResetPasswordScreen(),
       ),
@@ -174,6 +200,10 @@ final appRouterProvider = Provider<GoRouter>((ref) {
           final emergencyId = state.extra as String? ?? '';
           return EmergencyStatusScreen(emergencyId: emergencyId);
         },
+      ),
+      GoRoute(
+        path: AppRoutes.driverChatHistory,
+        builder: (context, state) => const DriverChatHistoryScreen(),
       ),
       GoRoute(
         path: AppRoutes.driverChat,

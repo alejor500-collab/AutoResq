@@ -31,6 +31,24 @@ class AuthRemoteDataSourceImpl implements AuthRemoteDataSource {
 
   // ── Helpers ────────────────────────────────────────────────────────────────
 
+  core_exceptions.NetworkException _networkException() {
+    return const core_exceptions.NetworkException(
+      message:
+          'No se pudo conectar con AutoResQ. Revisa tu internet, VPN, firewall o bloqueo del navegador e intenta nuevamente.',
+    );
+  }
+
+  bool _looksLikeNetworkError(Object error) {
+    final message = error.toString().toLowerCase();
+    return message.contains('clientexception') ||
+        message.contains('failed to fetch') ||
+        message.contains('xmlhttprequest error') ||
+        message.contains('socketexception') ||
+        message.contains('connection refused') ||
+        message.contains('timed out') ||
+        message.contains('network');
+  }
+
   /// Fetches the profile row. If it doesn't exist (e.g. first OAuth login and
   /// the DB trigger hasn't run), it creates the row from auth user metadata
   /// so the app never treats an authenticated user as unauthenticated.
@@ -64,6 +82,7 @@ class AuthRemoteDataSourceImpl implements AuthRemoteDataSource {
         avatarUrl: avatarUrl,
         rating: 0.0,
         totalServices: 0,
+        isActive: true,
         isAvailable: false,
         isApproved: true,
         createdAt: DateTime.now(),
@@ -83,27 +102,41 @@ class AuthRemoteDataSourceImpl implements AuthRemoteDataSource {
     String? rejectionReason;
     double? lat;
     double? lng;
-    double rating = 0.0;
-    int totalServices = 0;
+    double rating = (data['calificacion_promedio'] as num?)?.toDouble() ?? 0.0;
+    int totalServices = (data['total_servicios'] as num?)?.toInt() ?? 0;
     bool isAvailable = false;
-    bool isApproved = data['activo'] as bool? ?? true;
+    final isActive = data['activo'] as bool? ?? true;
+    bool isApproved = isActive;
 
-    final tecnico = await _client
-        .from(AppConstants.tableTecnicos)
-        .select(
-            'id, especialidad, disponible, estado_verificacion, motivo_rechazo, ubicacion_lat, ubicacion_lng, calificacion_promedio')
-        .eq('usuario_id', userId)
-        .maybeSingle();
+    Map<String, dynamic>? tecnico;
+    try {
+      tecnico = await _client
+          .from(AppConstants.tableTecnicos)
+          .select(
+              'id, especialidad, disponible, estado_verificacion, motivo_rechazo, ubicacion_lat, ubicacion_lng, calificacion_promedio, total_servicios')
+          .eq('usuario_id', userId)
+          .maybeSingle();
+    } on PostgrestException {
+      tecnico = await _client
+          .from(AppConstants.tableTecnicos)
+          .select(
+              'id, especialidad, disponible, estado_verificacion, motivo_rechazo, ubicacion_lat, ubicacion_lng, calificacion_promedio')
+          .eq('usuario_id', userId)
+          .maybeSingle();
+    }
     specialty = tecnico?['especialidad'] as String?;
     isAvailable = tecnico?['disponible'] as bool? ?? false;
     verificationStatus = tecnico?['estado_verificacion'] as String?;
     rejectionReason = tecnico?['motivo_rechazo'] as String?;
     lat = (tecnico?['ubicacion_lat'] as num?)?.toDouble();
     lng = (tecnico?['ubicacion_lng'] as num?)?.toDouble();
-    rating = (tecnico?['calificacion_promedio'] as num?)?.toDouble() ?? 0.0;
+    rating =
+        (tecnico?['calificacion_promedio'] as num?)?.toDouble() ?? rating;
+    totalServices =
+        (tecnico?['total_servicios'] as num?)?.toInt() ?? totalServices;
 
     final tecnicoId = tecnico?['id']?.toString();
-    if (tecnicoId != null && tecnicoId.isNotEmpty) {
+    if (totalServices == 0 && tecnicoId != null && tecnicoId.isNotEmpty) {
       try {
         final finishedAssignments = await _client
             .from(AppConstants.tableAsignaciones)
@@ -131,6 +164,7 @@ class AuthRemoteDataSourceImpl implements AuthRemoteDataSource {
       'avatar_url': data['avatar_url'],
       'rating': rating,
       'total_services': totalServices,
+      'is_active': isActive,
       'is_available': isAvailable,
       'is_approved': isApproved,
       'specialty': specialty,
@@ -140,6 +174,7 @@ class AuthRemoteDataSourceImpl implements AuthRemoteDataSource {
           data['creado_en']?.toString() ?? DateTime.now().toIso8601String(),
       'verification_status': verificationStatus,
       'rejection_reason': rejectionReason,
+      'account_disabled_reason': data['account_disabled_reason'] as String?,
     });
   }
 
@@ -165,6 +200,7 @@ class AuthRemoteDataSourceImpl implements AuthRemoteDataSource {
     } on PostgrestException catch (e) {
       throw core_exceptions.ServerException(message: e.message);
     } catch (e) {
+      if (_looksLikeNetworkError(e)) throw _networkException();
       throw core_exceptions.ServerException(message: e.toString());
     }
   }
@@ -226,6 +262,7 @@ class AuthRemoteDataSourceImpl implements AuthRemoteDataSource {
         specialty: specialty,
         rating: 0.0,
         totalServices: 0,
+        isActive: true,
         isAvailable: false,
         isApproved: true,
         createdAt: DateTime.now(),
@@ -240,6 +277,7 @@ class AuthRemoteDataSourceImpl implements AuthRemoteDataSource {
     } on PostgrestException catch (e) {
       throw core_exceptions.ServerException(message: e.message);
     } catch (e) {
+      if (_looksLikeNetworkError(e)) throw _networkException();
       throw core_exceptions.ServerException(message: e.toString());
     }
   }
@@ -292,6 +330,7 @@ class AuthRemoteDataSourceImpl implements AuthRemoteDataSource {
     } on PostgrestException catch (e) {
       throw core_exceptions.ServerException(message: e.message);
     } catch (e) {
+      if (_looksLikeNetworkError(e)) throw _networkException();
       throw core_exceptions.ServerException(message: e.toString());
     }
   }
@@ -309,6 +348,7 @@ class AuthRemoteDataSourceImpl implements AuthRemoteDataSource {
         redirectTo: 'com.autoresq.app://reset-password',
       );
     } catch (e) {
+      if (_looksLikeNetworkError(e)) throw _networkException();
       throw const core_exceptions.AuthException(
           message: 'No se pudo enviar el correo de recuperación');
     }
@@ -321,6 +361,7 @@ class AuthRemoteDataSourceImpl implements AuthRemoteDataSource {
     } on AuthException catch (e) {
       throw core_exceptions.AuthException(message: e.message);
     } catch (e) {
+      if (_looksLikeNetworkError(e)) throw _networkException();
       throw core_exceptions.ServerException(message: e.toString());
     }
   }
@@ -363,6 +404,7 @@ class AuthRemoteDataSourceImpl implements AuthRemoteDataSource {
         avatarUrl: fresh.avatarUrl,
         rating: fresh.rating,
         totalServices: fresh.totalServices,
+        isActive: fresh.isActive,
         isAvailable: fresh.isAvailable,
         isApproved: fresh.isApproved,
         specialty: user.specialty,
@@ -371,6 +413,7 @@ class AuthRemoteDataSourceImpl implements AuthRemoteDataSource {
         createdAt: fresh.createdAt,
         verificationStatus: fresh.verificationStatus,
         rejectionReason: fresh.rejectionReason,
+        accountDisabledReason: fresh.accountDisabledReason,
       );
     } on PostgrestException catch (e) {
       throw core_exceptions.ServerException(message: e.message);

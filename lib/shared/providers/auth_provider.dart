@@ -136,6 +136,17 @@ class AuthNotifier extends StateNotifier<AsyncValue<AppUser?>> {
     );
   }
 
+  Future<AppUser?> reloadCurrentUser() async {
+    final result = await _repo.getCurrentUser();
+    return result.fold(
+      (_) => state.valueOrNull,
+      (user) {
+        state = AsyncValue.data(user);
+        return user;
+      },
+    );
+  }
+
   void refreshUser(AppUser user) {
     state = AsyncValue.data(user);
   }

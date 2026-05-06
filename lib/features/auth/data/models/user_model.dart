@@ -10,6 +10,7 @@ class UserModel extends AppUser {
     super.avatarUrl,
     super.rating,
     super.totalServices,
+    super.isActive,
     super.isAvailable,
     super.isApproved,
     super.specialty,
@@ -18,6 +19,7 @@ class UserModel extends AppUser {
     required super.createdAt,
     super.verificationStatus,
     super.rejectionReason,
+    super.accountDisabledReason,
   });
 
   factory UserModel.fromJson(Map<String, dynamic> json) {
@@ -30,6 +32,7 @@ class UserModel extends AppUser {
       avatarUrl: json['avatar_url'] as String?,
       rating: (json['rating'] as num?)?.toDouble() ?? 0.0,
       totalServices: json['total_services'] as int? ?? 0,
+      isActive: json['is_active'] as bool? ?? true,
       isAvailable: json['is_available'] as bool? ?? false,
       isApproved: json['is_approved'] as bool? ?? false,
       specialty: json['specialty'] as String?,
@@ -40,6 +43,7 @@ class UserModel extends AppUser {
           : DateTime.now(),
       verificationStatus: json['verification_status'] as String?,
       rejectionReason: json['rejection_reason'] as String?,
+      accountDisabledReason: json['account_disabled_reason'] as String?,
     );
   }
 
@@ -53,6 +57,7 @@ class UserModel extends AppUser {
       'avatar_url': avatarUrl,
       'rating': rating,
       'total_services': totalServices,
+      'is_active': isActive,
       'is_available': isAvailable,
       'is_approved': isApproved,
       'specialty': specialty,
@@ -61,6 +66,7 @@ class UserModel extends AppUser {
       'created_at': createdAt.toIso8601String(),
       'verification_status': verificationStatus,
       'rejection_reason': rejectionReason,
+      'account_disabled_reason': accountDisabledReason,
     };
   }
 
@@ -74,6 +80,7 @@ class UserModel extends AppUser {
       avatarUrl: entity.avatarUrl,
       rating: entity.rating,
       totalServices: entity.totalServices,
+      isActive: entity.isActive,
       isAvailable: entity.isAvailable,
       isApproved: entity.isApproved,
       specialty: entity.specialty,
@@ -82,6 +89,7 @@ class UserModel extends AppUser {
       createdAt: entity.createdAt,
       verificationStatus: entity.verificationStatus,
       rejectionReason: entity.rejectionReason,
+      accountDisabledReason: entity.accountDisabledReason,
     );
   }
 }

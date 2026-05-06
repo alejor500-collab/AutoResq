@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import '../../core/constants/app_colors.dart';
+import 'animated_pressable.dart';
 
 enum AppButtonVariant { primary, secondary, outline, ghost, danger }
 
@@ -121,33 +122,23 @@ class _AnimatedPillButton extends StatefulWidget {
 }
 
 class _AnimatedPillButtonState extends State<_AnimatedPillButton> {
-  bool _pressed = false;
-
-  void _handleTapDown(TapDownDetails _) {
-    if (widget.onPressed == null) return;
-    setState(() => _pressed = true);
-  }
-
-  void _handleTapUp(TapUpDetails _) {
-    setState(() => _pressed = false);
-    widget.onPressed?.call();
-  }
-
-  void _handleTapCancel() => setState(() => _pressed = false);
-
   @override
   Widget build(BuildContext context) {
-    return GestureDetector(
-      onTapDown: _handleTapDown,
-      onTapUp: _handleTapUp,
-      onTapCancel: _handleTapCancel,
-      child: AnimatedScale(
-        scale: _pressed ? 0.96 : 1.0,
-        duration: _pressed
-            ? const Duration(milliseconds: 100)
-            : const Duration(milliseconds: 220),
-        curve: _pressed ? Curves.easeOutQuart : Curves.elasticOut,
-        child: _buildBody(),
+    return AnimatedPressable(
+      onTap: widget.onPressed,
+      borderRadius: BorderRadius.circular(9999),
+      pressedScale: 0.965,
+      hoverScale: 1.012,
+      duration: const Duration(milliseconds: 180),
+      disabledOpacity: widget.isLoading ? 1 : 0.58,
+      child: AnimatedSwitcher(
+        duration: const Duration(milliseconds: 220),
+        switchInCurve: Curves.easeOutCubic,
+        switchOutCurve: Curves.easeInCubic,
+        child: KeyedSubtree(
+          key: ValueKey(widget.isLoading),
+          child: _buildBody(),
+        ),
       ),
     );
   }
@@ -173,8 +164,8 @@ class _AnimatedPillButtonState extends State<_AnimatedPillButton> {
         boxShadow: [
           BoxShadow(
             color: AppColors.primary.withValues(alpha: 0.2),
-            blurRadius: 20,
-            offset: const Offset(0, 8),
+            blurRadius: 24,
+            offset: const Offset(0, 10),
           ),
         ],
       ),

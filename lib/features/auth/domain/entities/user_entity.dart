@@ -10,14 +10,16 @@ class AppUser extends Equatable {
   final String? avatarUrl;
   final double rating;
   final int totalServices;
-  final bool isAvailable;   // solo técnicos
-  final bool isApproved;    // solo técnicos
-  final String? specialty;  // solo técnicos
+  final bool isActive;
+  final bool isAvailable; // solo tecnicos
+  final bool isApproved; // solo tecnicos
+  final String? specialty; // solo tecnicos
   final double? lat;
   final double? lng;
   final DateTime createdAt;
-  final String? verificationStatus; // solo técnicos: pendiente | aprobado | rechazado
-  final String? rejectionReason;    // solo técnicos rechazados
+  final String? verificationStatus; // pendiente | aprobado | rechazado
+  final String? rejectionReason;
+  final String? accountDisabledReason;
 
   const AppUser({
     required this.id,
@@ -28,6 +30,7 @@ class AppUser extends Equatable {
     this.avatarUrl,
     this.rating = 0.0,
     this.totalServices = 0,
+    this.isActive = true,
     this.isAvailable = false,
     this.isApproved = false,
     this.specialty,
@@ -36,6 +39,7 @@ class AppUser extends Equatable {
     required this.createdAt,
     this.verificationStatus,
     this.rejectionReason,
+    this.accountDisabledReason,
   });
 
   bool get isDriver => role == 'conductor';
@@ -51,6 +55,7 @@ class AppUser extends Equatable {
     String? avatarUrl,
     double? rating,
     int? totalServices,
+    bool? isActive,
     bool? isAvailable,
     bool? isApproved,
     String? specialty,
@@ -59,6 +64,7 @@ class AppUser extends Equatable {
     DateTime? createdAt,
     String? verificationStatus,
     String? rejectionReason,
+    String? accountDisabledReason,
   }) {
     return AppUser(
       id: id ?? this.id,
@@ -69,6 +75,7 @@ class AppUser extends Equatable {
       avatarUrl: avatarUrl ?? this.avatarUrl,
       rating: rating ?? this.rating,
       totalServices: totalServices ?? this.totalServices,
+      isActive: isActive ?? this.isActive,
       isAvailable: isAvailable ?? this.isAvailable,
       isApproved: isApproved ?? this.isApproved,
       specialty: specialty ?? this.specialty,
@@ -77,14 +84,30 @@ class AppUser extends Equatable {
       createdAt: createdAt ?? this.createdAt,
       verificationStatus: verificationStatus ?? this.verificationStatus,
       rejectionReason: rejectionReason ?? this.rejectionReason,
+      accountDisabledReason:
+          accountDisabledReason ?? this.accountDisabledReason,
     );
   }
 
   @override
   List<Object?> get props => [
-        id, email, name, phone, role, avatarUrl,
-        rating, totalServices, isAvailable, isApproved,
-        specialty, lat, lng, createdAt,
-        verificationStatus, rejectionReason,
+        id,
+        email,
+        name,
+        phone,
+        role,
+        avatarUrl,
+        rating,
+        totalServices,
+        isActive,
+        isAvailable,
+        isApproved,
+        specialty,
+        lat,
+        lng,
+        createdAt,
+        verificationStatus,
+        rejectionReason,
+        accountDisabledReason,
       ];
 }
