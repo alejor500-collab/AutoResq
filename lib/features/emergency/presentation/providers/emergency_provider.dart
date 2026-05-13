@@ -62,6 +62,99 @@ class EmergencyState {
   }
 }
 
+class TechnicianOffer {
+  final String id;
+  final String emergencyId;
+  final String technicianId;
+  final String technicianUserId;
+  final String name;
+  final String? phone;
+  final String? specialty;
+  final double rating;
+  final int totalServices;
+  final double? distanceKm;
+  final int? etaMinutes;
+  final double? offeredAmount;
+  final String status;
+  final DateTime createdAt;
+
+  const TechnicianOffer({
+    required this.id,
+    required this.emergencyId,
+    required this.technicianId,
+    required this.technicianUserId,
+    required this.name,
+    this.phone,
+    this.specialty,
+    required this.rating,
+    required this.totalServices,
+    this.distanceKm,
+    this.etaMinutes,
+    this.offeredAmount,
+    required this.status,
+    required this.createdAt,
+  });
+
+  factory TechnicianOffer.fromJson(Map<String, dynamic> json) {
+    final technician = json['tecnicos'] is Map
+        ? Map<String, dynamic>.from(json['tecnicos'] as Map)
+        : const <String, dynamic>{};
+    final technicianUser = technician['usuarios'] is Map
+        ? Map<String, dynamic>.from(technician['usuarios'] as Map)
+        : const <String, dynamic>{};
+
+    return TechnicianOffer(
+      id: json['id']?.toString() ?? '',
+      emergencyId: json['emergencia_id']?.toString() ?? '',
+      technicianId:
+          json['tecnico_id']?.toString() ?? json['technician_id']?.toString() ?? '',
+      technicianUserId: technician['usuario_id']?.toString() ??
+          json['technician_user_id']?.toString() ??
+          '',
+      name: (json['technician_name'] ?? technicianUser['nombre'])
+                  ?.toString()
+                  .trim()
+                  .isNotEmpty ==
+              true
+          ? (json['technician_name'] ?? technicianUser['nombre']).toString()
+          : technicianUser['nombre']?.toString().trim().isNotEmpty == true
+          ? technicianUser['nombre'].toString()
+          : 'Tecnico verificado',
+      phone: json['technician_phone']?.toString() ??
+          technicianUser['telefono']?.toString(),
+      specialty:
+          json['specialty']?.toString() ?? technician['especialidad']?.toString(),
+      rating: (json['rating'] as num?)?.toDouble() ??
+          (technician['calificacion_promedio'] as num?)?.toDouble() ??
+          0,
+      totalServices: (json['total_services'] as num?)?.toInt() ??
+          (technician['total_servicios'] as num?)?.toInt() ??
+          0,
+      distanceKm: (json['distancia_km'] as num?)?.toDouble(),
+      etaMinutes: (json['eta_minutos'] as num?)?.toInt(),
+      offeredAmount: (json['monto_ofertado'] as num?)?.toDouble(),
+      status: json['estado']?.toString() ?? 'pendiente',
+      createdAt: DateTime.tryParse(json['fecha_oferta']?.toString() ?? '') ??
+          DateTime.now(),
+    );
+  }
+
+  String get ratingLabel => rating <= 0 ? 'Nuevo' : rating.toStringAsFixed(1);
+
+  String get distanceLabel {
+    final value = distanceKm;
+    if (value == null) return 'Cerca de ti';
+    if (value < 1) return '${(value * 1000).round()} m';
+    return '${value.toStringAsFixed(value >= 10 ? 0 : 1)} km';
+  }
+
+  String get etaLabel {
+    final value = etaMinutes;
+    if (value == null) return 'ETA por confirmar';
+    return '$value min';
+  }
+}
+
 // ─── Emergency Notifier ───────────────────────────────────────────────────────
 class EmergencyNotifier extends StateNotifier<EmergencyState> {
   final EmergencyRemoteDataSource _dataSource;
@@ -294,6 +387,53 @@ class EmergencyNotifier extends StateNotifier<EmergencyState> {
     }
   }
 
+  Future<bool> createTechnicianOffer(String emergencyId) async {
+    final user = _currentUser;
+    if (user == null) return false;
+    state = state.copyWith(isLoading: true, error: null);
+    try {
+      final hasPendingRating = await _dataSource.hasPendingRating(
+        userId: user.id,
+        role: 'technician',
+      );
+      if (hasPendingRating) {
+        state = state.copyWith(
+          isLoading: false,
+          error: 'Tienes una calificacion pendiente.',
+        );
+        return false;
+      }
+      final active = await _dataSource.getActiveTechnicianEmergency(user.id);
+      if (active != null && active.id != emergencyId) {
+        state = state.copyWith(
+          isLoading: false,
+          activeEmergency: active,
+          error: 'Ya tienes una emergencia activa.',
+        );
+        return false;
+      }
+      await _dataSource.createTechnicianOffer(emergencyId);
+      state = state.copyWith(isLoading: false);
+      return true;
+    } catch (e) {
+      state = state.copyWith(isLoading: false, error: e.toString());
+      return false;
+    }
+  }
+
+  Future<bool> acceptTechnicianOffer(String offerId, String emergencyId) async {
+    state = state.copyWith(isLoading: true, error: null);
+    try {
+      await _dataSource.acceptTechnicianOffer(offerId);
+      final updated = await _dataSource.getEmergency(emergencyId);
+      state = state.copyWith(isLoading: false, activeEmergency: updated);
+      return true;
+    } catch (e) {
+      state = state.copyWith(isLoading: false, error: e.toString());
+      return false;
+    }
+  }
+
   // ─── Update Status ────────────────────────────────────────────────────────
   Future<bool> updateStatus(String emergencyId, String status) async {
     state = state.copyWith(isLoading: true);
@@ -331,6 +471,7 @@ class EmergencyNotifier extends StateNotifier<EmergencyState> {
     if (user == null) return false;
     return _dataSource.hasPendingRating(userId: user.id, role: role);
   }
+
 }
 
 final emergencyNotifierProvider =
@@ -350,6 +491,21 @@ final watchEmergencyProvider =
     yield* Stream.periodic(const Duration(seconds: 2)).asyncMap(
       (_) => ds.getEmergency(id),
     );
+  })();
+});
+
+final technicianOffersProvider =
+    StreamProvider.family<List<TechnicianOffer>, String>((ref, emergencyId) {
+  final ds = ref.read(emergencyDataSourceProvider);
+  return (() async* {
+    yield (await ds.getTechnicianOffers(emergencyId))
+        .map(TechnicianOffer.fromJson)
+        .toList();
+    yield* ds.watchTechnicianOfferRows(emergencyId).asyncMap((_) async {
+      return (await ds.getTechnicianOffers(emergencyId))
+          .map(TechnicianOffer.fromJson)
+          .toList();
+    });
   })();
 });
 
@@ -378,6 +534,26 @@ final technicianPendingEmergenciesProvider =
   yield await fetchPending();
   yield* Stream.periodic(const Duration(seconds: 4)).asyncMap(
     (_) => fetchPending(),
+  );
+});
+
+final activeTechnicianEmergencyProvider =
+    StreamProvider.autoDispose<Emergency?>((ref) async* {
+  final user = ref.watch(authNotifierProvider).value ??
+      ref.watch(authStateProvider).valueOrNull;
+  if (user == null || !user.isApproved) {
+    yield null;
+    return;
+  }
+
+  final ds = ref.read(emergencyDataSourceProvider);
+  Future<Emergency?> fetchActive() {
+    return ds.getActiveTechnicianEmergency(user.id);
+  }
+
+  yield await fetchActive();
+  yield* Stream.periodic(const Duration(seconds: 3)).asyncMap(
+    (_) => fetchActive(),
   );
 });
 

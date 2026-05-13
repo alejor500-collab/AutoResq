@@ -33,8 +33,7 @@ dependencies:
   # Functional programming
   dartz: ^0.10.1
 
-  # Fonts & UI
-  google_fonts: ^6.2.1
+  # UI
   shimmer: ^3.0.0
   gap: ^3.0.1
   iconsax: ^0.0.8

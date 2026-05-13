@@ -86,7 +86,7 @@ class _IncomingRequestSheetState extends ConsumerState<IncomingRequestSheet> {
           ),
           title: const Text('Tienes una calificacion pendiente'),
           content: const Text(
-            'Califica tu ultimo servicio para poder aceptar una nueva emergencia.',
+            'Califica tu ultimo servicio para poder responder una nueva emergencia.',
           ),
           actions: [
             TextButton(
@@ -338,21 +338,22 @@ class _IncomingRequestSheetState extends ConsumerState<IncomingRequestSheet> {
                       _ProtectedPriceCard(emergency: emergency),
                       const Gap(20),
 
-                      // ─── Botón Aceptar ────────────────────────────────
+                      // ─── Botón de oferta ──────────────────────────────
                       AppButton(
-                        label: '✓ Aceptar Servicio',
+                        label: 'Enviar oferta',
                         onPressed: emergencyState.isLoading
                             ? null
                             : () async {
                                 final ok = await ref
                                     .read(emergencyNotifierProvider.notifier)
-                                    .acceptEmergency(emergency.id);
+                                    .createTechnicianOffer(emergency.id);
                                 if (!context.mounted) return;
                                 if (ok) {
                                   context.pop();
-                                  context.push(
-                                    AppRoutes.activeService,
-                                    extra: emergency.id,
+                                  AppHelpers.showSnackBar(
+                                    context,
+                                    'Oferta enviada. Espera la eleccion del conductor.',
+                                    isSuccess: true,
                                   );
                                 } else {
                                   final pending = await ref
@@ -364,10 +365,10 @@ class _IncomingRequestSheetState extends ConsumerState<IncomingRequestSheet> {
                                   } else {
                                     AppHelpers.showSnackBar(
                                       context,
-                                      ref
-                                              .read(emergencyNotifierProvider)
-                                              .error ??
-                                          'No se pudo aceptar el servicio',
+                                          ref
+                                                  .read(emergencyNotifierProvider)
+                                                  .error ??
+                                          'No se pudo enviar la oferta',
                                       isError: true,
                                     );
                                   }

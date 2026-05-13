@@ -5,7 +5,6 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:gap/gap.dart';
 import 'package:flutter_map/flutter_map.dart';
-import 'package:google_fonts/google_fonts.dart';
 import 'package:latlong2/latlong.dart';
 import '../../../../core/constants/app_colors.dart';
 import '../../../../core/constants/app_constants.dart';
@@ -42,6 +41,7 @@ class _TechnicianHomeScreenState extends ConsumerState<TechnicianHomeScreen> {
   final _mapController = MapController();
   ProviderSubscription<AsyncValue<List<Emergency>>>?
       _pendingEmergenciesSubscription;
+  ProviderSubscription<AsyncValue<Emergency?>>? _activeServiceSubscription;
   ProviderSubscription<AsyncValue<int>>? _unreadChatSubscription;
   Timer? _bannerDismissTimer;
   int _navIndex = 0;
@@ -71,6 +71,11 @@ class _TechnicianHomeScreenState extends ConsumerState<TechnicianHomeScreen> {
         );
       },
     );
+    _activeServiceSubscription =
+        ref.listenManual<AsyncValue<Emergency?>>(
+      activeTechnicianEmergencyProvider,
+      _handleActiveServiceUpdate,
+    );
     _unreadChatSubscription = ref.listenManual<AsyncValue<int>>(
       unreadChatCountProvider,
       _handleUnreadChatCount,
@@ -97,8 +102,27 @@ class _TechnicianHomeScreenState extends ConsumerState<TechnicianHomeScreen> {
   void dispose() {
     _bannerDismissTimer?.cancel();
     _pendingEmergenciesSubscription?.close();
+    _activeServiceSubscription?.close();
     _unreadChatSubscription?.close();
     super.dispose();
+  }
+
+  void _handleActiveServiceUpdate(
+    AsyncValue<Emergency?>? previous,
+    AsyncValue<Emergency?> next,
+  ) {
+    final active = next.valueOrNull;
+    final previousActive = previous?.valueOrNull;
+    if (active == null) {
+      _activeWarningShown = false;
+      return;
+    }
+
+    if (!mounted || previousActive?.id == active.id) return;
+    ref.invalidate(technicianEmergencyHistoryProvider);
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (mounted) _showActiveServiceDialog(active);
+    });
   }
 
   void _handleUnreadChatCount(
@@ -135,7 +159,7 @@ class _TechnicianHomeScreenState extends ConsumerState<TechnicianHomeScreen> {
     Emergency active, {
     bool fromStartup = false,
   }) {
-    if (fromStartup && _activeWarningShown) return;
+    if (!mounted || _activeWarningShown) return;
     _activeWarningShown = true;
     showDialog<void>(
       context: context,
@@ -187,6 +211,7 @@ class _TechnicianHomeScreenState extends ConsumerState<TechnicianHomeScreen> {
 
   Future<void> _refreshEmergencies() {
     ref.invalidate(technicianPendingEmergenciesProvider);
+    ref.invalidate(activeTechnicianEmergencyProvider);
     return ref
         .read(emergencyNotifierProvider.notifier)
         .loadPendingEmergencies();
@@ -350,7 +375,7 @@ class _TechnicianHomeScreenState extends ConsumerState<TechnicianHomeScreen> {
                   children: [
                     Text(
                       technicianName,
-                      style: GoogleFonts.poppins(
+                      style: TextStyle(
                         fontSize: 15,
                         fontWeight: FontWeight.w800,
                         color: AppColors.onSurface,
@@ -361,7 +386,7 @@ class _TechnicianHomeScreenState extends ConsumerState<TechnicianHomeScreen> {
                     const Gap(2),
                     Text(
                       specialty,
-                      style: GoogleFonts.poppins(
+                      style: TextStyle(
                         fontSize: 12,
                         fontWeight: FontWeight.w600,
                         color: AppColors.textSecondary,
@@ -463,6 +488,7 @@ class _TechnicianHomeScreenState extends ConsumerState<TechnicianHomeScreen> {
 
   Widget _buildRequestsView({
     required List<Emergency> emergencies,
+    required Emergency? activeEmergency,
     required bool isAvailable,
     required bool isLoading,
   }) {
@@ -482,7 +508,7 @@ class _TechnicianHomeScreenState extends ConsumerState<TechnicianHomeScreen> {
               Expanded(
                 child: Text(
                   'Solicitudes activas',
-                  style: GoogleFonts.poppins(
+                  style: TextStyle(
                     fontSize: 20,
                     fontWeight: FontWeight.w900,
                     color: AppColors.onSurface,
@@ -509,8 +535,8 @@ class _TechnicianHomeScreenState extends ConsumerState<TechnicianHomeScreen> {
           const Gap(4),
           Text(
             isAvailable
-                ? 'Acepta solo las solicitudes que puedas atender.'
-                : 'Activa tu disponibilidad para poder aceptar solicitudes.',
+                ? 'Responde a las solicitudes que puedas atender. El conductor elegira el tecnico.'
+                : 'Activa tu disponibilidad para poder responder solicitudes.',
             style: const TextStyle(
               fontSize: 13,
               color: AppColors.textSecondary,
@@ -518,6 +544,16 @@ class _TechnicianHomeScreenState extends ConsumerState<TechnicianHomeScreen> {
             ),
           ),
           const Gap(14),
+          if (activeEmergency != null) ...[
+            _ActiveServiceNotice(
+              emergency: activeEmergency,
+              onOpen: () => context.push(
+                AppRoutes.activeService,
+                extra: activeEmergency.id,
+              ),
+            ),
+            const Gap(12),
+          ],
           if (emergencies.isEmpty && !isLoading)
             const _EmptyEmergencyRequests()
           else
@@ -529,7 +565,7 @@ class _TechnicianHomeScreenState extends ConsumerState<TechnicianHomeScreen> {
                   canAccept: isAvailable,
                   isLoading: isLoading,
                   onTap: () => _showIncomingRequest(emergency),
-                  onAccept: () => _acceptEmergencyFromList(emergency),
+                  onAccept: () => _sendOfferFromList(emergency),
                 ),
               ),
             ),
@@ -538,7 +574,10 @@ class _TechnicianHomeScreenState extends ConsumerState<TechnicianHomeScreen> {
     );
   }
 
-  Widget _buildTechnicianHistoryView(AsyncValue<List<Emergency>> historyAsync) {
+  Widget _buildTechnicianHistoryView(
+    AsyncValue<List<Emergency>> historyAsync, {
+    required Emergency? activeEmergency,
+  }) {
     return historyAsync.when(
       loading: () => const Center(
         child: CircularProgressIndicator(color: AppColors.primary),
@@ -548,65 +587,90 @@ class _TechnicianHomeScreenState extends ConsumerState<TechnicianHomeScreen> {
         detail: e.toString(),
         onRetry: () => ref.invalidate(technicianEmergencyHistoryProvider),
       ),
-      data: (history) => RefreshIndicator(
-        color: AppColors.primary,
-        onRefresh: _refreshTechnicianHistory,
-        child: ListView(
-          padding: EdgeInsets.fromLTRB(
-            16,
-            12,
-            16,
-            92 + MediaQuery.of(context).padding.bottom,
-          ),
-          children: [
-            Row(
-              children: [
-                Expanded(
-                  child: Text(
-                    'Historial de solicitudes',
-                    style: GoogleFonts.poppins(
-                      fontSize: 20,
-                      fontWeight: FontWeight.w900,
-                      color: AppColors.onSurface,
-                      letterSpacing: -0.2,
+      data: (history) {
+        final visibleHistory = activeEmergency == null
+            ? history
+            : [
+                activeEmergency,
+                ...history.where(
+                  (emergency) => emergency.id != activeEmergency.id,
+                ),
+              ];
+
+        return RefreshIndicator(
+          color: AppColors.primary,
+          onRefresh: _refreshTechnicianHistory,
+          child: ListView(
+            padding: EdgeInsets.fromLTRB(
+              16,
+              12,
+              16,
+              92 + MediaQuery.of(context).padding.bottom,
+            ),
+            children: [
+              Row(
+                children: [
+                  Expanded(
+                    child: Text(
+                      'Historial de solicitudes',
+                      style: TextStyle(
+                        fontSize: 20,
+                        fontWeight: FontWeight.w900,
+                        color: AppColors.onSurface,
+                        letterSpacing: -0.2,
+                      ),
                     ),
                   ),
-                ),
-                IconButton(
-                  tooltip: 'Actualizar',
-                  onPressed: () =>
-                      ref.invalidate(technicianEmergencyHistoryProvider),
-                  icon: const Icon(Icons.refresh_rounded),
-                ),
-              ],
-            ),
-            const Gap(4),
-            const Text(
-              'Aqui veras servicios completados, rechazados y en proceso.',
-              style: TextStyle(
-                fontSize: 13,
-                color: AppColors.textSecondary,
-                height: 1.35,
+                  IconButton(
+                    tooltip: 'Actualizar',
+                    onPressed: () =>
+                        ref.invalidate(technicianEmergencyHistoryProvider),
+                    icon: const Icon(Icons.refresh_rounded),
+                  ),
+                ],
               ),
-            ),
-            const Gap(14),
-            if (history.isEmpty)
-              const _EmptyTechnicianHistory()
-            else
-              ...history.map(
-                (emergency) => Padding(
-                  padding: const EdgeInsets.only(bottom: 12),
-                  child: _TechnicianHistoryCard(emergency: emergency),
+              const Gap(4),
+              const Text(
+                'Aqui veras servicios completados, rechazados y en proceso.',
+                style: TextStyle(
+                  fontSize: 13,
+                  color: AppColors.textSecondary,
+                  height: 1.35,
                 ),
               ),
-          ],
-        ),
-      ),
+              const Gap(14),
+              if (visibleHistory.isEmpty)
+                const _EmptyTechnicianHistory()
+              else
+                ...visibleHistory.map(
+                  (emergency) {
+                    final isActive = activeEmergency?.id == emergency.id;
+                    return Padding(
+                      padding: const EdgeInsets.only(bottom: 12),
+                      child: isActive
+                          ? _ActiveServiceNotice(
+                              emergency: emergency,
+                              onOpen: () => context.push(
+                                AppRoutes.activeService,
+                                extra: emergency.id,
+                              ),
+                            )
+                          : _TechnicianHistoryCard(emergency: emergency),
+                    );
+                  },
+                ),
+            ],
+          ),
+        );
+      },
     );
   }
 
   Widget _buildTechnicianChatHistoryView(
     AsyncValue<List<Emergency>> historyAsync,
+    {
+    required Emergency? activeEmergency,
+  }
   ) {
     return historyAsync.when(
       loading: () => const Center(
@@ -621,6 +685,14 @@ class _TechnicianHomeScreenState extends ConsumerState<TechnicianHomeScreen> {
         final chats = history
             .where((emergency) => emergency.asignacionId?.isNotEmpty == true)
             .toList();
+        final visibleChats = activeEmergency?.asignacionId?.isNotEmpty == true
+            ? [
+                activeEmergency!,
+                ...chats.where(
+                  (emergency) => emergency.id != activeEmergency.id,
+                ),
+              ]
+            : chats;
         return RefreshIndicator(
           color: AppColors.primary,
           onRefresh: _refreshTechnicianHistory,
@@ -637,7 +709,7 @@ class _TechnicianHomeScreenState extends ConsumerState<TechnicianHomeScreen> {
                   Expanded(
                     child: Text(
                       'Chats de servicios',
-                      style: GoogleFonts.poppins(
+                      style: TextStyle(
                         fontSize: 20,
                         fontWeight: FontWeight.w900,
                         color: AppColors.onSurface,
@@ -663,10 +735,22 @@ class _TechnicianHomeScreenState extends ConsumerState<TechnicianHomeScreen> {
                 ),
               ),
               const Gap(14),
-              if (chats.isEmpty)
+              if (activeEmergency != null) ...[
+                _ActiveServiceNotice(
+                  emergency: activeEmergency,
+                  onOpen: () => context.push(
+                    AppRoutes.activeService,
+                    extra: activeEmergency.id,
+                  ),
+                ),
+                const Gap(12),
+              ],
+              if (visibleChats.isEmpty)
                 const _EmptyTechnicianChats()
               else
-                ...chats.map(
+                ...visibleChats
+                    .where((emergency) => emergency.id != activeEmergency?.id)
+                    .map(
                   (emergency) => Padding(
                     padding: const EdgeInsets.only(bottom: 12),
                     child: _TechnicianChatHistoryCard(
@@ -727,7 +811,10 @@ class _TechnicianHomeScreenState extends ConsumerState<TechnicianHomeScreen> {
 
   void _showNewEmergencyBanner(List<Emergency> emergencies) {
     if (!mounted || emergencies.isEmpty) return;
-    if (ref.read(emergencyNotifierProvider).activeEmergency != null) return;
+    if (ref.read(activeTechnicianEmergencyProvider).valueOrNull != null ||
+        ref.read(emergencyNotifierProvider).activeEmergency != null) {
+      return;
+    }
 
     _bannerDismissTimer?.cancel();
     setState(
@@ -755,14 +842,14 @@ class _TechnicianHomeScreenState extends ConsumerState<TechnicianHomeScreen> {
     });
   }
 
-  Future<void> _acceptEmergencyFromList(Emergency emergency) async {
+  Future<void> _sendOfferFromList(Emergency emergency) async {
     final isAvailable = _isAvailable ??
         ref.read(authNotifierProvider).value?.isAvailable ??
         false;
     if (!isAvailable) {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(
-          content: Text('Activa tu disponibilidad para aceptar solicitudes'),
+          content: Text('Activa tu disponibilidad para responder solicitudes'),
         ),
       );
       return;
@@ -770,12 +857,16 @@ class _TechnicianHomeScreenState extends ConsumerState<TechnicianHomeScreen> {
 
     final ok = await ref
         .read(emergencyNotifierProvider.notifier)
-        .acceptEmergency(emergency.id);
+        .createTechnicianOffer(emergency.id);
     if (!mounted) return;
     if (ok) {
       ref.invalidate(technicianPendingEmergenciesProvider);
       ref.invalidate(technicianEmergencyHistoryProvider);
-      context.push(AppRoutes.activeService, extra: emergency.id);
+      AppHelpers.showSnackBar(
+        context,
+        'Oferta enviada. El conductor decidira si te asigna el servicio.',
+        isSuccess: true,
+      );
       return;
     }
 
@@ -798,7 +889,7 @@ class _TechnicianHomeScreenState extends ConsumerState<TechnicianHomeScreen> {
       AppHelpers.showSnackBar(
         context,
         ref.read(emergencyNotifierProvider).error ??
-            'No se pudo aceptar la solicitud',
+            'No se pudo enviar la oferta',
         isError: true,
       );
     }
@@ -918,6 +1009,8 @@ class _TechnicianHomeScreenState extends ConsumerState<TechnicianHomeScreen> {
     final mapState = ref.watch(mapNotifierProvider);
     final emergencyState = ref.watch(emergencyNotifierProvider);
     final technicianHistory = ref.watch(technicianEmergencyHistoryProvider);
+    final activeTechnicianEmergency =
+        ref.watch(activeTechnicianEmergencyProvider);
     final pendingEmergenciesAsync =
         ref.watch(technicianPendingEmergenciesProvider);
     final user = ref.watch(authNotifierProvider).value;
@@ -946,6 +1039,8 @@ class _TechnicianHomeScreenState extends ConsumerState<TechnicianHomeScreen> {
     final lng = mapState.currentLocation?.lng ?? AppConstants.defaultLng;
     final pendingEmergencies =
         pendingEmergenciesAsync.valueOrNull ?? emergencyState.emergencies;
+    final activeEmergency =
+        activeTechnicianEmergency.valueOrNull ?? emergencyState.activeEmergency;
     final isPendingLoading =
         (pendingEmergenciesAsync.isLoading && pendingEmergencies.isEmpty) ||
             emergencyState.isLoading;
@@ -986,11 +1081,26 @@ class _TechnicianHomeScreenState extends ConsumerState<TechnicianHomeScreen> {
                       stats?.totalServices ?? user?.totalServices ?? 0,
                   pendingCount: pendingEmergencies.length,
                 ),
+              if (_navIndex == 2 && activeEmergency != null)
+                Padding(
+                  padding: const EdgeInsets.fromLTRB(16, 0, 16, 12),
+                  child: _ActiveServiceNotice(
+                    emergency: activeEmergency,
+                    onOpen: () => context.push(
+                      AppRoutes.activeService,
+                      extra: activeEmergency.id,
+                    ),
+                  ),
+                ),
               Expanded(
                 child: switch (_navIndex) {
-                  0 => _buildTechnicianHistoryView(technicianHistory),
+                  0 => _buildTechnicianHistoryView(
+                      technicianHistory,
+                      activeEmergency: activeEmergency,
+                    ),
                   1 => _buildRequestsView(
                       emergencies: pendingEmergencies,
+                      activeEmergency: activeEmergency,
                       isAvailable: isAvailable,
                       isLoading: isPendingLoading,
                     ),
@@ -1002,7 +1112,10 @@ class _TechnicianHomeScreenState extends ConsumerState<TechnicianHomeScreen> {
                       isAvailable: isAvailable,
                       isLoading: isPendingLoading,
                     ),
-                  3 => _buildTechnicianChatHistoryView(technicianHistory),
+                  3 => _buildTechnicianChatHistoryView(
+                      technicianHistory,
+                      activeEmergency: activeEmergency,
+                    ),
                   _ => _buildMapView(
                       lat: lat,
                       lng: lng,
@@ -1067,7 +1180,7 @@ class _TechnicianHomeScreenState extends ConsumerState<TechnicianHomeScreen> {
                         const Spacer(),
                         Text(
                           'AutoResQ',
-                          style: GoogleFonts.poppins(
+                          style: TextStyle(
                             fontSize: 20,
                             fontWeight: FontWeight.w900,
                             color: AppColors.onSurface,
@@ -1139,6 +1252,153 @@ class _TechnicianHomeScreenState extends ConsumerState<TechnicianHomeScreen> {
 // ── Helper widget ─────────────────────────────────────────────────────────────
 
 // ── Emergency card for SERVICIOS tab ─────────────────────────────────────────
+
+class _ActiveServiceNotice extends StatelessWidget {
+  final Emergency emergency;
+  final VoidCallback onOpen;
+
+  const _ActiveServiceNotice({
+    required this.emergency,
+    required this.onOpen,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final serviceName = emergency.pricingServiceName ??
+        emergency.aiEmergencyType ??
+        emergency.clasificacionIa ??
+        'Servicio activo';
+    final driverName = emergency.driverName ?? 'Conductor';
+    final address = emergency.direccion?.trim().isNotEmpty == true
+        ? emergency.direccion!
+        : 'Ubicacion del conductor';
+
+    return AnimatedPressable(
+      onTap: onOpen,
+      borderRadius: BorderRadius.circular(22),
+      pressedScale: 0.985,
+      hoverScale: 1.006,
+      child: Container(
+        width: double.infinity,
+        padding: const EdgeInsets.all(16),
+        decoration: BoxDecoration(
+          gradient: LinearGradient(
+            colors: [
+              AppColors.primary,
+              AppColors.primary.withValues(alpha: 0.82),
+            ],
+            begin: Alignment.topLeft,
+            end: Alignment.bottomRight,
+          ),
+          borderRadius: BorderRadius.circular(22),
+          boxShadow: [
+            BoxShadow(
+              color: AppColors.primary.withValues(alpha: 0.24),
+              blurRadius: 26,
+              offset: const Offset(0, 14),
+            ),
+          ],
+        ),
+        child: Row(
+          children: [
+            Container(
+              width: 48,
+              height: 48,
+              decoration: BoxDecoration(
+                color: Colors.white.withValues(alpha: 0.16),
+                borderRadius: BorderRadius.circular(16),
+                border: Border.all(
+                  color: Colors.white.withValues(alpha: 0.22),
+                ),
+              ),
+              child: const Icon(
+                Icons.route_rounded,
+                color: Colors.white,
+                size: 25,
+              ),
+            ),
+            const Gap(12),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Row(
+                    children: [
+                      Container(
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: 9,
+                          vertical: 4,
+                        ),
+                        decoration: BoxDecoration(
+                          color: Colors.white.withValues(alpha: 0.18),
+                          borderRadius: BorderRadius.circular(999),
+                        ),
+                        child: const Text(
+                          'Atendiendo ahora',
+                          style: TextStyle(
+                            color: Colors.white,
+                            fontSize: 10,
+                            fontWeight: FontWeight.w900,
+                            letterSpacing: 0.2,
+                          ),
+                        ),
+                      ),
+                      const Gap(8),
+                      const Icon(
+                        Icons.circle,
+                        color: AppColors.success,
+                        size: 9,
+                      ),
+                    ],
+                  ),
+                  const Gap(8),
+                  Text(
+                    serviceName,
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: TextStyle(
+                      color: Colors.white,
+                      fontSize: 16,
+                      fontWeight: FontWeight.w900,
+                      letterSpacing: -0.2,
+                    ),
+                  ),
+                  const Gap(3),
+                  Text(
+                    '$driverName - $address',
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: TextStyle(
+                      color: Colors.white.withValues(alpha: 0.82),
+                      fontSize: 12,
+                      fontWeight: FontWeight.w600,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+            const Gap(10),
+            FilledButton(
+              onPressed: onOpen,
+              style: FilledButton.styleFrom(
+                backgroundColor: Colors.white,
+                foregroundColor: AppColors.primary,
+                padding: const EdgeInsets.symmetric(
+                  horizontal: 14,
+                  vertical: 12,
+                ),
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(14),
+                ),
+              ),
+              child: const Text('Ver'),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
 
 class _TechnicianHistoryCard extends StatelessWidget {
   final Emergency emergency;
@@ -1851,7 +2111,7 @@ class _EmergencyRequestCard extends StatelessWidget {
                         backgroundColor: AppColors.primary,
                         foregroundColor: Colors.white,
                       ),
-                      child: const Text('Aceptar'),
+                      child: const Text('Ofertar'),
                     ),
                   ),
                 ],
@@ -1941,7 +2201,7 @@ class _TechnicianMetricPill extends StatelessWidget {
                   label,
                   maxLines: 1,
                   overflow: TextOverflow.ellipsis,
-                  style: GoogleFonts.poppins(
+                  style: TextStyle(
                     fontSize: 10,
                     fontWeight: FontWeight.w800,
                     color: color,
@@ -1952,7 +2212,7 @@ class _TechnicianMetricPill extends StatelessWidget {
                   value,
                   maxLines: 1,
                   overflow: TextOverflow.ellipsis,
-                  style: GoogleFonts.poppins(
+                  style: TextStyle(
                     fontSize: 11,
                     fontWeight: FontWeight.w700,
                     color: AppColors.onSurface,

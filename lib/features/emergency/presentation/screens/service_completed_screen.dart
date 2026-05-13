@@ -10,13 +10,15 @@ import '../../../../shared/widgets/status_chip.dart';
 
 // Route path: /technician/service-completed
 class ServiceCompletedScreen extends StatelessWidget {
-  const ServiceCompletedScreen({super.key});
+  final Map<String, dynamic> extra;
+
+  const ServiceCompletedScreen({
+    super.key,
+    this.extra = const <String, dynamic>{},
+  });
 
   @override
   Widget build(BuildContext context) {
-    final extra =
-        GoRouterState.of(context).extra as Map<String, dynamic>? ?? {};
-
     final driverName = extra['driverName'] as String? ?? 'Cliente';
     final vehicleInfo = extra['vehicleInfo'] as String?;
     final duration = extra['duration'] as String?;

@@ -20,6 +20,12 @@ abstract class EmergencyRemoteDataSource {
     String aiAnalysisStatus = 'pending',
     EmergencyPriceQuote? priceQuote,
   });
+  Future<void> createTechnicianOffer(String emergencyId);
+  Future<void> acceptTechnicianOffer(String offerId);
+  Future<List<Map<String, dynamic>>> getTechnicianOffers(String emergencyId);
+  Stream<List<Map<String, dynamic>>> watchTechnicianOfferRows(
+    String emergencyId,
+  );
   Future<EmergencyAiAnalysisModel> analyzeEmergency({
     required String description,
     double? lat,
@@ -139,7 +145,9 @@ class EmergencyRemoteDataSourceImpl implements EmergencyRemoteDataSource {
         'descripcion': 'Emergencia creada',
       });
 
-      unawaited(_notifyTechniciansAboutEmergency(emergencyData['id']?.toString()));
+      unawaited(
+        _notifyTechniciansAboutEmergency(emergencyData['id']?.toString()),
+      );
 
       // 5. Fetch with joins
       return await getEmergency(emergencyData['id']);
@@ -552,6 +560,57 @@ class EmergencyRemoteDataSourceImpl implements EmergencyRemoteDataSource {
     } on PostgrestException catch (e) {
       throw ServerException(message: e.message);
     }
+  }
+
+  @override
+  Future<void> createTechnicianOffer(String emergencyId) async {
+    try {
+      await _client.rpc(
+        'create_technician_offer',
+        params: {'p_emergency_id': emergencyId},
+      );
+    } on PostgrestException catch (e) {
+      throw ServerException(message: e.message);
+    }
+  }
+
+  @override
+  Future<void> acceptTechnicianOffer(String offerId) async {
+    try {
+      await _client.rpc(
+        'accept_technician_offer',
+        params: {'p_offer_id': offerId},
+      );
+    } on PostgrestException catch (e) {
+      throw ServerException(message: e.message);
+    }
+  }
+
+  @override
+  Future<List<Map<String, dynamic>>> getTechnicianOffers(
+    String emergencyId,
+  ) async {
+    try {
+      final data = await _client.rpc(
+        'get_technician_offers_for_driver',
+        params: {'p_emergency_id': emergencyId},
+      );
+      return (data as List)
+          .whereType<Map>()
+          .map((row) => Map<String, dynamic>.from(row))
+          .toList();
+    } on PostgrestException catch (e) {
+      throw ServerException(message: e.message);
+    }
+  }
+
+  @override
+  Stream<List<Map<String, dynamic>>> watchTechnicianOfferRows(
+    String emergencyId,
+  ) {
+    return _client
+        .from(AppConstants.tableTechnicianOffers)
+        .stream(primaryKey: ['id']).eq('emergencia_id', emergencyId);
   }
 
   @override

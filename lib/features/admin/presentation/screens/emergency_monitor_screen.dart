@@ -2,7 +2,6 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:gap/gap.dart';
-import 'package:google_fonts/google_fonts.dart';
 import '../../../../core/constants/app_colors.dart';
 import '../../../../core/constants/app_constants.dart';
 import '../../../../core/router/app_router.dart';
@@ -204,7 +203,7 @@ class _MonitorAppBar extends StatelessWidget {
         children: [
           Text(
             'Monitor de Emergencias',
-            style: GoogleFonts.poppins(
+            style: TextStyle(
               fontSize: 16,
               fontWeight: FontWeight.w700,
               color: AppColors.textPrimary,
@@ -292,7 +291,7 @@ class _StatTile extends StatelessWidget {
       children: [
         Text(
           item.value,
-          style: GoogleFonts.poppins(
+          style: TextStyle(
             fontSize: 20,
             fontWeight: FontWeight.w800,
             color: item.color,
@@ -302,7 +301,7 @@ class _StatTile extends StatelessWidget {
         const Gap(2),
         Text(
           item.label,
-          style: GoogleFonts.poppins(
+          style: TextStyle(
             fontSize: 10,
             fontWeight: FontWeight.w500,
             color: AppColors.textSecondary,
@@ -362,7 +361,7 @@ class _MonitorTabBar extends StatelessWidget {
                 child: Text(
                   count > 0 ? '$label ($count)' : label,
                   textAlign: TextAlign.center,
-                  style: GoogleFonts.poppins(
+                  style: TextStyle(
                     fontSize: 13,
                     fontWeight: isActive ? FontWeight.w700 : FontWeight.w500,
                     color:
@@ -454,7 +453,7 @@ class _EmergencyCard extends StatelessWidget {
                     aiSummary?.isNotEmpty == true ? aiSummary! : descripcion,
                     maxLines: 2,
                     overflow: TextOverflow.ellipsis,
-                    style: GoogleFonts.poppins(
+                    style: TextStyle(
                       fontSize: 13,
                       fontWeight: FontWeight.w600,
                       color: AppColors.textPrimary,
@@ -479,7 +478,7 @@ class _EmergencyCard extends StatelessWidget {
                     const Gap(5),
                     Text(
                       conductorNombre,
-                      style: GoogleFonts.poppins(
+                      style: TextStyle(
                         fontSize: 12,
                         color: AppColors.textSecondary,
                       ),
@@ -497,7 +496,7 @@ class _EmergencyCard extends StatelessWidget {
                         direccion,
                         maxLines: 1,
                         overflow: TextOverflow.ellipsis,
-                        style: GoogleFonts.poppins(
+                        style: TextStyle(
                           fontSize: 12,
                           color: AppColors.textSecondary,
                         ),
@@ -506,7 +505,7 @@ class _EmergencyCard extends StatelessWidget {
                     const Gap(6),
                     Text(
                       timeAgoFn(fechaStr),
-                      style: GoogleFonts.poppins(
+                      style: TextStyle(
                         fontSize: 10,
                         color: AppColors.textHint,
                       ),
@@ -559,7 +558,7 @@ class _EmergencyCard extends StatelessWidget {
                       Expanded(
                         child: Text(
                           tecnicoNombre,
-                          style: GoogleFonts.poppins(
+                          style: TextStyle(
                             fontSize: 12,
                             fontWeight: FontWeight.w600,
                             color: AppColors.textPrimary,
@@ -580,7 +579,7 @@ class _EmergencyCard extends StatelessWidget {
                           icon: const Icon(Icons.person_add_rounded, size: 16),
                           label: Text(
                             'Asignar Técnico',
-                            style: GoogleFonts.poppins(
+                            style: TextStyle(
                               fontSize: 12,
                               fontWeight: FontWeight.w600,
                             ),
@@ -602,7 +601,7 @@ class _EmergencyCard extends StatelessWidget {
                           const Gap(6),
                           Text(
                             'Sin técnico asignado',
-                            style: GoogleFonts.poppins(
+                            style: TextStyle(
                               fontSize: 12,
                               color: AppColors.textHint,
                             ),
@@ -637,7 +636,7 @@ class _AiChip extends StatelessWidget {
           const Gap(4),
           Text(
             'IA: $label',
-            style: GoogleFonts.poppins(
+            style: TextStyle(
               fontSize: 10,
               fontWeight: FontWeight.w600,
               color: AppColors.info,

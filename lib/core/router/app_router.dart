@@ -73,14 +73,28 @@ abstract class AppRoutes {
   static const String emergencyMonitor = '/admin/monitor';
 }
 
-final appRouterProvider = Provider<GoRouter>((ref) {
-  final authState = ref.watch(authStateProvider);
-  final authNotifierState = ref.watch(authNotifierProvider);
-  final isRecovery = ref.watch(passwordRecoveryProvider).value == true;
+class _RouterRefreshNotifier extends ChangeNotifier {
+  void refresh() => notifyListeners();
+}
 
+final _routerRefreshProvider = Provider<_RouterRefreshNotifier>((ref) {
+  final notifier = _RouterRefreshNotifier();
+  ref.listen(authStateProvider, (_, __) => notifier.refresh());
+  ref.listen(authNotifierProvider, (_, __) => notifier.refresh());
+  ref.listen(passwordRecoveryProvider, (_, __) => notifier.refresh());
+  ref.onDispose(notifier.dispose);
+  return notifier;
+});
+
+final appRouterProvider = Provider<GoRouter>((ref) {
+  final refreshNotifier = ref.watch(_routerRefreshProvider);
   return GoRouter(
     initialLocation: AppRoutes.splash,
+    refreshListenable: refreshNotifier,
     redirect: (context, state) {
+      final authState = ref.read(authStateProvider);
+      final authNotifierState = ref.read(authNotifierProvider);
+      final isRecovery = ref.read(passwordRecoveryProvider).value == true;
       final user = authNotifierState.valueOrNull ?? authState.valueOrNull;
       final isLoggedIn = user != null;
       final authIsLoading =
@@ -215,7 +229,15 @@ final appRouterProvider = Provider<GoRouter>((ref) {
       GoRoute(
         path: AppRoutes.rateService,
         builder: (context, state) {
-          final args = state.extra as Map<String, String>? ?? {};
+          final rawArgs = state.extra;
+          final args = rawArgs is Map
+              ? rawArgs.map(
+                  (key, value) => MapEntry(
+                    key.toString(),
+                    value?.toString() ?? '',
+                  ),
+                )
+              : const <String, String>{};
           return RateServiceScreen(
             emergencyId: args['emergencyId'] ?? '',
             technicianId: args['technicianId'] ?? '',
@@ -253,17 +275,27 @@ final appRouterProvider = Provider<GoRouter>((ref) {
       GoRoute(
         path: AppRoutes.rateDriver,
         builder: (context, state) {
-          final args = state.extra as Map<String, dynamic>? ?? {};
+          final rawArgs = state.extra;
+          final args = rawArgs is Map
+              ? Map<String, dynamic>.fromEntries(
+                  rawArgs.entries.map(
+                    (entry) => MapEntry(
+                      entry.key.toString(),
+                      entry.value,
+                    ),
+                  ),
+                )
+              : const <String, dynamic>{};
           return RateDriverScreen(
-            emergencyId: args['emergencyId'] as String? ?? '',
-            asignacionId: args['asignacionId'] as String?,
-            technicianId: args['technicianId'] as String?,
-            driverId: args['driverId'] as String? ?? '',
-            driverName: args['driverName'] as String? ?? 'Conductor',
-            vehicleInfo: args['vehicleInfo'] as String?,
-            duration: args['duration'] as String?,
-            clasificacionIa: args['clasificacionIa'] as String?,
-            amount: args['amount'] as String?,
+            emergencyId: args['emergencyId']?.toString() ?? '',
+            asignacionId: args['asignacionId']?.toString(),
+            technicianId: args['technicianId']?.toString(),
+            driverId: args['driverId']?.toString() ?? '',
+            driverName: args['driverName']?.toString() ?? 'Conductor',
+            vehicleInfo: args['vehicleInfo']?.toString(),
+            duration: args['duration']?.toString(),
+            clasificacionIa: args['clasificacionIa']?.toString(),
+            amount: args['amount']?.toString(),
           );
         },
       ),
@@ -273,7 +305,20 @@ final appRouterProvider = Provider<GoRouter>((ref) {
       ),
       GoRoute(
         path: AppRoutes.serviceCompleted,
-        builder: (context, state) => const ServiceCompletedScreen(),
+        builder: (context, state) {
+          final rawArgs = state.extra;
+          final args = rawArgs is Map
+              ? Map<String, dynamic>.fromEntries(
+                  rawArgs.entries.map(
+                    (entry) => MapEntry(
+                      entry.key.toString(),
+                      entry.value,
+                    ),
+                  ),
+                )
+              : const <String, dynamic>{};
+          return ServiceCompletedScreen(extra: args);
+        },
       ),
 
       // ─── Shared ────────────────────────────────────────────────────────

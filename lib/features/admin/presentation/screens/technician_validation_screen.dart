@@ -2,7 +2,6 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:gap/gap.dart';
-import 'package:google_fonts/google_fonts.dart';
 import '../../../../core/constants/app_colors.dart';
 import '../../../../core/constants/app_constants.dart';
 import '../../../../core/router/app_router.dart';
@@ -189,7 +188,7 @@ class _ValidationAppBar extends StatelessWidget {
       ),
       title: Text(
         'Validación de Técnicos',
-        style: GoogleFonts.poppins(
+        style: TextStyle(
           fontSize: 17,
           fontWeight: FontWeight.w700,
           color: AppColors.textPrimary,
@@ -266,7 +265,7 @@ class _ValidationTabBar extends StatelessWidget {
                           children: [
                             Text(
                               count > 0 ? '$count' : '—',
-                              style: GoogleFonts.poppins(
+                              style: TextStyle(
                                 fontSize: 16,
                                 fontWeight: FontWeight.w800,
                                 color: isActive
@@ -278,7 +277,7 @@ class _ValidationTabBar extends StatelessWidget {
                             const Gap(2),
                             Text(
                               label,
-                              style: GoogleFonts.poppins(
+                              style: TextStyle(
                                 fontSize: 10,
                                 fontWeight: FontWeight.w600,
                                 color: isActive
@@ -338,7 +337,7 @@ class _SpecialtyFilter extends StatelessWidget {
                 ),
                 child: Text(
                   opt,
-                  style: GoogleFonts.poppins(
+                  style: TextStyle(
                     fontSize: 12,
                     fontWeight: FontWeight.w600,
                     color: isSelected ? Colors.white : AppColors.textSecondary,
@@ -405,7 +404,7 @@ class _TechCard extends StatelessWidget {
                     children: [
                       Text(
                         nombre,
-                        style: GoogleFonts.poppins(
+                        style: TextStyle(
                           fontSize: 14,
                           fontWeight: FontWeight.w700,
                           color: AppColors.textPrimary,
@@ -416,7 +415,7 @@ class _TechCard extends StatelessWidget {
                       if (especialidad.isNotEmpty)
                         Text(
                           especialidad,
-                          style: GoogleFonts.poppins(
+                          style: TextStyle(
                             fontSize: 11,
                             color: AppColors.textSecondary,
                           ),
@@ -515,7 +514,7 @@ class _StatusBadge extends StatelessWidget {
       ),
       child: Text(
         label,
-        style: GoogleFonts.poppins(
+        style: TextStyle(
           fontSize: 10,
           fontWeight: FontWeight.w700,
           color: color,
@@ -552,7 +551,7 @@ class _DetailRow extends StatelessWidget {
             children: [
               Text(
                 label,
-                style: GoogleFonts.poppins(
+                style: TextStyle(
                   fontSize: 10,
                   fontWeight: FontWeight.w600,
                   color: AppColors.textHint,
@@ -562,7 +561,7 @@ class _DetailRow extends StatelessWidget {
               const Gap(1),
               Text(
                 value,
-                style: GoogleFonts.poppins(
+                style: TextStyle(
                   fontSize: 13,
                   color: AppColors.textPrimary,
                 ),
@@ -627,7 +626,7 @@ class _CredentialRow extends StatelessWidget {
                         const Gap(8),
                         Text(
                           'No se pudo cargar la imagen',
-                          style: GoogleFonts.poppins(
+                          style: TextStyle(
                             fontSize: 12,
                             color: Colors.white38,
                           ),
@@ -688,7 +687,7 @@ class _CredentialRow extends StatelessWidget {
                 children: [
                   Text(
                     'Documento de identidad',
-                    style: GoogleFonts.poppins(
+                    style: TextStyle(
                       fontSize: 10,
                       fontWeight: FontWeight.w600,
                       color: AppColors.textHint,
@@ -699,7 +698,7 @@ class _CredentialRow extends StatelessWidget {
                     hasDoc
                         ? 'Foto adjunta — toca para ampliar'
                         : 'Documento no disponible',
-                    style: GoogleFonts.poppins(
+                    style: TextStyle(
                       fontSize: 12,
                       fontWeight: FontWeight.w500,
                       color: hasDoc ? AppColors.info : AppColors.textHint,
@@ -758,7 +757,7 @@ class _CredentialRow extends StatelessWidget {
                         const Gap(8),
                         Text(
                           'No se pudo cargar la imagen',
-                          style: GoogleFonts.poppins(
+                          style: TextStyle(
                             fontSize: 12,
                             color: AppColors.textHint,
                           ),
@@ -874,7 +873,7 @@ class _ApproveSheet extends StatelessWidget {
           const Gap(16),
           Text(
             'Confirmar aprobación',
-            style: GoogleFonts.poppins(
+            style: TextStyle(
               fontSize: 18,
               fontWeight: FontWeight.w700,
               color: AppColors.textPrimary,
@@ -884,7 +883,7 @@ class _ApproveSheet extends StatelessWidget {
           Text(
             '$nombre podrá acceder a la plataforma\ncomo técnico verificado.',
             textAlign: TextAlign.center,
-            style: GoogleFonts.poppins(
+            style: TextStyle(
               fontSize: 13,
               color: AppColors.textSecondary,
               height: 1.5,
@@ -997,7 +996,7 @@ class _RejectSheetState extends State<_RejectSheet> {
                 children: [
                   Text(
                     'Rechazar técnico',
-                    style: GoogleFonts.poppins(
+                    style: TextStyle(
                       fontSize: 16,
                       fontWeight: FontWeight.w700,
                       color: AppColors.textPrimary,
@@ -1005,7 +1004,7 @@ class _RejectSheetState extends State<_RejectSheet> {
                   ),
                   Text(
                     'Selecciona el motivo de rechazo',
-                    style: GoogleFonts.poppins(
+                    style: TextStyle(
                       fontSize: 12,
                       color: AppColors.textSecondary,
                     ),
@@ -1017,7 +1016,7 @@ class _RejectSheetState extends State<_RejectSheet> {
           const Gap(20),
           Text(
             'Motivo',
-            style: GoogleFonts.poppins(
+            style: TextStyle(
               fontSize: 12,
               fontWeight: FontWeight.w600,
               color: AppColors.textSecondary,
@@ -1047,7 +1046,7 @@ class _RejectSheetState extends State<_RejectSheet> {
                   ),
                   child: Text(
                     reason,
-                    style: GoogleFonts.poppins(
+                    style: TextStyle(
                       fontSize: 12,
                       fontWeight:
                           isSelected ? FontWeight.w700 : FontWeight.w500,
@@ -1063,7 +1062,7 @@ class _RejectSheetState extends State<_RejectSheet> {
           const Gap(16),
           Text(
             'Observaciones',
-            style: GoogleFonts.poppins(
+            style: TextStyle(
               fontSize: 12,
               fontWeight: FontWeight.w600,
               color: AppColors.textSecondary,
@@ -1075,10 +1074,10 @@ class _RejectSheetState extends State<_RejectSheet> {
             controller: _noteCtrl,
             maxLines: 3,
             style:
-                GoogleFonts.poppins(fontSize: 13, color: AppColors.textPrimary),
+                TextStyle(fontSize: 13, color: AppColors.textPrimary),
             decoration: InputDecoration(
               hintText: 'Agrega detalles adicionales...',
-              hintStyle: GoogleFonts.poppins(
+              hintStyle: TextStyle(
                 fontSize: 13,
                 color: AppColors.textHint,
               ),

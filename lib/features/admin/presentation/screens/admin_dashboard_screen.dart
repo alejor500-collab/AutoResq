@@ -2,7 +2,6 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:gap/gap.dart';
-import 'package:google_fonts/google_fonts.dart';
 import '../../../../core/constants/app_colors.dart';
 import '../../../../core/constants/app_constants.dart';
 import '../../../../core/router/app_router.dart';
@@ -159,7 +158,7 @@ class _AdminAppBar extends StatelessWidget {
           const Gap(8),
           Text(
             'Panel de Control',
-            style: GoogleFonts.poppins(
+            style: TextStyle(
               color: Colors.white,
               fontSize: 17,
               fontWeight: FontWeight.w700,
@@ -220,7 +219,7 @@ class _HeroBanner extends StatelessWidget {
               children: [
                 Text(
                   'Bienvenido,',
-                  style: GoogleFonts.poppins(
+                  style: TextStyle(
                     color: Colors.white.withValues(alpha: 0.72),
                     fontSize: 12,
                     fontWeight: FontWeight.w400,
@@ -228,7 +227,7 @@ class _HeroBanner extends StatelessWidget {
                 ),
                 Text(
                   userName,
-                  style: GoogleFonts.poppins(
+                  style: TextStyle(
                     color: Colors.white,
                     fontSize: 20,
                     fontWeight: FontWeight.w700,
@@ -276,7 +275,7 @@ class _SectionHeader extends StatelessWidget {
         Expanded(
           child: Text(
             title,
-            style: GoogleFonts.poppins(
+            style: TextStyle(
               fontSize: 15,
               fontWeight: FontWeight.w700,
               color: AppColors.textPrimary,
@@ -289,7 +288,7 @@ class _SectionHeader extends StatelessWidget {
             onTap: onAction,
             child: Text(
               actionLabel!,
-              style: GoogleFonts.poppins(
+              style: TextStyle(
                 fontSize: 12,
                 fontWeight: FontWeight.w600,
                 color: AppColors.primary,
@@ -400,7 +399,7 @@ class _StatCard extends StatelessWidget {
           const Spacer(),
           Text(
             item.value,
-            style: GoogleFonts.poppins(
+            style: TextStyle(
               fontSize: 26,
               fontWeight: FontWeight.w800,
               color: AppColors.textPrimary,
@@ -410,7 +409,7 @@ class _StatCard extends StatelessWidget {
           const Gap(2),
           Text(
             item.label,
-            style: GoogleFonts.poppins(
+            style: TextStyle(
               fontSize: 11,
               fontWeight: FontWeight.w500,
               color: AppColors.textSecondary,
@@ -459,7 +458,7 @@ class _PendingTechniciansSection extends StatelessWidget {
               const Gap(8),
               Text(
                 'Sin técnicos pendientes',
-                style: GoogleFonts.poppins(
+                style: TextStyle(
                   fontSize: 13,
                   color: AppColors.textSecondary,
                 ),
@@ -493,7 +492,7 @@ class _PendingTechniciansSection extends StatelessWidget {
               child: Text(
                 'Ver ${items.length - 3} más',
                 textAlign: TextAlign.center,
-                style: GoogleFonts.poppins(
+                style: TextStyle(
                   fontSize: 13,
                   fontWeight: FontWeight.w600,
                   color: AppColors.primary,
@@ -542,7 +541,7 @@ class _TechnicianCard extends StatelessWidget {
             child: Center(
               child: Text(
                 initial,
-                style: GoogleFonts.poppins(
+                style: TextStyle(
                   fontSize: 18,
                   fontWeight: FontWeight.w700,
                   color: AppColors.warning,
@@ -557,7 +556,7 @@ class _TechnicianCard extends StatelessWidget {
               children: [
                 Text(
                   nombre,
-                  style: GoogleFonts.poppins(
+                  style: TextStyle(
                     fontSize: 13,
                     fontWeight: FontWeight.w600,
                     color: AppColors.textPrimary,
@@ -567,7 +566,7 @@ class _TechnicianCard extends StatelessWidget {
                 ),
                 Text(
                   email,
-                  style: GoogleFonts.poppins(
+                  style: TextStyle(
                     fontSize: 11,
                     color: AppColors.textSecondary,
                   ),
@@ -586,7 +585,7 @@ class _TechnicianCard extends StatelessWidget {
             ),
             child: Text(
               'Pendiente',
-              style: GoogleFonts.poppins(
+              style: TextStyle(
                 fontSize: 10,
                 fontWeight: FontWeight.w700,
                 color: AppColors.warning,
@@ -652,7 +651,7 @@ class _RecentEmergenciesSection extends StatelessWidget {
                     activeCount == 0
                         ? 'Sin emergencias activas'
                         : '$activeCount emergencia${activeCount != 1 ? 's' : ''} activa${activeCount != 1 ? 's' : ''}',
-                    style: GoogleFonts.poppins(
+                    style: TextStyle(
                       fontSize: 14,
                       fontWeight: FontWeight.w700,
                       color: activeCount > 0
@@ -662,7 +661,7 @@ class _RecentEmergenciesSection extends StatelessWidget {
                   ),
                   Text(
                     'Toca para abrir el monitor en tiempo real',
-                    style: GoogleFonts.poppins(
+                    style: TextStyle(
                       fontSize: 11,
                       color: AppColors.textSecondary,
                     ),

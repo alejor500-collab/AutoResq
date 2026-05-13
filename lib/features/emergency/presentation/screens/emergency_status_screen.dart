@@ -178,10 +178,36 @@ class _StatusBodyState extends ConsumerState<_StatusBody> {
     );
   }
 
+  Future<void> _acceptOffer(TechnicianOffer offer) async {
+    final ok = await ref
+        .read(emergencyNotifierProvider.notifier)
+        .acceptTechnicianOffer(offer.id, widget.emergency.id);
+    if (!mounted) return;
+    if (ok) {
+      AppHelpers.showSnackBar(
+        context,
+        '${offer.name} fue asignado a tu servicio.',
+        isSuccess: true,
+      );
+      return;
+    }
+
+    AppHelpers.showSnackBar(
+      context,
+      ref.read(emergencyNotifierProvider).error ??
+          'No se pudo elegir este tecnico.',
+      isError: true,
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     final emergency = widget.emergency;
     final emergencyState = ref.watch(emergencyNotifierProvider);
+    final offersAsync =
+        emergency.estado == AppConstants.statusPending && !emergency.hasTechnician
+            ? ref.watch(technicianOffersProvider(emergency.id))
+            : const AsyncValue<List<TechnicianOffer>>.data([]);
     final lat = emergency.lat ?? AppConstants.defaultLat;
     final lng = emergency.lng ?? AppConstants.defaultLng;
     final technicianLocation = emergency.tecnicoId == null
@@ -329,9 +355,11 @@ class _StatusBodyState extends ConsumerState<_StatusBody> {
                       onCancel: () => _cancelService(context, ref),
                     )
                   else
-                    _SearchingCard(
+                    _OfferSelectionCard(
+                      offersAsync: offersAsync,
+                      isChoosing: emergencyState.isLoading,
+                      onAccept: _acceptOffer,
                       onCancel: () => _cancelService(context, ref),
-                      isCancelling: emergencyState.isLoading,
                     ),
                   const Gap(24),
 
@@ -1122,6 +1150,387 @@ class _ActionButton extends StatelessWidget {
 }
 
 // ─── Searching Card ───────────────────────────────────────────────────────────
+
+class _OfferSelectionCard extends StatefulWidget {
+  final AsyncValue<List<TechnicianOffer>> offersAsync;
+  final bool isChoosing;
+  final ValueChanged<TechnicianOffer> onAccept;
+  final VoidCallback onCancel;
+
+  const _OfferSelectionCard({
+    required this.offersAsync,
+    required this.isChoosing,
+    required this.onAccept,
+    required this.onCancel,
+  });
+
+  @override
+  State<_OfferSelectionCard> createState() => _OfferSelectionCardState();
+}
+
+class _OfferSelectionCardState extends State<_OfferSelectionCard>
+    with SingleTickerProviderStateMixin {
+  late AnimationController _ctrl;
+
+  @override
+  void initState() {
+    super.initState();
+    _ctrl =
+        AnimationController(vsync: this, duration: const Duration(seconds: 2))
+          ..repeat();
+  }
+
+  @override
+  void dispose() {
+    _ctrl.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.all(22),
+      decoration: BoxDecoration(
+        color: AppColors.surfaceContainerLow,
+        borderRadius: BorderRadius.circular(16),
+      ),
+      child: widget.offersAsync.when(
+        loading: () => _WaitingForOffers(
+          animation: _ctrl,
+          onCancel: widget.onCancel,
+          isBusy: widget.isChoosing,
+        ),
+        error: (_, __) => _WaitingForOffers(
+          animation: _ctrl,
+          onCancel: widget.onCancel,
+          isBusy: widget.isChoosing,
+          message: 'No se pudieron cargar ofertas. Seguimos escuchando.',
+        ),
+        data: (offers) {
+          final pending =
+              offers.where((offer) => offer.status == 'pendiente').toList();
+          if (pending.isEmpty) {
+            return _WaitingForOffers(
+              animation: _ctrl,
+              onCancel: widget.onCancel,
+              isBusy: widget.isChoosing,
+            );
+          }
+
+          return Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Row(
+                children: [
+                  Container(
+                    width: 42,
+                    height: 42,
+                    decoration: BoxDecoration(
+                      color: AppColors.primary.withValues(alpha: 0.10),
+                      borderRadius: BorderRadius.circular(14),
+                    ),
+                    child: const Icon(
+                      Icons.engineering_rounded,
+                      color: AppColors.primary,
+                      size: 22,
+                    ),
+                  ),
+                  const Gap(12),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          '${pending.length} tecnico${pending.length == 1 ? '' : 's'} respondieron',
+                          style: const TextStyle(
+                            fontSize: 17,
+                            fontWeight: FontWeight.w900,
+                            color: AppColors.onSurface,
+                          ),
+                        ),
+                        const Text(
+                          'Elige quien atendera tu solicitud.',
+                          style: TextStyle(
+                            fontSize: 12,
+                            color: AppColors.textSecondary,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                ],
+              ),
+              const Gap(16),
+              ...pending.map(
+                (offer) => Padding(
+                  padding: const EdgeInsets.only(bottom: 10),
+                  child: _TechnicianOfferTile(
+                    offer: offer,
+                    isChoosing: widget.isChoosing,
+                    onAccept: () => widget.onAccept(offer),
+                  ),
+                ),
+              ),
+              const Gap(6),
+              SizedBox(
+                width: double.infinity,
+                child: OutlinedButton.icon(
+                  onPressed: widget.isChoosing ? null : widget.onCancel,
+                  icon: widget.isChoosing
+                      ? const SizedBox(
+                          width: 16,
+                          height: 16,
+                          child: CircularProgressIndicator(strokeWidth: 2),
+                        )
+                      : const Icon(Icons.close_rounded, size: 18),
+                  label: Text(
+                    widget.isChoosing ? 'Procesando...' : 'Cancelar solicitud',
+                  ),
+                ),
+              ),
+            ],
+          );
+        },
+      ),
+    );
+  }
+}
+
+class _WaitingForOffers extends StatelessWidget {
+  final Animation<double> animation;
+  final VoidCallback onCancel;
+  final bool isBusy;
+  final String message;
+
+  const _WaitingForOffers({
+    required this.animation,
+    required this.onCancel,
+    required this.isBusy,
+    this.message = 'Los tecnicos disponibles podran responder en tiempo real.',
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return Column(
+      children: [
+        RotationTransition(
+          turns: animation,
+          child: const Icon(Icons.sync, color: AppColors.primary, size: 32),
+        ),
+        const Gap(16),
+        const Text(
+          'Esperando respuestas de tecnicos...',
+          textAlign: TextAlign.center,
+          style: TextStyle(
+            fontSize: 16,
+            fontWeight: FontWeight.w700,
+            color: AppColors.onSurface,
+          ),
+        ),
+        const Gap(4),
+        Text(
+          message,
+          textAlign: TextAlign.center,
+          style: const TextStyle(fontSize: 13, color: AppColors.secondary),
+        ),
+        const Gap(24),
+        SizedBox(
+          width: double.infinity,
+          child: OutlinedButton.icon(
+            onPressed: isBusy ? null : onCancel,
+            icon: isBusy
+                ? const SizedBox(
+                    width: 16,
+                    height: 16,
+                    child: CircularProgressIndicator(strokeWidth: 2),
+                  )
+                : const Icon(Icons.close_rounded, size: 18),
+            label: Text(isBusy ? 'Procesando...' : 'Cancelar solicitud'),
+          ),
+        ),
+        const Gap(8),
+        const Text(
+          'Puedes cancelar sin cargo mientras no elijas un tecnico.',
+          textAlign: TextAlign.center,
+          style: TextStyle(
+            fontSize: 12,
+            color: AppColors.textSecondary,
+            height: 1.35,
+          ),
+        ),
+      ],
+    );
+  }
+}
+
+class _TechnicianOfferTile extends StatelessWidget {
+  final TechnicianOffer offer;
+  final bool isChoosing;
+  final VoidCallback onAccept;
+
+  const _TechnicianOfferTile({
+    required this.offer,
+    required this.isChoosing,
+    required this.onAccept,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final specialty = offer.specialty?.trim().isNotEmpty == true
+        ? offer.specialty!.trim()
+        : 'Tecnico verificado';
+
+    return Container(
+      padding: const EdgeInsets.all(14),
+      decoration: BoxDecoration(
+        color: AppColors.surfaceContainerLowest,
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(color: AppColors.outlineVariant),
+      ),
+      child: Column(
+        children: [
+          Row(
+            children: [
+              CircleAvatar(
+                radius: 24,
+                backgroundColor: AppColors.surfaceContainerHigh,
+                child: Text(
+                  AppHelpers.getInitials(offer.name),
+                  style: const TextStyle(
+                    fontWeight: FontWeight.w800,
+                    color: AppColors.onSurface,
+                  ),
+                ),
+              ),
+              const Gap(12),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      offer.name,
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: const TextStyle(
+                        fontSize: 15,
+                        fontWeight: FontWeight.w900,
+                        color: AppColors.onSurface,
+                      ),
+                    ),
+                    Text(
+                      specialty,
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: const TextStyle(
+                        fontSize: 12,
+                        color: AppColors.textSecondary,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+              Container(
+                padding:
+                    const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+                decoration: BoxDecoration(
+                  color: AppColors.primary.withValues(alpha: 0.10),
+                  borderRadius: BorderRadius.circular(9999),
+                ),
+                child: Text(
+                  offer.etaLabel,
+                  style: const TextStyle(
+                    fontSize: 11,
+                    fontWeight: FontWeight.w900,
+                    color: AppColors.primary,
+                  ),
+                ),
+              ),
+            ],
+          ),
+          const Gap(12),
+          Row(
+            children: [
+              _OfferMetric(
+                icon: Icons.star_rounded,
+                label: offer.ratingLabel,
+                color: Colors.amber.shade700,
+              ),
+              const Gap(8),
+              _OfferMetric(
+                icon: Icons.route_outlined,
+                label: offer.distanceLabel,
+                color: AppColors.secondary,
+              ),
+              const Gap(8),
+              _OfferMetric(
+                icon: Icons.assignment_turned_in_outlined,
+                label: '${offer.totalServices} servicios',
+                color: AppColors.tertiary,
+              ),
+            ],
+          ),
+          const Gap(12),
+          SizedBox(
+            width: double.infinity,
+            child: FilledButton.icon(
+              onPressed: isChoosing ? null : onAccept,
+              style: FilledButton.styleFrom(
+                backgroundColor: AppColors.primary,
+                foregroundColor: Colors.white,
+              ),
+              icon: const Icon(Icons.check_rounded, size: 18),
+              label: const Text('Elegir tecnico'),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _OfferMetric extends StatelessWidget {
+  final IconData icon;
+  final String label;
+  final Color color;
+
+  const _OfferMetric({
+    required this.icon,
+    required this.label,
+    required this.color,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return Expanded(
+      child: Container(
+        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 7),
+        decoration: BoxDecoration(
+          color: color.withValues(alpha: 0.08),
+          borderRadius: BorderRadius.circular(12),
+        ),
+        child: Row(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            Icon(icon, size: 14, color: color),
+            const Gap(4),
+            Flexible(
+              child: Text(
+                label,
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+                style: TextStyle(
+                  fontSize: 11,
+                  fontWeight: FontWeight.w800,
+                  color: color,
+                ),
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
 
 class _SearchingCard extends StatefulWidget {
   final VoidCallback onCancel;

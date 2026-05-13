@@ -112,6 +112,7 @@ class _RateDriverScreenState extends ConsumerState<RateDriverScreen> {
             comentario: _reviewCtrl.text.trim().isEmpty
                 ? null
                 : _reviewCtrl.text.trim(),
+            refreshCurrentUser: false,
           );
       if (!ok) {
         final error = ref.read(ratingNotifierProvider).error;
@@ -121,11 +122,18 @@ class _RateDriverScreenState extends ConsumerState<RateDriverScreen> {
       }
 
       if (!mounted) return;
-      ref.read(emergencyNotifierProvider.notifier).clearActiveEmergency();
-      context.go(
-        AppRoutes.serviceCompleted,
-        extra: _resumenParams(techRating: _stars),
-      );
+      setState(() => _isLoading = false);
+      final emergencyNotifier = ref.read(emergencyNotifierProvider.notifier);
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (!mounted) return;
+        context.go(
+          AppRoutes.serviceCompleted,
+          extra: _resumenParams(techRating: _stars),
+        );
+        Future<void>.delayed(Duration.zero, () {
+          emergencyNotifier.clearActiveEmergency();
+        });
+      });
     } catch (e) {
       if (!mounted) return;
       AppHelpers.showSnackBar(

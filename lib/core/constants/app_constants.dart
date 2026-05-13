@@ -55,6 +55,7 @@ abstract class AppConstants {
   static const String tableEmergencias = 'emergencias';
   static const String tableUbicaciones = 'ubicaciones';
   static const String tableAsignaciones = 'asignaciones';
+  static const String tableTechnicianOffers = 'technician_offers';
   static const String tableMensajes = 'mensajes';
   static const String tableCalificaciones = 'calificaciones';
   static const String tableHistorial = 'historial';

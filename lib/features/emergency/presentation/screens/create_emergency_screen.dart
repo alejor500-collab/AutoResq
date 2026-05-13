@@ -508,7 +508,7 @@ class _CreateEmergencyScreenState extends ConsumerState<CreateEmergencyScreen> {
                   ? 'Enviando...'
                   : needsDestination
                       ? 'Seleccionar destino'
-                      : 'Buscar tecnico cercano',
+                      : 'Publicar solicitud',
           icon: needsDestination ? Icons.map_outlined : Icons.arrow_forward,
           isLoading: emergencyState.isLoading || _isPricingLoading,
           onPressed: emergencyState.isLoading || _isPricingLoading

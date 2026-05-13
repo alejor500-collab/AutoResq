@@ -1,6 +1,5 @@
 import 'package:flutter/material.dart';
 import 'package:gap/gap.dart';
-import 'package:google_fonts/google_fonts.dart';
 import '../../core/constants/app_colors.dart';
 import '../../core/constants/app_constants.dart';
 
@@ -97,7 +96,7 @@ class _NavTile extends StatelessWidget {
               const Gap(4),
               Text(
                 item.label,
-                style: GoogleFonts.poppins(
+                style: TextStyle(
                   fontSize: 10,
                   fontWeight: isSelected ? FontWeight.w700 : FontWeight.w500,
                   color: isSelected ? AppColors.onPrimary : AppColors.secondary,

@@ -3,7 +3,6 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:flutter_map/flutter_map.dart';
-import 'package:google_fonts/google_fonts.dart';
 import 'package:latlong2/latlong.dart';
 import '../../../../core/constants/app_colors.dart';
 import '../../../../core/constants/app_constants.dart';
@@ -297,7 +296,7 @@ class _DriverHomeScreenState extends ConsumerState<DriverHomeScreen> {
                         children: [
                           Text(
                             'BIENVENIDO DE VUELTA',
-                            style: GoogleFonts.poppins(
+                            style: TextStyle(
                               fontSize: 12,
                               fontWeight: FontWeight.w700,
                               letterSpacing: 0.5,
@@ -307,7 +306,7 @@ class _DriverHomeScreenState extends ConsumerState<DriverHomeScreen> {
                           const SizedBox(height: 4),
                           Text(
                             'Hola, ${user?.name.split(' ').first ?? 'Conductor'}',
-                            style: GoogleFonts.poppins(
+                            style: TextStyle(
                               fontSize: 34,
                               fontWeight: FontWeight.w800,
                               color: Colors.white,
@@ -328,7 +327,7 @@ class _DriverHomeScreenState extends ConsumerState<DriverHomeScreen> {
                                       ? 'Obteniendo ubicación...'
                                       : address,
                                   overflow: TextOverflow.ellipsis,
-                                  style: GoogleFonts.poppins(
+                                  style: TextStyle(
                                     fontSize: 13,
                                     color: Colors.white.withValues(alpha: 0.84),
                                     fontWeight: FontWeight.w500,
@@ -490,7 +489,7 @@ class _DriverHomeScreenState extends ConsumerState<DriverHomeScreen> {
                         const Spacer(),
                         Text(
                           'AutoResQ',
-                          style: GoogleFonts.poppins(
+                          style: TextStyle(
                             fontSize: 20,
                             fontWeight: FontWeight.w900,
                             color: AppColors.onSurface,
@@ -835,7 +834,7 @@ class _MapSection extends ConsumerWidget {
                           const SizedBox(width: 8),
                           Text(
                             'Servicios en ruta',
-                            style: GoogleFonts.poppins(
+                            style: TextStyle(
                               fontSize: 12,
                               fontWeight: FontWeight.w700,
                               color: AppColors.onSurface,

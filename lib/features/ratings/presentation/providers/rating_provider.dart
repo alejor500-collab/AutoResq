@@ -15,6 +15,7 @@ class RatingNotifier extends StateNotifier<AsyncValue<void>> {
     required int puntuacion,
     required String raterRole,
     String? comentario,
+    bool refreshCurrentUser = true,
   }) async {
     final user = _ref.read(authNotifierProvider).value ??
         _ref.read(authStateProvider).valueOrNull;
@@ -33,9 +34,11 @@ class RatingNotifier extends StateNotifier<AsyncValue<void>> {
 
       await _recalculateStats(calificadoId);
       await _recalculateStats(user.id);
-      final freshUser =
-          await _ref.read(authNotifierProvider.notifier).reloadCurrentUser();
-      _ref.read(currentUserProvider.notifier).state = freshUser;
+      if (refreshCurrentUser) {
+        final freshUser =
+            await _ref.read(authNotifierProvider.notifier).reloadCurrentUser();
+        _ref.read(currentUserProvider.notifier).state = freshUser;
+      }
 
       state = const AsyncValue.data(null);
       return true;
@@ -44,9 +47,11 @@ class RatingNotifier extends StateNotifier<AsyncValue<void>> {
           e.message.toLowerCase().contains('duplicate key')) {
         await _recalculateStats(calificadoId);
         await _recalculateStats(user.id);
-        final freshUser =
-            await _ref.read(authNotifierProvider.notifier).reloadCurrentUser();
-        _ref.read(currentUserProvider.notifier).state = freshUser;
+        if (refreshCurrentUser) {
+          final freshUser =
+              await _ref.read(authNotifierProvider.notifier).reloadCurrentUser();
+          _ref.read(currentUserProvider.notifier).state = freshUser;
+        }
         state = const AsyncValue.data(null);
         return true;
       }

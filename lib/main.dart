@@ -1,7 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:google_fonts/google_fonts.dart';
 import 'package:intl/date_symbol_data_local.dart';
 import 'package:intl/intl.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
@@ -115,85 +114,85 @@ class _AutoResQAppState extends ConsumerState<AutoResQApp> {
       surfaceTint: AppColors.surfaceTint,
     );
 
-    final textTheme = GoogleFonts.interTextTheme().copyWith(
-      displayLarge: GoogleFonts.inter(
+    final textTheme = ThemeData.light().textTheme.copyWith(
+      displayLarge: TextStyle(
         fontSize: 44,
         fontWeight: FontWeight.w800,
         color: AppColors.onSurface,
         letterSpacing: -1.5,
         height: 1.1,
       ),
-      displayMedium: GoogleFonts.inter(
+      displayMedium: TextStyle(
         fontSize: 36,
         fontWeight: FontWeight.w800,
         color: AppColors.onSurface,
         letterSpacing: -1.0,
         height: 1.1,
       ),
-      displaySmall: GoogleFonts.inter(
+      displaySmall: TextStyle(
         fontSize: 28,
         fontWeight: FontWeight.w800,
         color: AppColors.onSurface,
         letterSpacing: -0.5,
       ),
-      headlineLarge: GoogleFonts.inter(
+      headlineLarge: TextStyle(
         fontSize: 24,
         fontWeight: FontWeight.w700,
         color: AppColors.onSurface,
         letterSpacing: -0.5,
       ),
-      headlineSmall: GoogleFonts.inter(
+      headlineSmall: TextStyle(
         fontSize: 20,
         fontWeight: FontWeight.w700,
         color: AppColors.onSurface,
         letterSpacing: -0.3,
       ),
-      titleLarge: GoogleFonts.inter(
+      titleLarge: TextStyle(
         fontSize: 18,
         fontWeight: FontWeight.w700,
         color: AppColors.onSurface,
         letterSpacing: -0.2,
       ),
-      titleMedium: GoogleFonts.inter(
+      titleMedium: TextStyle(
         fontSize: 16,
         fontWeight: FontWeight.w600,
         color: AppColors.onSurface,
       ),
-      titleSmall: GoogleFonts.inter(
+      titleSmall: TextStyle(
         fontSize: 14,
         fontWeight: FontWeight.w600,
         color: AppColors.onSurface,
       ),
-      bodyLarge: GoogleFonts.inter(
+      bodyLarge: TextStyle(
         fontSize: 16,
         fontWeight: FontWeight.w400,
         color: AppColors.onSurface,
         height: 1.5,
       ),
-      bodyMedium: GoogleFonts.inter(
+      bodyMedium: TextStyle(
         fontSize: 14,
         fontWeight: FontWeight.w400,
         color: AppColors.onSurface,
         height: 1.5,
       ),
-      bodySmall: GoogleFonts.inter(
+      bodySmall: TextStyle(
         fontSize: 12,
         fontWeight: FontWeight.w400,
         color: AppColors.secondary,
       ),
-      labelLarge: GoogleFonts.inter(
+      labelLarge: TextStyle(
         fontSize: 14,
         fontWeight: FontWeight.w700,
         color: AppColors.onSurface,
         letterSpacing: 0.5,
       ),
-      labelMedium: GoogleFonts.inter(
+      labelMedium: TextStyle(
         fontSize: 12,
         fontWeight: FontWeight.w700,
         color: AppColors.secondary,
         letterSpacing: 0.5,
       ),
-      labelSmall: GoogleFonts.inter(
+      labelSmall: TextStyle(
         fontSize: 10,
         fontWeight: FontWeight.w700,
         color: AppColors.secondary,
@@ -221,7 +220,7 @@ class _AutoResQAppState extends ConsumerState<AutoResQApp> {
         scrolledUnderElevation: 0,
         centerTitle: true,
         iconTheme: const IconThemeData(color: AppColors.secondary),
-        titleTextStyle: GoogleFonts.inter(
+        titleTextStyle: TextStyle(
           fontSize: 18,
           fontWeight: FontWeight.w700,
           color: AppColors.onSurface,
@@ -277,7 +276,7 @@ class _AutoResQAppState extends ConsumerState<AutoResQApp> {
             borderRadius: BorderRadius.circular(22),
           ),
           elevation: 0,
-          textStyle: GoogleFonts.inter(
+          textStyle: TextStyle(
             fontSize: 16,
             fontWeight: FontWeight.w700,
           ),
@@ -291,7 +290,7 @@ class _AutoResQAppState extends ConsumerState<AutoResQApp> {
           shape: RoundedRectangleBorder(
             borderRadius: BorderRadius.circular(20),
           ),
-          textStyle: GoogleFonts.inter(
+          textStyle: TextStyle(
             fontSize: 15,
             fontWeight: FontWeight.w800,
           ),
@@ -305,7 +304,7 @@ class _AutoResQAppState extends ConsumerState<AutoResQApp> {
             borderRadius: BorderRadius.circular(20),
           ),
           side: const BorderSide(color: AppColors.surfaceContainerHigh),
-          textStyle: GoogleFonts.inter(
+          textStyle: TextStyle(
             fontSize: 15,
             fontWeight: FontWeight.w800,
           ),
@@ -314,7 +313,7 @@ class _AutoResQAppState extends ConsumerState<AutoResQApp> {
       textButtonTheme: TextButtonThemeData(
         style: TextButton.styleFrom(
           foregroundColor: AppColors.primary,
-          textStyle: GoogleFonts.inter(
+          textStyle: TextStyle(
             fontSize: 14,
             fontWeight: FontWeight.w700,
           ),
@@ -365,7 +364,7 @@ class _AutoResQAppState extends ConsumerState<AutoResQApp> {
       ),
       snackBarTheme: SnackBarThemeData(
         backgroundColor: AppColors.inverseSurface,
-        contentTextStyle: GoogleFonts.inter(
+        contentTextStyle: TextStyle(
           color: AppColors.inverseOnSurface,
           fontWeight: FontWeight.w500,
         ),
