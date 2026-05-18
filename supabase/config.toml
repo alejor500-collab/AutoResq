@@ -1,0 +1,20 @@
+project_id = "AutoResQ"
+
+[auth]
+site_url = "http://localhost:8080"
+additional_redirect_urls = [
+  "com.autoresq.app://login-callback",
+  "com.autoresq.app://reset-password",
+  "http://localhost:8080",
+  "http://localhost:8080/**",
+  "http://localhost:3000",
+  "http://localhost:3000/**",
+]
+
+[auth.mfa.totp]
+enroll_enabled = true
+verify_enabled = true
+
+[auth.email]
+max_frequency = "1m0s"
+otp_length = 8

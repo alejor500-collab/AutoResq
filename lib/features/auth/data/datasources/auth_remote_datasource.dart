@@ -1,7 +1,5 @@
 import 'dart:async';
-import 'dart:io' show Platform;
 import 'package:flutter/foundation.dart' show kIsWeb;
-import 'package:google_sign_in/google_sign_in.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import '../../../../core/constants/app_constants.dart';
 import '../../../../core/constants/technician_specialties.dart';
@@ -29,15 +27,7 @@ abstract class AuthRemoteDataSource {
 
 class AuthRemoteDataSourceImpl implements AuthRemoteDataSource {
   final SupabaseClient _client;
-  static const _googleWebClientId =
-      '362021637892-ta4rii3kafr7l8p2en8khst5f9ipeik4.apps.googleusercontent.com';
-  // TODO: Replace with the real iOS OAuth client ID from Google Cloud.
-  static const _googleIosClientId =
-      'REPLACE_WITH_GOOGLE_IOS_CLIENT_ID.apps.googleusercontent.com';
-  // TODO: In Google Cloud create an Android OAuth client for package
-  // com.autoresq.app with SHA-1 E1:64:1C:37:48:C6:9C:75:DC:85:75:3F:B7:5B:D6:25:BA:65:95:85.
-  // TODO: In Supabase > Auth > Providers > Google, configure this Web Client
-  // ID together with its Client Secret. Do not place the secret in Flutter.
+  static const _googleRedirectTo = 'com.autoresq.app://login-callback';
 
   AuthRemoteDataSourceImpl(this._client);
 
@@ -68,19 +58,6 @@ class AuthRemoteDataSourceImpl implements AuthRemoteDataSource {
     if (normalized != null) return normalized;
     throw const core_exceptions.AuthException(
       message: 'Selecciona una especialidad tecnica valida.',
-    );
-  }
-
-  GoogleSignIn _buildGoogleSignIn() {
-    final clientId = Platform.isIOS &&
-            _googleIosClientId.startsWith('REPLACE_WITH_') == false
-        ? _googleIosClientId
-        : null;
-
-    return GoogleSignIn(
-      scopes: const ['email', 'profile'],
-      serverClientId: _googleWebClientId,
-      clientId: clientId,
     );
   }
 
@@ -327,45 +304,46 @@ class AuthRemoteDataSourceImpl implements AuthRemoteDataSource {
       }
 
       // Android / iOS: Chrome Custom Tab → deep link → Supabase PKCE callback
-      final googleSignIn = _buildGoogleSignIn();
+      final existingUser = _client.auth.currentUser;
+      if (existingUser != null) return _ensureProfile(existingUser);
 
-      await googleSignIn.signOut();
+      final completer = Completer<UserModel>();
+      late final StreamSubscription<AuthState> subscription;
 
-      final googleUser = await googleSignIn.signIn();
-      if (googleUser == null) {
-        throw const core_exceptions.AuthException(
-          message: 'Inicio de sesion con Google cancelado.',
+      subscription = _client.auth.onAuthStateChange.listen((event) async {
+        final user = event.session?.user;
+        if (user == null || completer.isCompleted) return;
+        try {
+          completer.complete(await _ensureProfile(user));
+        } catch (error, stackTrace) {
+          completer.completeError(error, stackTrace);
+        }
+      });
+
+      try {
+        final launched = await _client.auth.signInWithOAuth(
+          OAuthProvider.google,
+          redirectTo: _googleRedirectTo,
         );
-      }
 
-      final googleAuth = await googleUser.authentication;
-      final idToken = googleAuth.idToken;
-      final accessToken = googleAuth.accessToken;
-      if (idToken == null || idToken.isEmpty) {
-        throw const core_exceptions.AuthException(
-          message: 'Google no devolvio un ID token valido.',
+        if (!launched) {
+          throw const core_exceptions.AuthException(
+            message: 'No se pudo abrir Google para iniciar sesion.',
+          );
+        }
+
+        return await completer.future.timeout(
+          const Duration(minutes: 2),
+          onTimeout: () {
+            throw const core_exceptions.AuthException(
+              message:
+                  'No se completo el inicio con Google. Intenta nuevamente.',
+            );
+          },
         );
+      } finally {
+        await subscription.cancel();
       }
-      if (accessToken == null || accessToken.isEmpty) {
-        throw const core_exceptions.AuthException(
-          message: 'Google no devolvio un access token valido.',
-        );
-      }
-
-      final response = await _client.auth.signInWithIdToken(
-        provider: OAuthProvider.google,
-        idToken: idToken,
-        accessToken: accessToken,
-      );
-
-      final user = response.user ?? _client.auth.currentUser;
-      if (user == null) {
-        throw const core_exceptions.AuthException(
-          message: 'No se pudo completar el acceso con Google.',
-        );
-      }
-
-      return _ensureProfile(user);
     } on core_exceptions.AuthException {
       rethrow;
     } on AuthException catch (e) {
@@ -380,13 +358,6 @@ class AuthRemoteDataSourceImpl implements AuthRemoteDataSource {
 
   @override
   Future<void> logout() async {
-    if (!kIsWeb) {
-      try {
-        await _buildGoogleSignIn().signOut();
-      } catch (_) {
-        // Ignore local Google session cleanup failures.
-      }
-    }
     await _client.auth.signOut();
   }
 
