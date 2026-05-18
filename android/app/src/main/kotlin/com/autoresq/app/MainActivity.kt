@@ -1,4 +1,4 @@
-package com.example.autoresq
+package com.autoresq.app
 
 import io.flutter.embedding.android.FlutterActivity
 

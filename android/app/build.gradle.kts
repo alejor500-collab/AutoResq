@@ -6,7 +6,7 @@ plugins {
 }
 
 android {
-    namespace = "com.example.autoresq"
+    namespace = "com.autoresq.app"
     compileSdk = flutter.compileSdkVersion
     ndkVersion = flutter.ndkVersion
 
@@ -20,8 +20,9 @@ android {
     }
 
     defaultConfig {
-        // TODO: Specify your own unique Application ID (https://developer.android.com/studio/build/application-id.html).
-        applicationId = "com.example.autoresq"
+        // TODO: Keep this package aligned with the Google Cloud Android OAuth
+        // client registered for SHA-1 E1:64:1C:37:48:C6:9C:75:DC:85:75:3F:B7:5B:D6:25:BA:65:95:85.
+        applicationId = "com.autoresq.app"
         // You can update the following values to match your application needs.
         // For more information, see: https://flutter.dev/to/review-gradle-config.
         minSdk = flutter.minSdkVersion
