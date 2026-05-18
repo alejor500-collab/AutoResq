@@ -11,6 +11,7 @@ import '../../../../shared/widgets/app_button.dart';
 import '../../../../shared/widgets/app_text_field.dart';
 import '../../../../shared/widgets/star_rating.dart';
 import '../../../../shared/widgets/user_avatar.dart';
+import '../../../emergency/presentation/providers/emergency_provider.dart';
 import '../providers/rating_provider.dart';
 
 class RateServiceScreen extends ConsumerStatefulWidget {
@@ -33,7 +34,6 @@ class RateServiceScreen extends ConsumerStatefulWidget {
 class _RateServiceScreenState extends ConsumerState<RateServiceScreen> {
   int _stars = 0;
   final _reviewCtrl = TextEditingController();
-  bool _submitted = false;
 
   @override
   void dispose() {
@@ -70,12 +70,21 @@ class _RateServiceScreenState extends ConsumerState<RateServiceScreen> {
           comentario: _reviewCtrl.text.trim().isEmpty
               ? null
               : _reviewCtrl.text.trim(),
+          refreshCurrentUser: false,
         );
 
     if (!mounted) return;
 
     if (ok) {
-      setState(() => _submitted = true);
+      final emergencyNotifier =
+          ref.read(emergencyNotifierProvider.notifier);
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (!mounted) return;
+        context.go(AppRoutes.driverHome);
+        Future<void>.delayed(Duration.zero, () {
+          emergencyNotifier.clearActiveEmergency();
+        });
+      });
     } else {
       AppHelpers.showSnackBar(
         context,
@@ -105,8 +114,6 @@ class _RateServiceScreenState extends ConsumerState<RateServiceScreen> {
   @override
   Widget build(BuildContext context) {
     final ratingState = ref.watch(ratingNotifierProvider);
-
-    if (_submitted) return _buildSuccessPage(context);
 
     return Scaffold(
       backgroundColor: AppColors.background,
@@ -208,44 +215,5 @@ class _RateServiceScreenState extends ConsumerState<RateServiceScreen> {
       default:
         return 'Selecciona una calificación';
     }
-  }
-
-  Widget _buildSuccessPage(BuildContext context) {
-    return Scaffold(
-      backgroundColor: AppColors.background,
-      body: Center(
-        child: Padding(
-          padding: const EdgeInsets.all(32),
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              const Icon(Icons.star_rounded,
-                  size: 80, color: Color(0xFFFFC107)),
-              const Gap(24),
-              const Text(
-                '¡Gracias por tu calificación!',
-                style: TextStyle(
-                  fontSize: 22,
-                  fontWeight: FontWeight.w700,
-                ),
-                textAlign: TextAlign.center,
-              ),
-              const Gap(12),
-              const Text(
-                'Tu opinión ayuda a mejorar el servicio',
-                textAlign: TextAlign.center,
-                style: TextStyle(color: AppColors.textSecondary),
-              ),
-              const Gap(32),
-              AppButton(
-                label: 'Volver al inicio',
-                onPressed: () => context.go(AppRoutes.driverHome),
-                height: 52,
-              ),
-            ],
-          ),
-        ),
-      ),
-    );
   }
 }

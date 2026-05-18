@@ -53,15 +53,6 @@ class _RateDriverScreenState extends ConsumerState<RateDriverScreen> {
     super.dispose();
   }
 
-  Map<String, dynamic> _resumenParams({int techRating = 0}) => {
-        'driverName': widget.driverName,
-        'vehicleInfo': widget.vehicleInfo,
-        'amount': widget.amount,
-        'duration': widget.duration,
-        'clasificacionIa': widget.clasificacionIa,
-        'techRating': techRating,
-      };
-
   // ─── Actualiza estado en Supabase al finalizar ────────────────────────────
   Future<void> _runCompletionUpdates() async {
     final client = ref.read(supabaseClientProvider);
@@ -124,16 +115,12 @@ class _RateDriverScreenState extends ConsumerState<RateDriverScreen> {
       if (!mounted) return;
       setState(() => _isLoading = false);
       final emergencyNotifier = ref.read(emergencyNotifierProvider.notifier);
-      WidgetsBinding.instance.addPostFrameCallback((_) {
-        if (!mounted) return;
-        context.go(
-          AppRoutes.serviceCompleted,
-          extra: _resumenParams(techRating: _stars),
-        );
-        Future<void>.delayed(Duration.zero, () {
-          emergencyNotifier.clearActiveEmergency();
-        });
-      });
+      await Future<void>.delayed(const Duration(milliseconds: 80));
+      emergencyNotifier.clearActiveEmergency();
+      ref.invalidate(activeTechnicianEmergencyProvider);
+      ref.invalidate(technicianEmergencyHistoryProvider);
+      if (!mounted) return;
+      context.go(AppRoutes.technicianHome);
     } catch (e) {
       if (!mounted) return;
       AppHelpers.showSnackBar(

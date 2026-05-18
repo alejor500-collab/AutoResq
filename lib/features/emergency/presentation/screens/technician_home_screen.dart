@@ -51,6 +51,7 @@ class _TechnicianHomeScreenState extends ConsumerState<TechnicianHomeScreen> {
   int _lastUnreadChatCount = 0;
   bool? _isAvailable;
   bool _activeWarningShown = false;
+  String? _autoOpenedActiveServiceId;
   bool _pendingEmergencyFeedSeeded = false;
   final Set<String> _knownPendingEmergencyIds = <String>{};
   List<Emergency> _bannerEmergencies = const [];
@@ -124,8 +125,17 @@ class _TechnicianHomeScreenState extends ConsumerState<TechnicianHomeScreen> {
     if (!mounted || previousActive?.id == active.id) return;
     ref.invalidate(technicianEmergencyHistoryProvider);
     WidgetsBinding.instance.addPostFrameCallback((_) {
-      if (mounted) _showActiveServiceDialog(active);
+      if (!mounted) return;
+      _openActiveService(active, auto: true);
     });
+  }
+
+  void _openActiveService(Emergency active, {bool auto = false}) {
+    if (!mounted) return;
+    if (auto && _autoOpenedActiveServiceId == active.id) return;
+    if (auto) _autoOpenedActiveServiceId = active.id;
+    _activeWarningShown = true;
+    context.push(AppRoutes.activeService, extra: active.id);
   }
 
   void _handleUnreadChatCount(
@@ -256,7 +266,7 @@ class _TechnicianHomeScreenState extends ConsumerState<TechnicianHomeScreen> {
           FilledButton(
             onPressed: () {
               Navigator.pop(dialogContext);
-              context.push(AppRoutes.activeService, extra: active.id);
+              _openActiveService(active);
             },
             child: const Text('Ver servicio'),
           ),
@@ -965,7 +975,7 @@ class _TechnicianHomeScreenState extends ConsumerState<TechnicianHomeScreen> {
           .loadActiveTechnicianEmergency();
       if (!mounted) return;
       if (active != null) {
-        _showActiveServiceDialog(active);
+        _openActiveService(active, auto: true);
         return;
       }
       AppHelpers.showSnackBar(

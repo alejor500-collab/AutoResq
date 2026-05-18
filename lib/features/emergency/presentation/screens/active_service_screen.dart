@@ -625,13 +625,7 @@ class _AttendingPanel extends StatelessWidget {
               color: AppColors.textSecondary,
             ),
           ),
-          const Gap(10),
-          AppButton(
-            label: 'Cancelar atencion',
-            variant: AppButtonVariant.danger,
-            onPressed: onCancel,
-          ),
-          const Gap(24),
+          const Gap(22),
 
           // Contador
           Center(
@@ -688,6 +682,23 @@ class _AttendingPanel extends StatelessWidget {
                     ? emergency.protectedTotal!.toStringAsFixed(2)
                     : emergency.estimatedTotal?.toStringAsFixed(2),
               },
+            ),
+          ),
+          const Gap(10),
+
+          // Cancelacion secundaria: no debe competir con la accion principal.
+          Center(
+            child: TextButton.icon(
+              onPressed: onCancel,
+              icon: const Icon(Icons.warning_amber_rounded, size: 18),
+              label: const Text('Cancelar atencion'),
+              style: TextButton.styleFrom(
+                foregroundColor: AppColors.error,
+                textStyle: const TextStyle(
+                  fontSize: 13,
+                  fontWeight: FontWeight.w700,
+                ),
+              ),
             ),
           ),
         ],

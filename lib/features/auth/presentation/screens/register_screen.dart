@@ -6,6 +6,7 @@ import 'package:image_picker/image_picker.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import '../../../../core/constants/app_colors.dart';
 import '../../../../core/constants/app_constants.dart';
+import '../../../../core/constants/technician_specialties.dart';
 import '../../../../core/router/app_router.dart';
 import '../../../../core/utils/helpers.dart';
 import '../../../../core/utils/navigation_utils.dart';
@@ -13,6 +14,7 @@ import '../../../../core/utils/validators.dart';
 import '../../../../shared/providers/auth_provider.dart';
 import '../../../../shared/widgets/app_button.dart';
 import '../../../../shared/widgets/app_text_field.dart';
+import '../../../../shared/widgets/technician_specialty_dropdown_field.dart';
 
 class RegisterScreen extends ConsumerStatefulWidget {
   final int? initialRole;
@@ -27,7 +29,6 @@ class _RegisterScreenState extends ConsumerState<RegisterScreen> {
   final _nameCtrl = TextEditingController();
   final _emailCtrl = TextEditingController();
   final _phoneCtrl = TextEditingController();
-  final _specialtyCtrl = TextEditingController();
   final _passwordCtrl = TextEditingController();
   final _confirmPassCtrl = TextEditingController();
   late int _selectedRole;
@@ -46,7 +47,6 @@ class _RegisterScreenState extends ConsumerState<RegisterScreen> {
     _nameCtrl.dispose();
     _emailCtrl.dispose();
     _phoneCtrl.dispose();
-    _specialtyCtrl.dispose();
     _passwordCtrl.dispose();
     _confirmPassCtrl.dispose();
     super.dispose();
@@ -377,14 +377,15 @@ class _RegisterScreenState extends ConsumerState<RegisterScreen> {
 
                     // Specialty (only for technician)
                     if (_selectedRole == 1) ...[
-                      AppTextField(
-                        label: 'Especialidad',
-                        hint: 'Ej: Mecánica automotriz',
-                        controller: _specialtyCtrl,
-                        validator: (v) => Validators.minLength(v, 3),
-                        textInputAction: TextInputAction.next,
-                        prefixIcon: const Icon(Icons.build_outlined,
-                            size: 20, color: AppColors.secondary),
+                      TechnicianSpecialtyDropdownField(
+                        value: _selectedSpecialtyCode,
+                        validator: (value) =>
+                            TechnicianSpecialties.isValidCode(value)
+                                ? null
+                                : 'Selecciona una especialidad tecnica',
+                        onChanged: (value) => setState(
+                          () => _selectedSpecialtyCode = value,
+                        ),
                       ),
                       const SizedBox(height: 16),
                       // Cedula photo picker
