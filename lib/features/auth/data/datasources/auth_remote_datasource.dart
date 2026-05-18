@@ -1,7 +1,10 @@
 import 'dart:async';
+import 'dart:io' show Platform;
 import 'package:flutter/foundation.dart' show kIsWeb;
+import 'package:google_sign_in/google_sign_in.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import '../../../../core/constants/app_constants.dart';
+import '../../../../core/constants/technician_specialties.dart';
 import '../../../../core/errors/exceptions.dart' as core_exceptions;
 import '../models/user_model.dart';
 
@@ -26,6 +29,15 @@ abstract class AuthRemoteDataSource {
 
 class AuthRemoteDataSourceImpl implements AuthRemoteDataSource {
   final SupabaseClient _client;
+  static const _googleWebClientId =
+      '362021637892-ta4rii3kafr7l8p2en8khst5f9ipeik4.apps.googleusercontent.com';
+  // TODO: Replace with the real iOS OAuth client ID from Google Cloud.
+  static const _googleIosClientId =
+      'REPLACE_WITH_GOOGLE_IOS_CLIENT_ID.apps.googleusercontent.com';
+  // TODO: In Google Cloud create an Android OAuth client for package
+  // com.autoresq.app with SHA-1 E1:64:1C:37:48:C6:9C:75:DC:85:75:3F:B7:5B:D6:25:BA:65:95:85.
+  // TODO: In Supabase > Auth > Providers > Google, configure this Web Client
+  // ID together with its Client Secret. Do not place the secret in Flutter.
 
   AuthRemoteDataSourceImpl(this._client);
 
@@ -47,6 +59,29 @@ class AuthRemoteDataSourceImpl implements AuthRemoteDataSource {
         message.contains('connection refused') ||
         message.contains('timed out') ||
         message.contains('network');
+  }
+
+  String? _normalizeSpecialtyCode(String? rawValue) {
+    final trimmed = rawValue?.trim();
+    if (trimmed == null || trimmed.isEmpty) return null;
+    final normalized = TechnicianSpecialties.normalizeCode(trimmed);
+    if (normalized != null) return normalized;
+    throw const core_exceptions.AuthException(
+      message: 'Selecciona una especialidad tecnica valida.',
+    );
+  }
+
+  GoogleSignIn _buildGoogleSignIn() {
+    final clientId = Platform.isIOS &&
+            _googleIosClientId.startsWith('REPLACE_WITH_') == false
+        ? _googleIosClientId
+        : null;
+
+    return GoogleSignIn(
+      scopes: const ['email', 'profile'],
+      serverClientId: _googleWebClientId,
+      clientId: clientId,
+    );
   }
 
   /// Fetches the profile row. If it doesn't exist (e.g. first OAuth login and
@@ -167,7 +202,7 @@ class AuthRemoteDataSourceImpl implements AuthRemoteDataSource {
       'is_active': isActive,
       'is_available': isAvailable,
       'is_approved': isApproved,
-      'specialty': specialty,
+      'specialty': TechnicianSpecialties.normalizeCode(specialty) ?? specialty,
       'lat': lat,
       'lng': lng,
       'created_at':
@@ -246,7 +281,8 @@ class AuthRemoteDataSourceImpl implements AuthRemoteDataSource {
       if (role == AppConstants.roleTechnician) {
         await _client.from(AppConstants.tableTecnicos).upsert({
           'usuario_id': userId,
-          'especialidad': specialty ?? '',
+          'especialidad': _normalizeSpecialtyCode(specialty) ??
+              TechnicianSpecialties.generalAssistance,
           'estado_verificacion': AppConstants.verificationPending,
           'disponible': false,
           'motivo_rechazo': null,
@@ -259,7 +295,7 @@ class AuthRemoteDataSourceImpl implements AuthRemoteDataSource {
         name: name,
         phone: phone,
         role: profileRole,
-        specialty: specialty,
+        specialty: _normalizeSpecialtyCode(specialty) ?? specialty,
         rating: 0.0,
         totalServices: 0,
         isActive: true,
@@ -291,38 +327,45 @@ class AuthRemoteDataSourceImpl implements AuthRemoteDataSource {
       }
 
       // Android / iOS: Chrome Custom Tab → deep link → Supabase PKCE callback
-      final completer = Completer<UserModel>();
-      late StreamSubscription<AuthState> sub;
+      final googleSignIn = _buildGoogleSignIn();
 
-      sub = _client.auth.onAuthStateChange.listen((event) async {
-        if (event.event == AuthChangeEvent.signedIn &&
-            event.session != null &&
-            !completer.isCompleted) {
-          try {
-            final user = await _ensureProfile(event.session!.user);
-            completer.complete(user);
-          } catch (e) {
-            completer.completeError(
-              core_exceptions.AuthException(message: e.toString()),
-            );
-          } finally {
-            await sub.cancel();
-          }
-        }
-      });
+      await googleSignIn.signOut();
 
-      final launched = await _client.auth.signInWithOAuth(
-        OAuthProvider.google,
-        redirectTo: 'com.autoresq.app://login-callback',
-      );
-
-      if (!launched) {
-        await sub.cancel();
+      final googleUser = await googleSignIn.signIn();
+      if (googleUser == null) {
         throw const core_exceptions.AuthException(
-            message: 'No se pudo abrir el navegador para Google');
+          message: 'Inicio de sesion con Google cancelado.',
+        );
       }
 
-      return completer.future;
+      final googleAuth = await googleUser.authentication;
+      final idToken = googleAuth.idToken;
+      final accessToken = googleAuth.accessToken;
+      if (idToken == null || idToken.isEmpty) {
+        throw const core_exceptions.AuthException(
+          message: 'Google no devolvio un ID token valido.',
+        );
+      }
+      if (accessToken == null || accessToken.isEmpty) {
+        throw const core_exceptions.AuthException(
+          message: 'Google no devolvio un access token valido.',
+        );
+      }
+
+      final response = await _client.auth.signInWithIdToken(
+        provider: OAuthProvider.google,
+        idToken: idToken,
+        accessToken: accessToken,
+      );
+
+      final user = response.user ?? _client.auth.currentUser;
+      if (user == null) {
+        throw const core_exceptions.AuthException(
+          message: 'No se pudo completar el acceso con Google.',
+        );
+      }
+
+      return _ensureProfile(user);
     } on core_exceptions.AuthException {
       rethrow;
     } on AuthException catch (e) {
@@ -337,6 +380,13 @@ class AuthRemoteDataSourceImpl implements AuthRemoteDataSource {
 
   @override
   Future<void> logout() async {
+    if (!kIsWeb) {
+      try {
+        await _buildGoogleSignIn().signOut();
+      } catch (_) {
+        // Ignore local Google session cleanup failures.
+      }
+    }
     await _client.auth.signOut();
   }
 
@@ -390,7 +440,8 @@ class AuthRemoteDataSourceImpl implements AuthRemoteDataSource {
 
       if (user.role == AppConstants.roleTechnician && user.specialty != null) {
         await _client.from(AppConstants.tableTecnicos).update({
-          'especialidad': user.specialty,
+          'especialidad': _normalizeSpecialtyCode(user.specialty) ??
+              TechnicianSpecialties.generalAssistance,
         }).eq('usuario_id', user.id);
       }
 

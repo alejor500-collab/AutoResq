@@ -911,7 +911,8 @@ class _ReactivationRequestSheetState
   }
 
   String _formatTimestamp(dynamic raw) {
-    final date = DateTime.tryParse(raw?.toString() ?? '')?.toLocal();
+    final parsed = DateTime.tryParse(raw?.toString() ?? '');
+    final date = parsed == null ? null : AppHelpers.toAppTime(parsed);
     if (date == null) return 'Fecha no disponible';
     String two(int value) => value.toString().padLeft(2, '0');
     return '${two(date.day)}/${two(date.month)}/${date.year} '

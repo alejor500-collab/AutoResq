@@ -2,6 +2,7 @@ import 'dart:async';
 
 import 'package:supabase_flutter/supabase_flutter.dart';
 import '../../../../core/constants/app_constants.dart';
+import '../../../../core/constants/technician_specialties.dart';
 import '../../../../core/errors/exceptions.dart';
 import '../models/emergency_ai_analysis_model.dart';
 import '../models/emergency_model.dart';
@@ -45,6 +46,7 @@ abstract class EmergencyRemoteDataSource {
   );
   Future<List<EmergencyModel>> getAllEmergencies();
   Future<void> updateStatus(String id, String estado);
+  Future<void> cancelTechnicianService(String emergencyId);
   Future<void> assignTechnician(String emergencyId, String technicianUserId);
   Future<bool> hasPendingRating({
     required String userId,
@@ -408,21 +410,18 @@ class EmergencyRemoteDataSourceImpl implements EmergencyRemoteDataSource {
     String? specialty,
   ) async {
     final emergencies = await getPendingEmergencies();
-    final normalized = specialty?.trim().toLowerCase() ?? '';
-    if (normalized.isEmpty) return emergencies;
+    final normalized = TechnicianSpecialties.normalizeCode(specialty);
+    if (normalized == null || normalized.isEmpty) return emergencies;
 
     final matching = emergencies.where((emergency) {
       final type = emergency.aiEmergencyType ?? emergency.clasificacionIa;
-      return _specialtyMatchesEmergencyType(normalized, type);
+      return TechnicianSpecialties.matchesEmergencyType(
+        specialtyCode: normalized,
+        emergencyType: type,
+      );
     }).toList();
 
     return matching.isEmpty ? emergencies : matching;
-  }
-
-  bool _specialtyMatchesEmergencyType(String specialty, String? type) {
-    final candidates = emergencyTypeSpecialtyKeywords[type] ??
-        emergencyTypeSpecialtyKeywords['unknown']!;
-    return candidates.any(specialty.contains);
   }
 
   bool _looksLikeMissingAiColumns(PostgrestException error) {
@@ -457,27 +456,6 @@ class EmergencyRemoteDataSourceImpl implements EmergencyRemoteDataSource {
     };
   }
 
-  static const emergencyTypeSpecialtyKeywords = {
-    'battery_jumpstart': ['electric', 'electri', 'bateria', 'bater'],
-    'tire_change': ['llanta', 'neumatic', 'vulcan', 'rueda'],
-    'flat_tire_no_spare': ['llanta', 'neumatic', 'vulcan', 'rueda'],
-    'tow_service': ['grua', 'remolque', 'asistencia', 'general'],
-    'minor_mechanic': ['motor', 'mecanic', 'general'],
-    'locksmith_vehicle': ['cerraj', 'asistencia', 'general'],
-    'fuel_delivery': ['combustible', 'gasolina', 'diesel'],
-    'battery': ['electric', 'electri', 'bateria', 'bater'],
-    'electrical': ['electric', 'electri'],
-    'tire': ['llanta', 'neumatic', 'vulcan', 'rueda'],
-    'fuel': ['combustible', 'gasolina', 'diesel'],
-    'engine': ['motor', 'mecanic', 'general'],
-    'overheating': ['motor', 'refriger', 'radiador', 'mecanic', 'general'],
-    'brakes': ['freno', 'mecanic', 'general'],
-    'accident': ['grua', 'asistencia', 'general', 'mecanic'],
-    'lockout': ['cerraj', 'asistencia', 'general'],
-    'unknown': ['asistencia', 'general', 'mecanic'],
-    'not_emergency': ['asistencia', 'general'],
-  };
-
   @override
   Future<List<EmergencyModel>> getAllEmergencies() async {
     try {
@@ -508,6 +486,18 @@ class EmergencyRemoteDataSourceImpl implements EmergencyRemoteDataSource {
       await _client
           .from(AppConstants.tableEmergencias)
           .update({'estado': estado}).eq('id', id);
+    } on PostgrestException catch (e) {
+      throw ServerException(message: e.message);
+    }
+  }
+
+  @override
+  Future<void> cancelTechnicianService(String emergencyId) async {
+    try {
+      await _client.rpc(
+        'technician_cancel_service',
+        params: {'p_emergency_id': emergencyId},
+      );
     } on PostgrestException catch (e) {
       throw ServerException(message: e.message);
     }

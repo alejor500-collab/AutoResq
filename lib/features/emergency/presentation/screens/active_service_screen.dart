@@ -8,6 +8,7 @@ import 'package:url_launcher/url_launcher.dart';
 import '../../../../core/constants/app_colors.dart';
 import '../../../../core/constants/app_constants.dart';
 import '../../../../core/router/app_router.dart';
+import '../../../../core/utils/helpers.dart';
 import '../../../../shared/providers/auth_provider.dart';
 import '../../../../shared/widgets/app_button.dart';
 import '../../../../shared/widgets/app_drawer.dart';
@@ -257,6 +258,57 @@ class _ActiveServiceBodyState extends ConsumerState<_ActiveServiceBody> {
     _startAttendingTimer();
   }
 
+  Future<void> _cancelByTechnician() async {
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (dialogContext) => AlertDialog(
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(24),
+        ),
+        title: const Text('Cancelar atencion'),
+        content: const Text(
+          'Sabemos que pueden surgir imprevistos. Si cancelas ahora, avisaremos al conductor y la solicitud volvera a buscar ayuda. Para cuidar la confianza del servicio, esta cancelacion quedara registrada y podria generar una penalizacion operativa en tu proxima asignacion.',
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(dialogContext, false),
+            child: const Text('Seguir atendiendo'),
+          ),
+          FilledButton(
+            onPressed: () => Navigator.pop(dialogContext, true),
+            style: FilledButton.styleFrom(
+              backgroundColor: AppColors.error,
+              foregroundColor: Colors.white,
+            ),
+            child: const Text('Cancelar atencion'),
+          ),
+        ],
+      ),
+    );
+    if (confirmed != true) return;
+
+    final ok = await ref
+        .read(emergencyNotifierProvider.notifier)
+        .cancelTechnicianService(widget.emergency.id);
+    if (!mounted) return;
+    if (ok) {
+      AppHelpers.showSnackBar(
+        context,
+        'Atencion cancelada. El conductor fue notificado.',
+        isSuccess: true,
+      );
+      context.go(AppRoutes.technicianHome);
+      return;
+    }
+
+    AppHelpers.showSnackBar(
+      context,
+      ref.read(emergencyNotifierProvider).error ??
+          'No se pudo cancelar la atencion.',
+      isError: true,
+    );
+  }
+
   @override
   void dispose() {
     _attendingTimer?.cancel();
@@ -384,10 +436,12 @@ class _ActiveServiceBodyState extends ConsumerState<_ActiveServiceBody> {
                   ? _EnRoutePanel(
                       emergency: emergency,
                       onHeLlegado: _onHeLlegado,
+                      onCancel: _cancelByTechnician,
                     )
                   : _AttendingPanel(
                       emergency: emergency,
                       elapsed: _formatElapsed(),
+                      onCancel: _cancelByTechnician,
                     ),
             ),
           ),
@@ -402,10 +456,12 @@ class _ActiveServiceBodyState extends ConsumerState<_ActiveServiceBody> {
 class _EnRoutePanel extends StatelessWidget {
   final Emergency emergency;
   final VoidCallback onHeLlegado;
+  final VoidCallback onCancel;
 
   const _EnRoutePanel({
     required this.emergency,
     required this.onHeLlegado,
+    required this.onCancel,
   });
 
   @override
@@ -521,6 +577,12 @@ class _EnRoutePanel extends StatelessWidget {
             label: '📍 He llegado',
             onPressed: onHeLlegado,
           ),
+          const Gap(10),
+          AppButton(
+            label: 'Cancelar atencion',
+            variant: AppButtonVariant.danger,
+            onPressed: onCancel,
+          ),
         ],
       ),
     );
@@ -532,10 +594,12 @@ class _EnRoutePanel extends StatelessWidget {
 class _AttendingPanel extends StatelessWidget {
   final Emergency emergency;
   final String elapsed;
+  final VoidCallback onCancel;
 
   const _AttendingPanel({
     required this.emergency,
     required this.elapsed,
+    required this.onCancel,
   });
 
   @override
@@ -560,6 +624,12 @@ class _AttendingPanel extends StatelessWidget {
               fontSize: 13,
               color: AppColors.textSecondary,
             ),
+          ),
+          const Gap(10),
+          AppButton(
+            label: 'Cancelar atencion',
+            variant: AppButtonVariant.danger,
+            onPressed: onCancel,
           ),
           const Gap(24),
 

@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 import '../../../../core/constants/app_colors.dart';
 import '../../../../core/router/app_router.dart';
+import '../../../../core/utils/navigation_utils.dart';
 
 const _kConductorColor = Color(0xFFE53935);
 const _kTechnicianColor = Color(0xFF1E88E5);
@@ -136,7 +137,7 @@ class _RoleSelectionScreenState extends State<RoleSelectionScreen>
                   FadeTransition(
                     opacity: _headerFade,
                     child: GestureDetector(
-                      onTap: () => context.pop(),
+                      onTap: () => safeBack(context),
                       child: Container(
                         width: 40,
                         height: 40,

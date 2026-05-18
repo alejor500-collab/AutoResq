@@ -6,8 +6,8 @@ import '../../../../core/constants/app_colors.dart';
 import '../../../../core/constants/app_constants.dart';
 import '../../../../core/router/app_router.dart';
 import '../../../../shared/providers/auth_provider.dart';
-import '../../../../shared/widgets/loading_overlay.dart';
 import '../../../../shared/widgets/admin_bottom_nav.dart';
+import '../../../../shared/widgets/loading_overlay.dart';
 import '../providers/admin_provider.dart';
 
 class AdminDashboardScreen extends ConsumerStatefulWidget {
@@ -21,19 +21,15 @@ class AdminDashboardScreen extends ConsumerStatefulWidget {
 class _AdminDashboardScreenState extends ConsumerState<AdminDashboardScreen> {
   void _reload() {
     final notifier = ref.read(adminNotifierProvider.notifier);
-    Future.wait([notifier.loadStats(), notifier.loadPendingTechnicians()]);
+    Future.wait([
+      notifier.loadStats(),
+      notifier.loadPendingTechnicians(),
+    ]);
   }
 
   @override
   void initState() {
     super.initState();
-    WidgetsBinding.instance.addPostFrameCallback((_) => _reload());
-  }
-
-  @override
-  void didChangeDependencies() {
-    super.didChangeDependencies();
-    // Refresh when navigating back to this screen
     WidgetsBinding.instance.addPostFrameCallback((_) => _reload());
   }
 
@@ -58,73 +54,62 @@ class _AdminDashboardScreenState extends ConsumerState<AdminDashboardScreen> {
   Widget build(BuildContext context) {
     final state = ref.watch(adminNotifierProvider);
     final user = ref.watch(authNotifierProvider).value;
+    final stats = state.stats;
 
     return Scaffold(
-      backgroundColor: AppColors.surface,
+      backgroundColor: AppColors.background,
       appBar: PreferredSize(
         preferredSize: const Size.fromHeight(kToolbarHeight),
         child: _AdminAppBar(
+          onRefresh: _reload,
           onLogout: () async {
             await ref.read(authNotifierProvider.notifier).logout();
             if (context.mounted) context.go(AppRoutes.login);
           },
         ),
       ),
-      body: Column(
-        children: [
-          _HeroBanner(userName: user?.name.split(' ').first ?? 'Admin'),
-          Expanded(
-            child: state.isLoading
-                ? const _LoadingSkeleton()
-                : SingleChildScrollView(
-                    padding: const EdgeInsets.fromLTRB(
-                      AppConstants.pagePadding,
-                      20,
-                      AppConstants.pagePadding,
-                      AppConstants.pagePadding,
-                    ),
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        const _SectionHeader(title: 'Resumen del sistema'),
-                        const Gap(12),
-                        _StatsGrid(stats: state.stats),
-                        const Gap(28),
-                        _SectionHeader(
-                          title: 'Técnicos pendientes',
-                          actionLabel: state.pendingTechnicians.isNotEmpty
-                              ? 'Ver todos'
-                              : null,
-                          onAction: () =>
-                              context.go(AppRoutes.technicianValidation),
-                        ),
-                        const Gap(12),
-                        _PendingTechniciansSection(
-                          items: state.pendingTechnicians,
-                          onViewAll: () =>
-                              context.go(AppRoutes.technicianValidation),
-                        ),
-                        const Gap(28),
-                        _SectionHeader(
-                          title: 'Emergencias recientes',
-                          actionLabel: 'Ver monitor',
-                          onAction: () =>
-                              context.go(AppRoutes.emergencyMonitor),
-                        ),
-                        const Gap(12),
-                        _RecentEmergenciesSection(
-                          activeCount:
-                              state.stats['active_emergencies'] as int? ?? 0,
-                          onViewAll: () =>
-                              context.go(AppRoutes.emergencyMonitor),
-                        ),
-                        const Gap(8),
-                      ],
-                    ),
+      body: state.isLoading
+          ? const _LoadingSkeleton()
+          : SingleChildScrollView(
+              padding: const EdgeInsets.fromLTRB(
+                AppConstants.pagePadding,
+                16,
+                AppConstants.pagePadding,
+                AppConstants.pagePadding,
+              ),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  _HeroAnalyticsCard(
+                    userName: user?.name.split(' ').first ?? 'Admin',
+                    stats: stats,
                   ),
-          ),
-        ],
-      ),
+                  const Gap(20),
+                  const _SectionTitle('KPIs de usuarios'),
+                  const Gap(12),
+                  _KpiGrid(stats: stats),
+                  const Gap(24),
+                  const _SectionTitle('Crecimiento y composicion'),
+                  const Gap(12),
+                  _GrowthAndRoleCard(stats: stats),
+                  const Gap(24),
+                  const _SectionTitle('Salud de la red tecnica'),
+                  const Gap(12),
+                  _TechnicianHealthCard(stats: stats),
+                  const Gap(24),
+                  const _SectionTitle('Alertas y decisiones'),
+                  const Gap(12),
+                  _AlertsCard(
+                    stats: stats,
+                    pendingTechnicians: state.pendingTechnicians,
+                    onOpenUsers: () => context.go(AppRoutes.userManagement),
+                    onOpenValidations: () =>
+                        context.go(AppRoutes.technicianValidation),
+                    onOpenMonitor: () => context.go(AppRoutes.emergencyMonitor),
+                  ),
+                ],
+              ),
+            ),
       bottomNavigationBar: AdminBottomNav(
         selectedIndex: 0,
         onItemTapped: _onNavTap,
@@ -133,121 +118,136 @@ class _AdminDashboardScreenState extends ConsumerState<AdminDashboardScreen> {
   }
 }
 
-// ─── AppBar ───────────────────────────────────────────────────────────────────
-
 class _AdminAppBar extends StatelessWidget {
+  final VoidCallback onRefresh;
   final VoidCallback onLogout;
 
-  const _AdminAppBar({required this.onLogout});
+  const _AdminAppBar({
+    required this.onRefresh,
+    required this.onLogout,
+  });
 
   @override
   Widget build(BuildContext context) {
     return AppBar(
       elevation: 0,
       scrolledUnderElevation: 0,
-      backgroundColor: AppColors.primary,
+      backgroundColor: AppColors.surfaceContainerLowest,
       automaticallyImplyLeading: false,
       titleSpacing: 16,
-      title: Row(
+      title: const Row(
         children: [
-          const Icon(
-            Icons.admin_panel_settings_rounded,
-            color: Colors.white,
+          Icon(
+            Icons.analytics_rounded,
+            color: AppColors.primary,
             size: 22,
           ),
-          const Gap(8),
+          Gap(8),
           Text(
-            'Panel de Control',
+            'Analiticas de usuarios',
             style: TextStyle(
-              color: Colors.white,
               fontSize: 17,
               fontWeight: FontWeight.w700,
-              letterSpacing: -0.2,
+              color: AppColors.textPrimary,
             ),
           ),
         ],
       ),
       actions: [
         IconButton(
-          icon: const Icon(Icons.logout_rounded, color: Colors.white, size: 20),
-          tooltip: 'Cerrar sesión',
+          onPressed: onRefresh,
+          icon: const Icon(Icons.refresh_rounded, color: AppColors.primary),
+          tooltip: 'Actualizar',
+        ),
+        IconButton(
           onPressed: onLogout,
+          icon: const Icon(Icons.logout_rounded, color: AppColors.textPrimary),
+          tooltip: 'Cerrar sesion',
         ),
       ],
     );
   }
 }
 
-// ─── Hero Banner ──────────────────────────────────────────────────────────────
-
-class _HeroBanner extends StatelessWidget {
+class _HeroAnalyticsCard extends StatelessWidget {
   final String userName;
+  final Map<String, dynamic> stats;
 
-  const _HeroBanner({required this.userName});
+  const _HeroAnalyticsCard({
+    required this.userName,
+    required this.stats,
+  });
 
   @override
   Widget build(BuildContext context) {
+    final totalUsers = stats['total_users'] as int? ?? 0;
+    final newUsers30d = stats['new_users_30d'] as int? ?? 0;
+    final completionRate = stats['completion_rate'] as int? ?? 0;
+
     return Container(
       width: double.infinity,
-      decoration: const BoxDecoration(
-        gradient: LinearGradient(
+      padding: const EdgeInsets.all(20),
+      decoration: BoxDecoration(
+        gradient: const LinearGradient(
           begin: Alignment.topLeft,
           end: Alignment.bottomRight,
           colors: [AppColors.primaryContainer, AppColors.primary],
         ),
+        borderRadius: BorderRadius.circular(24),
       ),
-      padding: const EdgeInsets.fromLTRB(20, 16, 20, 22),
-      child: Row(
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Container(
-            width: 52,
-            height: 52,
-            decoration: BoxDecoration(
-              color: Colors.white.withValues(alpha: 0.18),
-              borderRadius: BorderRadius.circular(16),
-            ),
-            child: const Icon(
-              Icons.person_rounded,
-              color: Colors.white,
-              size: 30,
-            ),
-          ),
-          const Gap(14),
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(
-                  'Bienvenido,',
-                  style: TextStyle(
-                    color: Colors.white.withValues(alpha: 0.72),
-                    fontSize: 12,
-                    fontWeight: FontWeight.w400,
-                  ),
+          Row(
+            children: [
+              Container(
+                width: 52,
+                height: 52,
+                decoration: BoxDecoration(
+                  color: Colors.white.withValues(alpha: 0.18),
+                  borderRadius: BorderRadius.circular(16),
                 ),
-                Text(
-                  userName,
-                  style: TextStyle(
-                    color: Colors.white,
-                    fontSize: 20,
-                    fontWeight: FontWeight.w700,
-                    height: 1.2,
-                  ),
+                child: const Icon(
+                  Icons.admin_panel_settings_rounded,
+                  color: Colors.white,
+                  size: 28,
                 ),
-              ],
-            ),
+              ),
+              const Gap(14),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      'Hola, $userName',
+                      style: const TextStyle(
+                        fontSize: 20,
+                        fontWeight: FontWeight.w800,
+                        color: Colors.white,
+                      ),
+                    ),
+                    Text(
+                      'Vista ejecutiva para decisiones sobre usuarios y tecnicos.',
+                      style: TextStyle(
+                        fontSize: 12,
+                        height: 1.4,
+                        color: Colors.white.withValues(alpha: 0.82),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ],
           ),
-          Container(
-            padding: const EdgeInsets.all(10),
-            decoration: BoxDecoration(
-              color: Colors.white.withValues(alpha: 0.14),
-              shape: BoxShape.circle,
-            ),
-            child: const Icon(
-              Icons.shield_rounded,
-              color: Colors.white,
-              size: 24,
-            ),
+          const Gap(18),
+          Wrap(
+            spacing: 10,
+            runSpacing: 10,
+            children: [
+              _HeroPill(label: '$totalUsers usuarios totales'),
+              _HeroPill(label: '+$newUsers30d nuevos en 30 dias'),
+              _HeroPill(label: '$completionRate% de cierre operativo'),
+            ],
           ),
         ],
       ),
@@ -255,84 +255,100 @@ class _HeroBanner extends StatelessWidget {
   }
 }
 
-// ─── Section Header ───────────────────────────────────────────────────────────
+class _HeroPill extends StatelessWidget {
+  final String label;
 
-class _SectionHeader extends StatelessWidget {
-  final String title;
-  final String? actionLabel;
-  final VoidCallback? onAction;
-
-  const _SectionHeader({
-    required this.title,
-    this.actionLabel,
-    this.onAction,
-  });
+  const _HeroPill({required this.label});
 
   @override
   Widget build(BuildContext context) {
-    return Row(
-      children: [
-        Expanded(
-          child: Text(
-            title,
-            style: TextStyle(
-              fontSize: 15,
-              fontWeight: FontWeight.w700,
-              color: AppColors.textPrimary,
-              letterSpacing: -0.1,
-            ),
-          ),
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+      decoration: BoxDecoration(
+        color: Colors.white.withValues(alpha: 0.16),
+        borderRadius: BorderRadius.circular(999),
+      ),
+      child: Text(
+        label,
+        style: const TextStyle(
+          fontSize: 11,
+          fontWeight: FontWeight.w700,
+          color: Colors.white,
         ),
-        if (actionLabel != null && onAction != null)
-          GestureDetector(
-            onTap: onAction,
-            child: Text(
-              actionLabel!,
-              style: TextStyle(
-                fontSize: 12,
-                fontWeight: FontWeight.w600,
-                color: AppColors.primary,
-              ),
-            ),
-          ),
-      ],
+      ),
     );
   }
 }
 
-// ─── Stats Grid ───────────────────────────────────────────────────────────────
+class _SectionTitle extends StatelessWidget {
+  final String title;
 
-class _StatsGrid extends StatelessWidget {
+  const _SectionTitle(this.title);
+
+  @override
+  Widget build(BuildContext context) {
+    return Text(
+      title,
+      style: const TextStyle(
+        fontSize: 16,
+        fontWeight: FontWeight.w800,
+        color: AppColors.textPrimary,
+      ),
+    );
+  }
+}
+
+class _KpiGrid extends StatelessWidget {
   final Map<String, dynamic> stats;
 
-  const _StatsGrid({required this.stats});
+  const _KpiGrid({required this.stats});
 
   @override
   Widget build(BuildContext context) {
     final items = [
-      _StatItem(
-        label: 'Total usuarios',
-        value: stats['total_users']?.toString() ?? '0',
-        icon: Icons.people_rounded,
+      _KpiItem(
+        label: 'Usuarios activos',
+        value: '${stats['active_users'] ?? 0}',
+        helper: '${stats['disabled_users'] ?? 0} desactivados',
+        color: AppColors.success,
+        icon: Icons.people_alt_rounded,
+      ),
+      _KpiItem(
+        label: 'Altas 7 dias',
+        value: '${stats['new_users_7d'] ?? 0}',
+        helper: '${stats['new_users_30d'] ?? 0} en 30 dias',
         color: AppColors.info,
+        icon: Icons.trending_up_rounded,
       ),
-      _StatItem(
-        label: 'Técnicos',
-        value: stats['total_technicians']?.toString() ?? '0',
-        icon: Icons.build_rounded,
+      _KpiItem(
+        label: 'Tecnicos aprobados',
+        value: '${stats['approved_technicians'] ?? 0}',
+        helper: '${stats['available_technicians'] ?? 0} disponibles',
         color: AppColors.warning,
+        icon: Icons.build_circle_rounded,
       ),
-      _StatItem(
-        label: 'Pendientes',
-        value: stats['pending_validations']?.toString() ?? '0',
-        icon: Icons.pending_rounded,
+      _KpiItem(
+        label: 'Calidad tecnica',
+        value:
+            (stats['avg_technician_rating'] as double? ?? 0).toStringAsFixed(1),
+        helper:
+            '${(stats['avg_services_per_technician'] as double? ?? 0).toStringAsFixed(1)} servicios promedio',
         color: AppColors.secondary,
+        icon: Icons.star_rounded,
       ),
-      _StatItem(
-        label: 'Emergencias activas',
-        value: stats['active_emergencies']?.toString() ?? '0',
-        icon: Icons.warning_amber_rounded,
+      _KpiItem(
+        label: 'Pendientes',
+        value: '${stats['pending_validations'] ?? 0}',
+        helper: '${stats['rejected_technicians'] ?? 0} rechazados',
         color: AppColors.error,
+        icon: Icons.pending_actions_rounded,
+      ),
+      _KpiItem(
+        label: 'Emergencias activas',
+        value: '${stats['active_emergencies'] ?? 0}',
+        helper: '${stats['completion_rate'] ?? 0}% completadas',
+        color: AppColors.primary,
+        icon: Icons.monitor_heart_rounded,
       ),
     ];
 
@@ -344,44 +360,46 @@ class _StatsGrid extends StatelessWidget {
         crossAxisCount: 2,
         crossAxisSpacing: 12,
         mainAxisSpacing: 12,
-        childAspectRatio: 1.45,
+        childAspectRatio: 1.1,
       ),
-      itemBuilder: (_, i) => _StatCard(item: items[i]),
+      itemBuilder: (_, index) => _KpiCard(item: items[index]),
     );
   }
 }
 
-class _StatItem {
+class _KpiItem {
   final String label;
   final String value;
-  final IconData icon;
+  final String helper;
   final Color color;
+  final IconData icon;
 
-  const _StatItem({
+  const _KpiItem({
     required this.label,
     required this.value,
-    required this.icon,
+    required this.helper,
     required this.color,
+    required this.icon,
   });
 }
 
-class _StatCard extends StatelessWidget {
-  final _StatItem item;
+class _KpiCard extends StatelessWidget {
+  final _KpiItem item;
 
-  const _StatCard({required this.item});
+  const _KpiCard({required this.item});
 
   @override
   Widget build(BuildContext context) {
     return Container(
-      padding: const EdgeInsets.all(14),
+      padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
         color: AppColors.surfaceContainerLowest,
-        borderRadius: BorderRadius.circular(16),
+        borderRadius: BorderRadius.circular(18),
         boxShadow: [
           BoxShadow(
             color: AppColors.onSurface.withValues(alpha: 0.05),
-            blurRadius: 10,
-            offset: const Offset(0, 2),
+            blurRadius: 14,
+            offset: const Offset(0, 3),
           ),
         ],
       ),
@@ -389,30 +407,39 @@ class _StatCard extends StatelessWidget {
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Container(
-            padding: const EdgeInsets.all(8),
+            padding: const EdgeInsets.all(9),
             decoration: BoxDecoration(
-              color: item.color.withValues(alpha: 0.1),
-              borderRadius: BorderRadius.circular(10),
+              color: item.color.withValues(alpha: 0.12),
+              borderRadius: BorderRadius.circular(12),
             ),
-            child: Icon(item.icon, color: item.color, size: 20),
+            child: Icon(item.icon, size: 20, color: item.color),
           ),
           const Spacer(),
           Text(
             item.value,
-            style: TextStyle(
-              fontSize: 26,
+            style: const TextStyle(
+              fontSize: 24,
               fontWeight: FontWeight.w800,
               color: AppColors.textPrimary,
               height: 1,
             ),
           ),
-          const Gap(2),
+          const Gap(4),
           Text(
             item.label,
-            style: TextStyle(
+            style: const TextStyle(
+              fontSize: 12,
+              fontWeight: FontWeight.w700,
+              color: AppColors.textPrimary,
+            ),
+          ),
+          const Gap(2),
+          Text(
+            item.helper,
+            style: const TextStyle(
               fontSize: 11,
-              fontWeight: FontWeight.w500,
               color: AppColors.textSecondary,
+              height: 1.35,
             ),
           ),
         ],
@@ -421,176 +448,474 @@ class _StatCard extends StatelessWidget {
   }
 }
 
-// ─── Pending Technicians ──────────────────────────────────────────────────────
+class _GrowthAndRoleCard extends StatelessWidget {
+  final Map<String, dynamic> stats;
 
-class _PendingTechniciansSection extends StatelessWidget {
-  final List<Map<String, dynamic>> items;
-  final VoidCallback onViewAll;
+  const _GrowthAndRoleCard({required this.stats});
 
-  const _PendingTechniciansSection({
-    required this.items,
-    required this.onViewAll,
+  @override
+  Widget build(BuildContext context) {
+    final growth = (stats['growth_7d'] as List? ?? const [])
+        .whereType<Map>()
+        .map((item) => Map<String, dynamic>.from(item))
+        .toList();
+    final roles = (stats['role_distribution'] as List? ?? const [])
+        .whereType<Map>()
+        .map((item) => Map<String, dynamic>.from(item))
+        .toList();
+    final maxCount = growth.fold<int>(
+      1,
+      (max, item) => ((item['count'] as int? ?? 0) > max)
+          ? (item['count'] as int? ?? 0)
+          : max,
+    );
+
+    return Container(
+      padding: const EdgeInsets.all(18),
+      decoration: _cardDecoration(),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          const Text(
+            'Altas diarias de usuarios',
+            style: TextStyle(
+              fontSize: 14,
+              fontWeight: FontWeight.w700,
+              color: AppColors.textPrimary,
+            ),
+          ),
+          const Gap(14),
+          SizedBox(
+            height: 160,
+            child: Row(
+              crossAxisAlignment: CrossAxisAlignment.end,
+              children: growth.map((item) {
+                final count = item['count'] as int? ?? 0;
+                final label = item['label']?.toString() ?? '';
+                final ratio = maxCount == 0 ? 0.0 : count / maxCount;
+                return Expanded(
+                  child: Padding(
+                    padding: const EdgeInsets.symmetric(horizontal: 3),
+                    child: Column(
+                      mainAxisAlignment: MainAxisAlignment.end,
+                      children: [
+                        Text(
+                          '$count',
+                          style: const TextStyle(
+                            fontSize: 10,
+                            fontWeight: FontWeight.w700,
+                            color: AppColors.textSecondary,
+                          ),
+                        ),
+                        const Gap(6),
+                        Container(
+                          height: 24 + (86 * ratio),
+                          decoration: BoxDecoration(
+                            gradient: const LinearGradient(
+                              begin: Alignment.bottomCenter,
+                              end: Alignment.topCenter,
+                              colors: [
+                                AppColors.primary,
+                                AppColors.primaryContainer,
+                              ],
+                            ),
+                            borderRadius: BorderRadius.circular(12),
+                          ),
+                        ),
+                        const Gap(8),
+                        Text(
+                          label,
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                          style: const TextStyle(
+                            fontSize: 10,
+                            color: AppColors.textSecondary,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                );
+              }).toList(),
+            ),
+          ),
+          const Gap(18),
+          const Text(
+            'Distribucion por rol',
+            style: TextStyle(
+              fontSize: 14,
+              fontWeight: FontWeight.w700,
+              color: AppColors.textPrimary,
+            ),
+          ),
+          const Gap(10),
+          Wrap(
+            spacing: 10,
+            runSpacing: 10,
+            children: roles.map((item) {
+              return _RoleChip(
+                label: item['label']?.toString() ?? 'Rol',
+                count: item['count'] as int? ?? 0,
+              );
+            }).toList(),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _RoleChip extends StatelessWidget {
+  final String label;
+  final int count;
+
+  const _RoleChip({
+    required this.label,
+    required this.count,
   });
 
   @override
   Widget build(BuildContext context) {
-    if (items.isEmpty) {
-      return Container(
-        padding: const EdgeInsets.symmetric(vertical: 20),
-        decoration: BoxDecoration(
-          color: AppColors.surfaceContainerLowest,
-          borderRadius: BorderRadius.circular(16),
-          boxShadow: [
-            BoxShadow(
-              color: AppColors.onSurface.withValues(alpha: 0.04),
-              blurRadius: 8,
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+      decoration: BoxDecoration(
+        color: AppColors.surface,
+        borderRadius: BorderRadius.circular(14),
+        border: Border.all(color: AppColors.border),
+      ),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Text(
+            '$count',
+            style: const TextStyle(
+              fontSize: 14,
+              fontWeight: FontWeight.w800,
+              color: AppColors.primary,
             ),
-          ],
-        ),
-        child: Center(
-          child: Column(
+          ),
+          const Gap(8),
+          Text(
+            label,
+            style: const TextStyle(
+              fontSize: 12,
+              fontWeight: FontWeight.w600,
+              color: AppColors.textPrimary,
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _TechnicianHealthCard extends StatelessWidget {
+  final Map<String, dynamic> stats;
+
+  const _TechnicianHealthCard({required this.stats});
+
+  @override
+  Widget build(BuildContext context) {
+    final approved = stats['approved_technicians'] as int? ?? 0;
+    final available = stats['available_technicians'] as int? ?? 0;
+    final pending = stats['pending_validations'] as int? ?? 0;
+    final rejected = stats['rejected_technicians'] as int? ?? 0;
+    final avgRating = stats['avg_technician_rating'] as double? ?? 0;
+    final avgServices = stats['avg_services_per_technician'] as double? ?? 0;
+
+    return Container(
+      padding: const EdgeInsets.all(18),
+      decoration: _cardDecoration(),
+      child: Column(
+        children: [
+          Row(
             children: [
-              const Icon(
-                Icons.verified_user_rounded,
-                size: 36,
-                color: AppColors.textHint,
+              Expanded(
+                child: _MiniMetric(
+                  label: 'Aprobados',
+                  value: '$approved',
+                  color: AppColors.success,
+                ),
               ),
-              const Gap(8),
-              Text(
-                'Sin técnicos pendientes',
-                style: TextStyle(
-                  fontSize: 13,
-                  color: AppColors.textSecondary,
+              const Gap(10),
+              Expanded(
+                child: _MiniMetric(
+                  label: 'Disponibles',
+                  value: '$available',
+                  color: AppColors.info,
                 ),
               ),
             ],
           ),
-        ),
-      );
-    }
-
-    final displayed = items.take(3).toList();
-
-    return Column(
-      children: [
-        ...displayed.map(
-          (tech) => Padding(
-            padding: const EdgeInsets.only(bottom: 10),
-            child: _TechnicianCard(tech: tech),
-          ),
-        ),
-        if (items.length > 3)
-          GestureDetector(
-            onTap: onViewAll,
-            child: Container(
-              width: double.infinity,
-              padding: const EdgeInsets.symmetric(vertical: 12),
-              decoration: BoxDecoration(
-                color: AppColors.primary.withValues(alpha: 0.06),
-                borderRadius: BorderRadius.circular(12),
-              ),
-              child: Text(
-                'Ver ${items.length - 3} más',
-                textAlign: TextAlign.center,
-                style: TextStyle(
-                  fontSize: 13,
-                  fontWeight: FontWeight.w600,
-                  color: AppColors.primary,
+          const Gap(10),
+          Row(
+            children: [
+              Expanded(
+                child: _MiniMetric(
+                  label: 'Pendientes',
+                  value: '$pending',
+                  color: AppColors.warning,
                 ),
               ),
+              const Gap(10),
+              Expanded(
+                child: _MiniMetric(
+                  label: 'Rechazados',
+                  value: '$rejected',
+                  color: AppColors.error,
+                ),
+              ),
+            ],
+          ),
+          const Gap(14),
+          Container(
+            width: double.infinity,
+            padding: const EdgeInsets.all(14),
+            decoration: BoxDecoration(
+              color: AppColors.surface,
+              borderRadius: BorderRadius.circular(16),
+            ),
+            child: Row(
+              children: [
+                Expanded(
+                  child: _TextMetric(
+                    title: 'Rating promedio',
+                    value: avgRating.toStringAsFixed(1),
+                    subtitle: avgRating >= 4
+                        ? 'Calidad saludable'
+                        : 'Conviene revisar soporte y supervision',
+                  ),
+                ),
+                const Gap(12),
+                Expanded(
+                  child: _TextMetric(
+                    title: 'Servicios por tecnico',
+                    value: avgServices.toStringAsFixed(1),
+                    subtitle: 'Carga media historica',
+                  ),
+                ),
+              ],
             ),
           ),
+        ],
+      ),
+    );
+  }
+}
+
+class _MiniMetric extends StatelessWidget {
+  final String label;
+  final String value;
+  final Color color;
+
+  const _MiniMetric({
+    required this.label,
+    required this.value,
+    required this.color,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.all(14),
+      decoration: BoxDecoration(
+        color: color.withValues(alpha: 0.08),
+        borderRadius: BorderRadius.circular(16),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(
+            value,
+            style: TextStyle(
+              fontSize: 22,
+              fontWeight: FontWeight.w800,
+              color: color,
+            ),
+          ),
+          const Gap(4),
+          Text(
+            label,
+            style: const TextStyle(
+              fontSize: 12,
+              fontWeight: FontWeight.w600,
+              color: AppColors.textPrimary,
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _TextMetric extends StatelessWidget {
+  final String title;
+  final String value;
+  final String subtitle;
+
+  const _TextMetric({
+    required this.title,
+    required this.value,
+    required this.subtitle,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text(
+          title,
+          style: const TextStyle(
+            fontSize: 12,
+            fontWeight: FontWeight.w700,
+            color: AppColors.textSecondary,
+          ),
+        ),
+        const Gap(6),
+        Text(
+          value,
+          style: const TextStyle(
+            fontSize: 24,
+            fontWeight: FontWeight.w800,
+            color: AppColors.textPrimary,
+          ),
+        ),
+        const Gap(4),
+        Text(
+          subtitle,
+          style: const TextStyle(
+            fontSize: 11,
+            height: 1.35,
+            color: AppColors.textSecondary,
+          ),
+        ),
       ],
     );
   }
 }
 
-class _TechnicianCard extends StatelessWidget {
-  final Map<String, dynamic> tech;
+class _AlertsCard extends StatelessWidget {
+  final Map<String, dynamic> stats;
+  final List<Map<String, dynamic>> pendingTechnicians;
+  final VoidCallback onOpenUsers;
+  final VoidCallback onOpenValidations;
+  final VoidCallback onOpenMonitor;
 
-  const _TechnicianCard({required this.tech});
+  const _AlertsCard({
+    required this.stats,
+    required this.pendingTechnicians,
+    required this.onOpenUsers,
+    required this.onOpenValidations,
+    required this.onOpenMonitor,
+  });
 
   @override
   Widget build(BuildContext context) {
-    final usuario = tech['usuarios'] as Map<String, dynamic>? ?? {};
-    final nombre = usuario['nombre'] as String? ?? 'Técnico';
-    final email = usuario['email'] as String? ?? '';
-    final initial = nombre.isNotEmpty ? nombre[0].toUpperCase() : 'T';
+    final alerts = (stats['alerts'] as List? ?? const [])
+        .whereType<Map>()
+        .map((item) => Map<String, dynamic>.from(item))
+        .toList();
+    final suggestions = (stats['suggestions'] as List? ?? const [])
+        .map((item) => item.toString())
+        .toList();
 
     return Container(
-      padding: const EdgeInsets.all(14),
-      decoration: BoxDecoration(
-        color: AppColors.surfaceContainerLowest,
-        borderRadius: BorderRadius.circular(14),
-        boxShadow: [
-          BoxShadow(
-            color: AppColors.onSurface.withValues(alpha: 0.04),
-            blurRadius: 8,
-          ),
-        ],
-      ),
-      child: Row(
+      padding: const EdgeInsets.all(18),
+      decoration: _cardDecoration(),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Container(
-            width: 44,
-            height: 44,
-            decoration: BoxDecoration(
-              color: AppColors.warning.withValues(alpha: 0.12),
-              shape: BoxShape.circle,
-            ),
-            child: Center(
-              child: Text(
-                initial,
-                style: TextStyle(
-                  fontSize: 18,
-                  fontWeight: FontWeight.w700,
-                  color: AppColors.warning,
-                ),
-              ),
+          Wrap(
+            spacing: 10,
+            runSpacing: 10,
+            children: alerts.isEmpty
+                ? [
+                    const _AlertBadge(
+                      label: 'Sin alertas criticas',
+                      count: null,
+                      tone: 'success',
+                    ),
+                  ]
+                : alerts
+                    .map(
+                      (item) => _AlertBadge(
+                        label: item['label']?.toString() ?? 'Alerta',
+                        count: item['count'] as int?,
+                        tone: item['tone']?.toString() ?? 'info',
+                      ),
+                    )
+                    .toList(),
+          ),
+          const Gap(16),
+          const Text(
+            'Sugerencias para tomar accion',
+            style: TextStyle(
+              fontSize: 14,
+              fontWeight: FontWeight.w700,
+              color: AppColors.textPrimary,
             ),
           ),
-          const Gap(12),
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(
-                  nombre,
-                  style: TextStyle(
-                    fontSize: 13,
-                    fontWeight: FontWeight.w600,
-                    color: AppColors.textPrimary,
+          const Gap(10),
+          ...suggestions.map(
+            (suggestion) => Padding(
+              padding: const EdgeInsets.only(bottom: 10),
+              child: Row(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Container(
+                    width: 8,
+                    height: 8,
+                    margin: const EdgeInsets.only(top: 6),
+                    decoration: const BoxDecoration(
+                      color: AppColors.primary,
+                      shape: BoxShape.circle,
+                    ),
                   ),
-                  maxLines: 1,
-                  overflow: TextOverflow.ellipsis,
-                ),
-                Text(
-                  email,
-                  style: TextStyle(
-                    fontSize: 11,
-                    color: AppColors.textSecondary,
+                  const Gap(10),
+                  Expanded(
+                    child: Text(
+                      suggestion,
+                      style: const TextStyle(
+                        fontSize: 12,
+                        height: 1.45,
+                        color: AppColors.textPrimary,
+                      ),
+                    ),
                   ),
-                  maxLines: 1,
-                  overflow: TextOverflow.ellipsis,
-                ),
-              ],
+                ],
+              ),
             ),
           ),
           const Gap(8),
-          Container(
-            padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
-            decoration: BoxDecoration(
-              color: AppColors.warning.withValues(alpha: 0.12),
-              borderRadius: BorderRadius.circular(20),
-            ),
-            child: Text(
-              'Pendiente',
-              style: TextStyle(
-                fontSize: 10,
-                fontWeight: FontWeight.w700,
-                color: AppColors.warning,
+          Row(
+            children: [
+              Expanded(
+                child: _ActionButton(
+                  label: 'Usuarios',
+                  icon: Icons.people_rounded,
+                  onTap: onOpenUsers,
+                ),
               ),
-            ),
+              const Gap(10),
+              Expanded(
+                child: _ActionButton(
+                  label: pendingTechnicians.isNotEmpty
+                      ? 'Validar'
+                      : 'Tecnicos',
+                  icon: Icons.verified_user_rounded,
+                  onTap: onOpenValidations,
+                ),
+              ),
+              const Gap(10),
+              Expanded(
+                child: _ActionButton(
+                  label: 'Monitor',
+                  icon: Icons.monitor_heart_rounded,
+                  onTap: onOpenMonitor,
+                ),
+              ),
+            ],
           ),
         ],
       ),
@@ -598,82 +923,78 @@ class _TechnicianCard extends StatelessWidget {
   }
 }
 
-// ─── Recent Emergencies ───────────────────────────────────────────────────────
+class _AlertBadge extends StatelessWidget {
+  final String label;
+  final int? count;
+  final String tone;
 
-class _RecentEmergenciesSection extends StatelessWidget {
-  final int activeCount;
-  final VoidCallback onViewAll;
+  const _AlertBadge({
+    required this.label,
+    required this.count,
+    required this.tone,
+  });
 
-  const _RecentEmergenciesSection({
-    required this.activeCount,
-    required this.onViewAll,
+  @override
+  Widget build(BuildContext context) {
+    final color = switch (tone) {
+      'danger' => AppColors.error,
+      'warning' => AppColors.warning,
+      'success' => AppColors.success,
+      _ => AppColors.info,
+    };
+
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+      decoration: BoxDecoration(
+        color: color.withValues(alpha: 0.08),
+        borderRadius: BorderRadius.circular(14),
+        border: Border.all(color: color.withValues(alpha: 0.16)),
+      ),
+      child: Text(
+        count == null ? label : '$label: $count',
+        style: TextStyle(
+          fontSize: 11,
+          fontWeight: FontWeight.w700,
+          color: color,
+        ),
+      ),
+    );
+  }
+}
+
+class _ActionButton extends StatelessWidget {
+  final String label;
+  final IconData icon;
+  final VoidCallback onTap;
+
+  const _ActionButton({
+    required this.label,
+    required this.icon,
+    required this.onTap,
   });
 
   @override
   Widget build(BuildContext context) {
     return GestureDetector(
-      onTap: onViewAll,
+      onTap: onTap,
       child: Container(
-        padding: const EdgeInsets.all(18),
+        padding: const EdgeInsets.symmetric(vertical: 12),
         decoration: BoxDecoration(
-          gradient: LinearGradient(
-            begin: Alignment.topLeft,
-            end: Alignment.bottomRight,
-            colors: [
-              AppColors.error.withValues(alpha: 0.08),
-              AppColors.error.withValues(alpha: 0.02),
-            ],
-          ),
-          border: Border.all(color: AppColors.error.withValues(alpha: 0.15)),
-          borderRadius: BorderRadius.circular(16),
+          color: AppColors.surface,
+          borderRadius: BorderRadius.circular(14),
+          border: Border.all(color: AppColors.border),
         ),
-        child: Row(
+        child: Column(
           children: [
-            Container(
-              width: 52,
-              height: 52,
-              decoration: BoxDecoration(
-                color: AppColors.error.withValues(alpha: 0.12),
-                borderRadius: BorderRadius.circular(14),
+            Icon(icon, color: AppColors.primary, size: 18),
+            const Gap(6),
+            Text(
+              label,
+              style: const TextStyle(
+                fontSize: 11,
+                fontWeight: FontWeight.w700,
+                color: AppColors.textPrimary,
               ),
-              child: const Icon(
-                Icons.local_fire_department_rounded,
-                color: AppColors.error,
-                size: 28,
-              ),
-            ),
-            const Gap(14),
-            Expanded(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(
-                    activeCount == 0
-                        ? 'Sin emergencias activas'
-                        : '$activeCount emergencia${activeCount != 1 ? 's' : ''} activa${activeCount != 1 ? 's' : ''}',
-                    style: TextStyle(
-                      fontSize: 14,
-                      fontWeight: FontWeight.w700,
-                      color: activeCount > 0
-                          ? AppColors.error
-                          : AppColors.textSecondary,
-                    ),
-                  ),
-                  Text(
-                    'Toca para abrir el monitor en tiempo real',
-                    style: TextStyle(
-                      fontSize: 11,
-                      color: AppColors.textSecondary,
-                    ),
-                  ),
-                ],
-              ),
-            ),
-            const Gap(8),
-            Icon(
-              Icons.chevron_right_rounded,
-              color: AppColors.error.withValues(alpha: 0.6),
-              size: 22,
             ),
           ],
         ),
@@ -682,7 +1003,19 @@ class _RecentEmergenciesSection extends StatelessWidget {
   }
 }
 
-// ─── Loading Skeleton ─────────────────────────────────────────────────────────
+BoxDecoration _cardDecoration() {
+  return BoxDecoration(
+    color: AppColors.surfaceContainerLowest,
+    borderRadius: BorderRadius.circular(22),
+    boxShadow: [
+      BoxShadow(
+        color: AppColors.onSurface.withValues(alpha: 0.05),
+        blurRadius: 14,
+        offset: const Offset(0, 3),
+      ),
+    ],
+  );
+}
 
 class _LoadingSkeleton extends StatelessWidget {
   const _LoadingSkeleton();
@@ -692,16 +1025,17 @@ class _LoadingSkeleton extends StatelessWidget {
     return const SingleChildScrollView(
       padding: EdgeInsets.fromLTRB(
         AppConstants.pagePadding,
-        20,
+        16,
         AppConstants.pagePadding,
         AppConstants.pagePadding,
       ),
       child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          ShimmerList(count: 2, itemHeight: 100),
-          Gap(24),
-          ShimmerList(count: 3, itemHeight: 70),
+          ShimmerList(count: 1, itemHeight: 170),
+          Gap(18),
+          ShimmerList(count: 2, itemHeight: 130),
+          Gap(18),
+          ShimmerList(count: 2, itemHeight: 120),
         ],
       ),
     );

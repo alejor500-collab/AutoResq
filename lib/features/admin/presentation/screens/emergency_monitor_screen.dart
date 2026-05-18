@@ -71,14 +71,15 @@ class _EmergencyMonitorScreenState
   }
 
   int get _hoyCount {
-    final now = DateTime.now();
+    final now = AppHelpers.appNow();
     final all = ref.read(adminNotifierProvider).emergencies;
     return all.where((e) {
       final date = DateTime.tryParse(e['fecha'] as String? ?? '');
       if (date == null) return false;
-      return date.year == now.year &&
-          date.month == now.month &&
-          date.day == now.day;
+      final appDate = AppHelpers.toAppTime(date);
+      return appDate.year == now.year &&
+          appDate.month == now.month &&
+          appDate.day == now.day;
     }).length;
   }
 

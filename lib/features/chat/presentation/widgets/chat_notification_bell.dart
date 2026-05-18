@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../../../core/constants/app_colors.dart';
 import '../providers/chat_provider.dart';
+import '../../../../shared/providers/notification_provider.dart';
 
 class ChatNotificationBell extends ConsumerWidget {
   final VoidCallback? onTap;
@@ -19,7 +20,9 @@ class ChatNotificationBell extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    final unread = ref.watch(unreadChatCountProvider).valueOrNull ?? 0;
+    final unreadMessages = ref.watch(unreadChatCountProvider).valueOrNull ?? 0;
+    final unreadNotifications = ref.watch(unreadNotificationsCountProvider);
+    final unread = unreadMessages + unreadNotifications;
     final badgeText = unread > 99 ? '99+' : unread.toString();
 
     return SizedBox(

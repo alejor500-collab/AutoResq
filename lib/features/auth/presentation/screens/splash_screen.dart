@@ -6,6 +6,7 @@ import '../../../../core/constants/app_constants.dart';
 import '../../../../core/router/app_router.dart';
 import '../../../../shared/providers/auth_provider.dart';
 import '../../../../features/auth/domain/entities/user_entity.dart';
+import '../../../../shared/widgets/app_logo.dart';
 
 class SplashScreen extends ConsumerStatefulWidget {
   const SplashScreen({super.key});
@@ -147,41 +148,8 @@ class _SplashScreenState extends ConsumerState<SplashScreen>
                       scale: _scaleAnim,
                       child: Column(
                         children: [
-                          Container(
-                            width: 96,
-                            height: 96,
-                            decoration: BoxDecoration(
-                              color: AppColors.surfaceContainerLowest,
-                              borderRadius: BorderRadius.circular(24),
-                              boxShadow: [
-                                BoxShadow(
-                                  color: AppColors.onSurface.withValues(alpha: 0.08),
-                                  blurRadius: 50,
-                                  offset: const Offset(0, 20),
-                                ),
-                              ],
-                            ),
-                            child: Transform.rotate(
-                              angle: -0.05,
-                              child: const Icon(
-                                Icons.car_repair,
-                                size: 56,
-                                color: AppColors.primary,
-                              ),
-                            ),
-                          ),
-                          const SizedBox(height: 32),
-                          const Text(
-                            'AutoResQ',
-                            style: TextStyle(
-                              fontSize: 44,
-                              fontWeight: FontWeight.w900,
-                              color: AppColors.onSurface,
-                              letterSpacing: -1.5,
-                              height: 1,
-                            ),
-                          ),
-                          const SizedBox(height: 12),
+                          const AppLogo(height: 132),
+                          const SizedBox(height: 16),
                           const Text(
                             'Asistencia automotriz al instante',
                             style: TextStyle(

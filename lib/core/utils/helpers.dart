@@ -4,22 +4,29 @@ import '../constants/app_colors.dart';
 import '../constants/app_constants.dart';
 
 abstract class AppHelpers {
+  static const Duration appUtcOffset = Duration(hours: -5);
+
+  static DateTime appNow() => DateTime.now().toUtc().add(appUtcOffset);
+
+  static DateTime toAppTime(DateTime date) {
+    return date.toUtc().add(appUtcOffset);
+  }
+
   // ─── Date formatting ──────────────────────────────────────────────────────
   static String formatDate(DateTime date) {
-    return DateFormat('dd/MM/yyyy', 'es').format(date);
+    return DateFormat('dd/MM/yyyy', 'es').format(toAppTime(date));
   }
 
   static String formatDateTime(DateTime date) {
-    return DateFormat('dd/MM/yyyy HH:mm', 'es').format(date);
+    return DateFormat('dd/MM/yyyy HH:mm', 'es').format(toAppTime(date));
   }
 
   static String formatTime(DateTime date) {
-    return DateFormat('HH:mm', 'es').format(date);
+    return DateFormat('HH:mm', 'es').format(toAppTime(date));
   }
 
   static String timeAgo(DateTime date) {
-    final now = DateTime.now();
-    final diff = now.difference(date);
+    final diff = appNow().difference(toAppTime(date));
 
     if (diff.inMinutes < 1) return 'Hace un momento';
     if (diff.inMinutes < 60) return 'Hace ${diff.inMinutes} min';

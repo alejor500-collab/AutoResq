@@ -10,6 +10,7 @@ import '../../features/profile/presentation/providers/vehicle_provider.dart';
 import '../providers/auth_provider.dart';
 import '../providers/role_provider.dart';
 import '../providers/tecnico_status_provider.dart';
+import 'app_logo.dart';
 import 'technician_request_sheet.dart';
 
 class AppDrawer extends ConsumerWidget {
@@ -268,7 +269,7 @@ class _DrawerHeader extends StatelessWidget {
   Widget build(BuildContext context) {
     return Container(
       margin: const EdgeInsets.fromLTRB(16, 20, 16, 16),
-      padding: const EdgeInsets.all(16),
+      padding: const EdgeInsets.all(14),
       decoration: BoxDecoration(
         gradient: AppColors.primaryGradient,
         borderRadius: BorderRadius.circular(20),
@@ -280,8 +281,13 @@ class _DrawerHeader extends StatelessWidget {
           ),
         ],
       ),
-      child: Row(
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
         children: [
+          const AppLogo(height: 38, width: 150),
+          const SizedBox(height: 14),
+          Row(
+            children: [
           Container(
             width: 52,
             height: 52,
@@ -341,6 +347,8 @@ class _DrawerHeader extends StatelessWidget {
                 ),
               ],
             ),
+          ),
+            ],
           ),
         ],
       ),

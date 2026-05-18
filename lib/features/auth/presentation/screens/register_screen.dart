@@ -8,6 +8,7 @@ import '../../../../core/constants/app_colors.dart';
 import '../../../../core/constants/app_constants.dart';
 import '../../../../core/router/app_router.dart';
 import '../../../../core/utils/helpers.dart';
+import '../../../../core/utils/navigation_utils.dart';
 import '../../../../core/utils/validators.dart';
 import '../../../../shared/providers/auth_provider.dart';
 import '../../../../shared/widgets/app_button.dart';
@@ -26,10 +27,11 @@ class _RegisterScreenState extends ConsumerState<RegisterScreen> {
   final _nameCtrl = TextEditingController();
   final _emailCtrl = TextEditingController();
   final _phoneCtrl = TextEditingController();
+  final _specialtyCtrl = TextEditingController();
   final _passwordCtrl = TextEditingController();
   final _confirmPassCtrl = TextEditingController();
-  final _specialtyCtrl = TextEditingController();
   late int _selectedRole;
+  String? _selectedSpecialtyCode;
   Uint8List? _cedulaBytes;
   String _cedulaExt = 'jpg';
 
@@ -44,9 +46,9 @@ class _RegisterScreenState extends ConsumerState<RegisterScreen> {
     _nameCtrl.dispose();
     _emailCtrl.dispose();
     _phoneCtrl.dispose();
+    _specialtyCtrl.dispose();
     _passwordCtrl.dispose();
     _confirmPassCtrl.dispose();
-    _specialtyCtrl.dispose();
     super.dispose();
   }
 
@@ -147,7 +149,7 @@ class _RegisterScreenState extends ConsumerState<RegisterScreen> {
       name: _nameCtrl.text.trim(),
       phone: _phoneCtrl.text.trim(),
       role: _roleName,
-      specialty: _selectedRole == 1 ? _specialtyCtrl.text.trim() : null,
+      specialty: _selectedRole == 1 ? _selectedSpecialtyCode : null,
     );
 
     if (!mounted) return;
@@ -261,7 +263,7 @@ class _RegisterScreenState extends ConsumerState<RegisterScreen> {
                     const SizedBox(height: 16),
                     // Back button
                     GestureDetector(
-                      onTap: () => context.pop(),
+                      onTap: () => safeBack(context),
                       child: Container(
                         width: 40,
                         height: 40,
@@ -538,7 +540,10 @@ class _RegisterScreenState extends ConsumerState<RegisterScreen> {
                                 color: AppColors.secondary, fontSize: 14),
                           ),
                           GestureDetector(
-                            onTap: () => context.pop(),
+                            onTap: () => safeBack(
+                              context,
+                              fallback: AppRoutes.login,
+                            ),
                             child: const Text(
                               'Iniciar sesión',
                               style: TextStyle(
@@ -582,7 +587,12 @@ class _RegisterScreenState extends ConsumerState<RegisterScreen> {
     final isActive = _selectedRole == index;
     return Expanded(
       child: GestureDetector(
-        onTap: () => setState(() => _selectedRole = index),
+        onTap: () => setState(() {
+          _selectedRole = index;
+          if (index != 1) {
+            _selectedSpecialtyCode = null;
+          }
+        }),
         child: AnimatedContainer(
           duration: const Duration(milliseconds: 200),
           padding: const EdgeInsets.symmetric(vertical: 12),

@@ -7,6 +7,7 @@ import '../../../../core/router/app_router.dart';
 import '../../../../core/utils/helpers.dart';
 import '../../../../shared/providers/auth_provider.dart';
 import '../../../../shared/widgets/app_button.dart';
+import '../../../../shared/widgets/app_logo.dart';
 
 class WelcomeScreen extends ConsumerWidget {
   const WelcomeScreen({super.key});
@@ -78,34 +79,8 @@ class WelcomeScreen extends ConsumerWidget {
                   // Brand
                   Column(
                     children: [
-                      Container(
-                        padding: const EdgeInsets.all(20),
-                        decoration: BoxDecoration(
-                          color: AppColors.primary,
-                          borderRadius: BorderRadius.circular(24),
-                          boxShadow: [
-                            BoxShadow(
-                              color: AppColors.primary.withValues(alpha: 0.25),
-                              blurRadius: 32,
-                              offset: const Offset(0, 12),
-                            ),
-                          ],
-                        ),
-                        child: const Icon(Icons.car_repair,
-                            size: 48, color: Colors.white),
-                      ),
-                      const SizedBox(height: 24),
-                      const Text(
-                        'AutoResQ',
-                        style: TextStyle(
-                          fontSize: 44,
-                          fontWeight: FontWeight.w900,
-                          color: AppColors.onSurface,
-                          letterSpacing: -1.5,
-                          height: 1,
-                        ),
-                      ),
-                      const SizedBox(height: 10),
+                      const AppLogo(height: 118),
+                      const SizedBox(height: 16),
                       const Text(
                         'Asistencia automotriz al instante',
                         style: TextStyle(

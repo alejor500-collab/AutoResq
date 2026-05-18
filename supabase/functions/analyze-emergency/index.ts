@@ -105,8 +105,16 @@ Deno.serve(async (req: Request) => {
 
     if (!response.ok) {
       const detail = await response.text();
+      const openAiError = parseOpenAiError(detail);
       console.error('[analyze-emergency] OpenAI error:', detail);
-      return jsonResponse({ error: 'OpenAI analysis failed' }, 502);
+      return jsonResponse(
+        {
+          error: 'OpenAI analysis failed',
+          reason: openAiError.code,
+          detail: openAiError.message,
+        },
+        openAiError.httpStatus,
+      );
     }
 
     const payload = await response.json();
@@ -190,6 +198,32 @@ function jsonResponse(payload: unknown, status: number): Response {
 
 function toErrorMessage(error: unknown): string {
   return error instanceof Error ? error.message : String(error);
+}
+
+function parseOpenAiError(detail: string): {
+  code: string;
+  message: string;
+  httpStatus: number;
+} {
+  try {
+    const parsed = JSON.parse(detail) as {
+      error?: { code?: string; message?: string };
+    };
+    const code = parsed.error?.code ?? 'openai_error';
+    const message = parsed.error?.message ?? 'OpenAI request failed';
+    return {
+      code,
+      message,
+      httpStatus:
+        code === 'insufficient_quota' ? 503 : 502,
+    };
+  } catch {
+    return {
+      code: 'openai_error',
+      message: detail || 'OpenAI request failed',
+      httpStatus: 502,
+    };
+  }
 }
 
 const analysisSchema = {

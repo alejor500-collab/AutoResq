@@ -6,15 +6,14 @@ import 'package:supabase_flutter/supabase_flutter.dart';
 
 import '../../core/constants/app_colors.dart';
 import '../../core/constants/app_constants.dart';
+import '../../core/constants/technician_specialties.dart';
 import '../../core/utils/validators.dart';
 import '../../features/auth/domain/entities/user_entity.dart';
 import '../providers/auth_provider.dart';
 import '../providers/tecnico_status_provider.dart';
 import 'app_text_field.dart';
+import 'technician_specialty_dropdown_field.dart';
 
-/// Opens the technician-request bottom sheet.
-/// Returns `true` if the request was successfully submitted.
-/// Set [isResubmission] to `true` when a rejected technician is re-sending.
 Future<bool?> showTechnicianRequestSheet(
   BuildContext context,
   String userId, {
@@ -56,7 +55,7 @@ class _TechnicianRequestSheetState
   final _formKey = GlobalKey<FormState>();
   final _nameCtrl = TextEditingController();
   final _phoneCtrl = TextEditingController();
-  final _specialtyCtrl = TextEditingController();
+  String? _selectedSpecialtyCode;
   Uint8List? _cedulaBytes;
   String _cedulaExt = 'jpg';
   bool _isSubmitting = false;
@@ -67,14 +66,15 @@ class _TechnicianRequestSheetState
     final current = ref.read(authNotifierProvider).value;
     _nameCtrl.text = current?.name ?? '';
     _phoneCtrl.text = current?.phone ?? '';
-    _specialtyCtrl.text = widget.currentSpecialty ?? current?.specialty ?? '';
+    _selectedSpecialtyCode = TechnicianSpecialties.normalizeCode(
+      widget.currentSpecialty ?? current?.specialty,
+    );
   }
 
   @override
   void dispose() {
     _nameCtrl.dispose();
     _phoneCtrl.dispose();
-    _specialtyCtrl.dispose();
     super.dispose();
   }
 
@@ -130,7 +130,8 @@ class _TechnicianRequestSheetState
       final supabase = ref.read(supabaseClientProvider);
       final name = _nameCtrl.text.trim();
       final phone = _phoneCtrl.text.trim();
-      final specialty = _specialtyCtrl.text.trim();
+      final specialty =
+          _selectedSpecialtyCode ?? TechnicianSpecialties.generalAssistance;
       final ext = _cedulaExt.isEmpty ? 'jpg' : _cedulaExt;
       final mimeType = switch (ext) {
         'png' => 'image/png',
@@ -264,7 +265,7 @@ class _TechnicianRequestSheetState
                 textInputAction: TextInputAction.next,
                 inputFormatters: [
                   FilteringTextInputFormatter.allow(
-                    RegExp(r'[a-zA-ZáéíóúÁÉÍÓÚñÑüÜ\s]'),
+                    RegExp(r'[a-zA-ZÃ¡Ã©Ã­Ã³ÃºÃÃ‰ÃÃ“ÃšÃ±Ã‘Ã¼Ãœ\s]'),
                   ),
                 ],
               ),
@@ -280,15 +281,14 @@ class _TechnicianRequestSheetState
                 inputFormatters: [FilteringTextInputFormatter.digitsOnly],
               ),
               const SizedBox(height: 16),
-              AppTextField(
-                label: 'Especialidad tecnica',
-                hint: 'Ej: Mecanica automotriz, Electricidad',
-                controller: _specialtyCtrl,
-                validator: (v) => (v == null || v.trim().length < 3)
-                    ? 'Ingresa tu especialidad (minimo 3 caracteres)'
-                    : null,
-                prefixIcon: const Icon(Icons.build_outlined, size: 20),
-                textInputAction: TextInputAction.done,
+              TechnicianSpecialtyDropdownField(
+                value: _selectedSpecialtyCode,
+                validator: (value) => TechnicianSpecialties.isValidCode(value)
+                    ? null
+                    : 'Selecciona una especialidad tecnica',
+                onChanged: (value) => setState(
+                  () => _selectedSpecialtyCode = value,
+                ),
               ),
               const SizedBox(height: 16),
               GestureDetector(
@@ -376,7 +376,8 @@ class _TechnicianRequestSheetState
                   style: ElevatedButton.styleFrom(
                     backgroundColor: AppColors.primary,
                     foregroundColor: Colors.white,
-                    disabledBackgroundColor: AppColors.primary.withValues(alpha: 0.5),
+                    disabledBackgroundColor:
+                        AppColors.primary.withValues(alpha: 0.5),
                     shape: RoundedRectangleBorder(
                       borderRadius: BorderRadius.circular(
                         AppConstants.borderRadiusButton,

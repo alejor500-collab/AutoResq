@@ -23,6 +23,18 @@ type TechnicianRow = {
   especialidad: string | null;
 };
 
+const specialtyCatalog = {
+  mechanical_quick: ['minor_mechanic', 'engine', 'overheating', 'brakes'],
+  battery_electrical: ['battery_jumpstart', 'battery', 'electrical'],
+  tires_vulcanization: ['tire_change', 'flat_tire_no_spare', 'tire'],
+  tow_truck: ['tow_service', 'accident'],
+  fuel_delivery: ['fuel_delivery', 'fuel'],
+  vehicle_locksmith: ['locksmith_vehicle', 'lockout'],
+  general_assistance: ['unknown', 'not_emergency'],
+} as const;
+
+const validSpecialtyCodes = new Set(Object.keys(specialtyCatalog));
+
 Deno.serve(async (req: Request) => {
   if (req.method === 'OPTIONS') {
     return new Response('ok', { headers: corsHeaders });
@@ -225,19 +237,12 @@ function specialtyMatchesEmergencyType(
   specialty: string | null,
   type: string | null,
 ): boolean {
-  const normalized = normalize(specialty ?? '');
-  if (!normalized) return false;
-  const candidates = emergencyTypeSpecialtyKeywords[type ?? 'unknown'] ??
-    emergencyTypeSpecialtyKeywords.unknown;
-  return candidates.some((candidate) => normalized.includes(candidate));
-}
-
-function normalize(value: string): string {
-  return value
-    .normalize('NFD')
-    .replace(/[\u0300-\u036f]/g, '')
-    .toLowerCase()
-    .trim();
+  const normalizedSpecialty = (specialty ?? '').trim();
+  if (!validSpecialtyCodes.has(normalizedSpecialty)) return false;
+  const emergencyType = (type ?? 'unknown').trim();
+  return specialtyCatalog[
+    normalizedSpecialty as keyof typeof specialtyCatalog
+  ].includes(emergencyType);
 }
 
 function serviceNameForType(type: string | null): string {
@@ -260,14 +265,3 @@ function serviceNameForType(type: string | null): string {
       return 'Emergencia automotriz';
   }
 }
-
-const emergencyTypeSpecialtyKeywords: Record<string, string[]> = {
-  battery_jumpstart: ['electric', 'electri', 'bateria', 'bater'],
-  tire_change: ['llanta', 'neumatic', 'vulcan', 'rueda'],
-  flat_tire_no_spare: ['llanta', 'neumatic', 'vulcan', 'rueda'],
-  tow_service: ['grua', 'remolque', 'asistencia', 'general'],
-  minor_mechanic: ['motor', 'mecanic', 'general'],
-  locksmith_vehicle: ['cerraj', 'asistencia', 'general'],
-  fuel_delivery: ['combustible', 'gasolina', 'diesel'],
-  unknown: ['asistencia', 'general', 'mecanic'],
-};

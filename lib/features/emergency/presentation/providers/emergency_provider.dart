@@ -448,6 +448,21 @@ class EmergencyNotifier extends StateNotifier<EmergencyState> {
     }
   }
 
+  Future<bool> cancelTechnicianService(String emergencyId) async {
+    state = state.copyWith(isLoading: true, error: null);
+    try {
+      await _dataSource.cancelTechnicianService(emergencyId);
+      state = state.copyWith(
+        isLoading: false,
+        clearActiveEmergency: true,
+      );
+      return true;
+    } catch (e) {
+      state = state.copyWith(isLoading: false, error: e.toString());
+      return false;
+    }
+  }
+
   void setActiveEmergency(Emergency emergency) {
     state = state.copyWith(activeEmergency: emergency);
   }

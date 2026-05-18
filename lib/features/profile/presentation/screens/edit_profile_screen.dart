@@ -1,13 +1,15 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:go_router/go_router.dart';
 import 'package:gap/gap.dart';
+import 'package:go_router/go_router.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
+
 import '../../../../core/constants/app_colors.dart';
 import '../../../../core/constants/app_constants.dart';
 import '../../../../core/constants/app_strings.dart';
+import '../../../../core/constants/technician_specialties.dart';
 import '../../../../core/network/dio_client.dart';
 import '../../../../core/utils/helpers.dart';
 import '../../../../core/utils/validators.dart';
@@ -15,6 +17,7 @@ import '../../../../features/auth/domain/entities/user_entity.dart';
 import '../../../../shared/providers/auth_provider.dart';
 import '../../../../shared/widgets/app_button.dart';
 import '../../../../shared/widgets/app_text_field.dart';
+import '../../../../shared/widgets/technician_specialty_dropdown_field.dart';
 import '../../../../shared/widgets/user_avatar.dart';
 import '../../../map/domain/entities/location_entity.dart';
 import '../../../map/presentation/providers/map_provider.dart';
@@ -31,7 +34,7 @@ class _EditProfileScreenState extends ConsumerState<EditProfileScreen> {
   final _formKey = GlobalKey<FormState>();
   late final TextEditingController _nameCtrl;
   late final TextEditingController _phoneCtrl;
-  late final TextEditingController _specialtyCtrl;
+  String? _selectedSpecialtyCode;
 
   bool _isUploadingAvatar = false;
   bool _isUpdatingLocation = false;
@@ -44,7 +47,8 @@ class _EditProfileScreenState extends ConsumerState<EditProfileScreen> {
     final user = ref.read(authNotifierProvider).value;
     _nameCtrl = TextEditingController(text: user?.name ?? '');
     _phoneCtrl = TextEditingController(text: user?.phone ?? '');
-    _specialtyCtrl = TextEditingController(text: user?.specialty ?? '');
+    _selectedSpecialtyCode =
+        TechnicianSpecialties.normalizeCode(user?.specialty);
     WidgetsBinding.instance.addPostFrameCallback((_) {
       _resolveSavedLocationAddress();
     });
@@ -54,7 +58,6 @@ class _EditProfileScreenState extends ConsumerState<EditProfileScreen> {
   void dispose() {
     _nameCtrl.dispose();
     _phoneCtrl.dispose();
-    _specialtyCtrl.dispose();
     super.dispose();
   }
 
@@ -159,11 +162,14 @@ class _EditProfileScreenState extends ConsumerState<EditProfileScreen> {
         if (ok) {
           AppHelpers.showSnackBar(context, 'Foto actualizada', isSuccess: true);
         } else {
-          AppHelpers.showSnackBar(context, 'Error al guardar foto',
-              isError: true);
+          AppHelpers.showSnackBar(
+            context,
+            'Error al guardar foto',
+            isError: true,
+          );
         }
       }
-    } catch (e) {
+    } catch (_) {
       if (mounted) {
         AppHelpers.showSnackBar(context, 'Error al subir foto', isError: true);
       }
@@ -215,9 +221,7 @@ class _EditProfileScreenState extends ConsumerState<EditProfileScreen> {
     final updated = user.copyWith(
       name: _nameCtrl.text.trim(),
       phone: _phoneCtrl.text.trim(),
-      specialty: _specialtyCtrl.text.trim().isEmpty
-          ? null
-          : _specialtyCtrl.text.trim(),
+      specialty: user.isTechnician ? _selectedSpecialtyCode : user.specialty,
     );
 
     final ok = await ref
@@ -247,6 +251,7 @@ class _EditProfileScreenState extends ConsumerState<EditProfileScreen> {
     final authState = ref.watch(authNotifierProvider);
     final user = authState.value;
     final isLoading = authState.isLoading;
+    final emailCtrl = TextEditingController(text: user?.email ?? '');
 
     return Scaffold(
       backgroundColor: AppColors.background,
@@ -273,7 +278,6 @@ class _EditProfileScreenState extends ConsumerState<EditProfileScreen> {
           child: Column(
             children: [
               const Gap(8),
-              // Avatar
               Center(
                 child: GestureDetector(
                   onTap: _isUploadingAvatar ? null : _pickAndUploadAvatar,
@@ -310,8 +314,11 @@ class _EditProfileScreenState extends ConsumerState<EditProfileScreen> {
                               color: AppColors.primary,
                               shape: BoxShape.circle,
                             ),
-                            child: const Icon(Icons.camera_alt,
-                                size: 16, color: Colors.white),
+                            child: const Icon(
+                              Icons.camera_alt,
+                              size: 16,
+                              color: Colors.white,
+                            ),
                           ),
                         ),
                     ],
@@ -327,8 +334,6 @@ class _EditProfileScreenState extends ConsumerState<EditProfileScreen> {
                 ),
               ),
               const Gap(28),
-
-              // Fields
               AppTextField(
                 label: AppStrings.name,
                 controller: _nameCtrl,
@@ -347,45 +352,46 @@ class _EditProfileScreenState extends ConsumerState<EditProfileScreen> {
                 hint: '0991234567',
                 textInputAction: TextInputAction.next,
               ),
-
-              const Gap(14),
-              AppTextField(
-                label: 'Especialidad técnica',
-                hint: 'Ej: Mecánica automotriz, Electricidad',
-                controller: _specialtyCtrl,
-                prefixIcon: const Icon(Icons.build_outlined, size: 20),
-                textInputAction: TextInputAction.next,
-              ),
-              const Gap(4),
-              Padding(
-                padding: const EdgeInsets.symmetric(horizontal: 4),
-                child: Text(
-                  user?.isTechnician == true
-                      ? 'Tu especialidad es visible para los conductores que solicitan asistencia.'
-                      : 'Opcional. Indícala si tienes conocimientos técnicos.',
-                  style: const TextStyle(
-                    fontSize: 12,
-                    color: AppColors.textSecondary,
+              if (user?.isTechnician == true) ...[
+                const Gap(14),
+                TechnicianSpecialtyDropdownField(
+                  value: _selectedSpecialtyCode,
+                  validator: (value) =>
+                      TechnicianSpecialties.isValidCode(value)
+                          ? null
+                          : 'Selecciona una especialidad tecnica',
+                  onChanged: (value) => setState(
+                    () => _selectedSpecialtyCode = value,
                   ),
                 ),
-              ),
-
-              // Email (read only)
+                const Gap(4),
+                const Padding(
+                  padding: EdgeInsets.symmetric(horizontal: 4),
+                  child: Text(
+                    'Tu especialidad es visible para los conductores que solicitan asistencia.',
+                    style: TextStyle(
+                      fontSize: 12,
+                      color: AppColors.textSecondary,
+                    ),
+                  ),
+                ),
+              ],
               const Gap(14),
               AppTextField(
                 label: AppStrings.email,
-                controller: TextEditingController(text: user?.email ?? ''),
+                controller: emailCtrl,
                 readOnly: true,
                 prefixIcon: const Icon(Icons.email_outlined, size: 20),
-                suffixIcon: const Icon(Icons.lock_outline,
-                    size: 16, color: AppColors.textHint),
+                suffixIcon: const Icon(
+                  Icons.lock_outline,
+                  size: 16,
+                  color: AppColors.textHint,
+                ),
               ),
-
-              // Location update
               const Gap(14),
               Container(
-                padding: const EdgeInsets.symmetric(
-                    horizontal: 16, vertical: 12),
+                padding:
+                    const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
                 decoration: BoxDecoration(
                   color: AppColors.surface,
                   borderRadius:
@@ -394,8 +400,11 @@ class _EditProfileScreenState extends ConsumerState<EditProfileScreen> {
                 ),
                 child: Row(
                   children: [
-                    const Icon(Icons.location_on_outlined,
-                        color: AppColors.primary, size: 20),
+                    const Icon(
+                      Icons.location_on_outlined,
+                      color: AppColors.primary,
+                      size: 20,
+                    ),
                     const SizedBox(width: 12),
                     Expanded(
                       child: Text(
@@ -424,19 +433,23 @@ class _EditProfileScreenState extends ConsumerState<EditProfileScreen> {
                             style: TextButton.styleFrom(
                               foregroundColor: AppColors.primary,
                               padding: const EdgeInsets.symmetric(
-                                  horizontal: 12, vertical: 6),
+                                horizontal: 12,
+                                vertical: 6,
+                              ),
                               minimumSize: Size.zero,
                               tapTargetSize: MaterialTapTargetSize.shrinkWrap,
                             ),
-                            child: const Text('Editar',
-                                style: TextStyle(
-                                    fontSize: 13,
-                                    fontWeight: FontWeight.w600)),
+                            child: const Text(
+                              'Editar',
+                              style: TextStyle(
+                                fontSize: 13,
+                                fontWeight: FontWeight.w600,
+                              ),
+                            ),
                           ),
                   ],
                 ),
               ),
-
               const Gap(32),
               AppButton(
                 label: AppStrings.save,

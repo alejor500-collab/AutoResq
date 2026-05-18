@@ -2,6 +2,7 @@ import 'package:flutter/foundation.dart' show debugPrint;
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import '../../../../core/constants/app_constants.dart';
+import '../../../../core/utils/helpers.dart';
 import '../../../../shared/providers/auth_provider.dart';
 
 class AdminState {
@@ -48,40 +49,295 @@ class AdminNotifier extends StateNotifier<AdminState> {
   Future<void> loadStats() async {
     state = state.copyWith(isLoading: true);
     try {
-      final users =
-          await _client.from(AppConstants.tableUsuarios).select('rol, activo');
+      final users = await _client.from(AppConstants.tableUsuarios).select(
+            'id, rol, activo, creado_en, account_disabled_at',
+          );
 
       final emergencies =
-          await _client.from(AppConstants.tableEmergencias).select('estado');
+          await _client.from(AppConstants.tableEmergencias).select(
+                'id, usuario_id, fecha, estado',
+              );
 
-      final tecnicos = await _client
-          .from(AppConstants.tableTecnicos)
-          .select('estado_verificacion');
+      final tecnicos = await _client.from(AppConstants.tableTecnicos).select(
+            'id, usuario_id, estado_verificacion, disponible, calificacion_promedio, total_servicios',
+          );
 
-      final userList = users as List;
-      final emList = emergencies as List;
-      final techList = tecnicos as List;
+      final ratings = await _client.from(AppConstants.tableCalificaciones).select(
+            'calificado_id, puntuacion, fecha',
+          );
+
+      final userList = List<Map<String, dynamic>>.from(
+        (users as List).map((row) => Map<String, dynamic>.from(row as Map)),
+      );
+      final emList = List<Map<String, dynamic>>.from(
+        (emergencies as List).map((row) => Map<String, dynamic>.from(row as Map)),
+      );
+      final techList = List<Map<String, dynamic>>.from(
+        (tecnicos as List).map((row) => Map<String, dynamic>.from(row as Map)),
+      );
+      final ratingList = List<Map<String, dynamic>>.from(
+        (ratings as List).map((row) => Map<String, dynamic>.from(row as Map)),
+      );
+
+      final totalUsers = userList.length;
+      final activeUsers =
+          userList.where((u) => (u['activo'] as bool?) ?? true).length;
+      final disabledUsers = totalUsers - activeUsers;
+      final driverCount = userList
+          .where((u) => u['rol'] == AppConstants.roleDriver)
+          .length;
+      final technicianUsers = userList
+          .where((u) => u['rol'] == AppConstants.roleTechnician)
+          .length;
+      final adminCount = userList
+          .where((u) => u['rol'] == AppConstants.roleAdmin)
+          .length;
+
+      final pendingValidations = techList
+          .where((t) =>
+              t['estado_verificacion'] == AppConstants.verificationPending)
+          .length;
+      final approvedTechnicians = techList
+          .where((t) =>
+              t['estado_verificacion'] == AppConstants.verificationApproved)
+          .length;
+      final rejectedTechnicians = techList
+          .where((t) =>
+              t['estado_verificacion'] == AppConstants.verificationRejected)
+          .length;
+      final availableTechnicians = techList
+          .where((t) =>
+              t['estado_verificacion'] == AppConstants.verificationApproved &&
+              (t['disponible'] as bool? ?? false))
+          .length;
+
+      final activeEmergencies = emList
+          .where((e) =>
+              e['estado'] == AppConstants.statusPending ||
+              e['estado'] == AppConstants.statusInProgress)
+          .length;
+      final completedEmergencies = emList
+          .where((e) =>
+              e['estado'] == AppConstants.statusCompleted ||
+              e['estado'] == AppConstants.statusAttended)
+          .length;
+      final cancelledEmergencies = emList
+          .where((e) => e['estado'] == AppConstants.statusCancelled)
+          .length;
+      final completionRate = emList.isEmpty
+          ? 0
+          : ((completedEmergencies / emList.length) * 100).round();
+
+      final avgTechnicianRating = _average(
+        techList
+            .map((t) => (t['calificacion_promedio'] as num?)?.toDouble() ?? 0)
+            .where((value) => value > 0),
+      );
+      final avgServicesPerTechnician = _average(
+        techList.map((t) => (t['total_servicios'] as num?)?.toDouble() ?? 0),
+      );
+      final lowRatedTechnicians = techList
+          .where((t) =>
+              ((t['total_servicios'] as num?)?.toInt() ?? 0) >= 3 &&
+              ((t['calificacion_promedio'] as num?)?.toDouble() ?? 0) > 0 &&
+              ((t['calificacion_promedio'] as num?)?.toDouble() ?? 0) < 4.0)
+          .length;
+
+      final newUsers7d = userList
+          .where((u) => _isWithinDays(u['creado_en'], 7))
+          .length;
+      final newUsers30d = userList
+          .where((u) => _isWithinDays(u['creado_en'], 30))
+          .length;
+      final disabledLast30d = userList
+          .where((u) => _isWithinDays(u['account_disabled_at'], 30))
+          .length;
+
+      final growth7d = _buildUserGrowthSeries(userList, 7);
+      final roleDistribution = [
+        {'label': 'Conductores', 'count': driverCount},
+        {'label': 'Tecnicos', 'count': technicianUsers},
+        {'label': 'Admins', 'count': adminCount},
+      ];
+      final alerts = _buildUserAlerts(
+        pendingValidations: pendingValidations,
+        disabledUsers: disabledUsers,
+        lowRatedTechnicians: lowRatedTechnicians,
+        activeEmergencies: activeEmergencies,
+        completionRate: completionRate,
+      );
+      final suggestions = _buildDecisionSuggestions(
+        pendingValidations: pendingValidations,
+        disabledUsers: disabledUsers,
+        lowRatedTechnicians: lowRatedTechnicians,
+        availableTechnicians: availableTechnicians,
+        activeEmergencies: activeEmergencies,
+      );
 
       state = state.copyWith(
         isLoading: false,
         stats: {
-          'total_users': userList.length,
+          'total_users': totalUsers,
+          'active_users': activeUsers,
+          'disabled_users': disabledUsers,
+          'driver_count': driverCount,
+          'technician_count': technicianUsers,
+          'admin_count': adminCount,
           'total_technicians': techList.length,
-          'pending_validations': techList
-              .where((t) =>
-                  t['estado_verificacion'] == AppConstants.verificationPending)
-              .length,
-          'active_emergencies': emList
-              .where((e) =>
-                  e['estado'] == AppConstants.statusPending ||
-                  e['estado'] == AppConstants.statusInProgress)
-              .length,
+          'approved_technicians': approvedTechnicians,
+          'pending_validations': pendingValidations,
+          'rejected_technicians': rejectedTechnicians,
+          'available_technicians': availableTechnicians,
+          'active_emergencies': activeEmergencies,
+          'completed_emergencies': completedEmergencies,
+          'cancelled_emergencies': cancelledEmergencies,
+          'completion_rate': completionRate,
+          'avg_technician_rating': avgTechnicianRating,
+          'avg_services_per_technician': avgServicesPerTechnician,
+          'new_users_7d': newUsers7d,
+          'new_users_30d': newUsers30d,
+          'disabled_last_30d': disabledLast30d,
+          'growth_7d': growth7d,
+          'role_distribution': roleDistribution,
+          'alerts': alerts,
+          'suggestions': suggestions,
+          'ratings_count': ratingList.length,
         },
       );
     } catch (e) {
       debugPrint('[AutoResQ] loadStats ERROR: $e');
       state = state.copyWith(isLoading: false, error: e.toString());
     }
+  }
+
+  bool _isWithinDays(dynamic value, int days) {
+    final date = DateTime.tryParse(value?.toString() ?? '');
+    if (date == null) return false;
+    final diff = AppHelpers.appNow().difference(AppHelpers.toAppTime(date));
+    return diff.inDays >= 0 && diff.inDays < days;
+  }
+
+  double _average(Iterable<double> values) {
+    final list = values.toList();
+    if (list.isEmpty) return 0;
+    return list.reduce((a, b) => a + b) / list.length;
+  }
+
+  List<Map<String, dynamic>> _buildUserGrowthSeries(
+    List<Map<String, dynamic>> users,
+    int days,
+  ) {
+    final now = AppHelpers.appNow();
+    final counts = <String, int>{};
+
+    for (var offset = days - 1; offset >= 0; offset--) {
+      final day = now.subtract(Duration(days: offset));
+      final key = '${day.year}-${day.month}-${day.day}';
+      counts[key] = 0;
+    }
+
+    for (final user in users) {
+      final created = DateTime.tryParse(user['creado_en']?.toString() ?? '');
+      if (created == null) continue;
+      final appDate = AppHelpers.toAppTime(created);
+      final key = '${appDate.year}-${appDate.month}-${appDate.day}';
+      if (counts.containsKey(key)) {
+        counts[key] = (counts[key] ?? 0) + 1;
+      }
+    }
+
+    return counts.entries.map((entry) {
+      final parts = entry.key.split('-');
+      final date = DateTime(
+        int.parse(parts[0]),
+        int.parse(parts[1]),
+        int.parse(parts[2]),
+      );
+      return {
+        'label': '${date.day}/${date.month}',
+        'count': entry.value,
+      };
+    }).toList();
+  }
+
+  List<Map<String, dynamic>> _buildUserAlerts({
+    required int pendingValidations,
+    required int disabledUsers,
+    required int lowRatedTechnicians,
+    required int activeEmergencies,
+    required int completionRate,
+  }) {
+    final alerts = <Map<String, dynamic>>[];
+
+    if (pendingValidations > 0) {
+      alerts.add({
+        'label': 'Validaciones pendientes',
+        'count': pendingValidations,
+        'tone': 'warning',
+      });
+    }
+    if (disabledUsers > 0) {
+      alerts.add({
+        'label': 'Cuentas desactivadas',
+        'count': disabledUsers,
+        'tone': 'danger',
+      });
+    }
+    if (lowRatedTechnicians > 0) {
+      alerts.add({
+        'label': 'Tecnicos con baja calificacion',
+        'count': lowRatedTechnicians,
+        'tone': 'danger',
+      });
+    }
+    if (activeEmergencies > 0 && completionRate < 70) {
+      alerts.add({
+        'label': 'Presion operativa',
+        'count': activeEmergencies,
+        'tone': 'info',
+      });
+    }
+
+    return alerts;
+  }
+
+  List<String> _buildDecisionSuggestions({
+    required int pendingValidations,
+    required int disabledUsers,
+    required int lowRatedTechnicians,
+    required int availableTechnicians,
+    required int activeEmergencies,
+  }) {
+    final suggestions = <String>[];
+
+    if (pendingValidations > 0) {
+      suggestions.add(
+        'Revisar tecnicos pendientes para aumentar la capacidad operativa.',
+      );
+    }
+    if (availableTechnicians < 3 && activeEmergencies > 0) {
+      suggestions.add(
+        'Hay poca cobertura tecnica disponible frente a la demanda activa.',
+      );
+    }
+    if (lowRatedTechnicians > 0) {
+      suggestions.add(
+        'Conviene auditar a los tecnicos con menor calificacion antes de que afecten la retencion.',
+      );
+    }
+    if (disabledUsers > 0) {
+      suggestions.add(
+        'Revisar cuentas desactivadas y solicitudes de reactivacion para evitar fuga de usuarios.',
+      );
+    }
+
+    if (suggestions.isEmpty) {
+      suggestions.add(
+        'La base de usuarios se ve estable; puedes enfocarte en crecimiento y calidad de servicio.',
+      );
+    }
+
+    return suggestions;
   }
 
   Future<void> loadUsers() async {

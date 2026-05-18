@@ -10,6 +10,7 @@ import '../../../../core/router/app_router.dart';
 import '../../../../shared/providers/auth_provider.dart';
 import '../../../../shared/widgets/animated_pressable.dart';
 import '../../../../shared/widgets/app_drawer.dart';
+import '../../../../shared/widgets/app_logo.dart';
 import '../../../../shared/widgets/bottom_nav_bar.dart';
 import '../../../../shared/widgets/in_app_message_notice.dart';
 import '../../../../shared/widgets/user_avatar.dart';
@@ -487,15 +488,7 @@ class _DriverHomeScreenState extends ConsumerState<DriverHomeScreen> {
                           ),
                         ),
                         const Spacer(),
-                        Text(
-                          'AutoResQ',
-                          style: TextStyle(
-                            fontSize: 20,
-                            fontWeight: FontWeight.w900,
-                            color: AppColors.onSurface,
-                            letterSpacing: -0.5,
-                          ),
-                        ),
+                        const AppLogo(height: 32, width: 132),
                         const Spacer(),
                         ChatNotificationBell(
                           onTap: _openLatestUnreadChat,

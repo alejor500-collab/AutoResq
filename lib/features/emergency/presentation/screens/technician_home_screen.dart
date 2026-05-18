@@ -8,13 +8,16 @@ import 'package:flutter_map/flutter_map.dart';
 import 'package:latlong2/latlong.dart';
 import '../../../../core/constants/app_colors.dart';
 import '../../../../core/constants/app_constants.dart';
+import '../../../../core/constants/technician_specialties.dart';
 import '../../../../core/router/app_router.dart';
 import '../../../../core/utils/helpers.dart';
 import '../../../../shared/providers/auth_provider.dart';
+import '../../../../shared/providers/notification_provider.dart';
 import '../../../../shared/providers/role_provider.dart';
 import '../../../../shared/providers/technician_stats_provider.dart';
 import '../../../../shared/widgets/animated_pressable.dart';
 import '../../../../shared/widgets/app_drawer.dart';
+import '../../../../shared/widgets/app_logo.dart';
 import '../../../../shared/widgets/bottom_nav_bar.dart';
 import '../../../../shared/widgets/in_app_message_notice.dart';
 import '../../../../shared/widgets/user_avatar.dart';
@@ -144,6 +147,13 @@ class _TechnicianHomeScreenState extends ConsumerState<TechnicianHomeScreen> {
   }
 
   Future<void> _openLatestUnreadChat() async {
+    final notifications =
+        ref.read(notificationsProvider).valueOrNull ?? const [];
+    if (notifications.isNotEmpty) {
+      _showNotificationsSheet();
+      return;
+    }
+
     final active = await ref
         .read(emergencyNotifierProvider.notifier)
         .loadActiveTechnicianEmergency();
@@ -153,6 +163,73 @@ class _TechnicianHomeScreenState extends ConsumerState<TechnicianHomeScreen> {
       return;
     }
     setState(() => _navIndex = 3);
+  }
+
+  void _showNotificationsSheet() {
+    final notifications =
+        ref.read(notificationsProvider).valueOrNull ?? const [];
+    ref.read(notificationActionsProvider).markAllRead();
+    showModalBottomSheet<void>(
+      context: context,
+      showDragHandle: true,
+      isScrollControlled: true,
+      backgroundColor: AppColors.surfaceContainerLowest,
+      builder: (sheetContext) => DraggableScrollableSheet(
+        expand: false,
+        initialChildSize: 0.72,
+        minChildSize: 0.36,
+        maxChildSize: 0.92,
+        builder: (context, scrollController) {
+          return ListView(
+            controller: scrollController,
+            padding: const EdgeInsets.fromLTRB(20, 4, 20, 28),
+            children: [
+              const Text(
+                'Notificaciones',
+                style: TextStyle(
+                  fontSize: 22,
+                  fontWeight: FontWeight.w900,
+                  color: AppColors.onSurface,
+                ),
+              ),
+              const Gap(6),
+              const Text(
+                'Aqui veras cancelaciones, mensajes y nuevas solicitudes.',
+                style: TextStyle(
+                  fontSize: 13,
+                  color: AppColors.textSecondary,
+                ),
+              ),
+              const Gap(18),
+              if (notifications.isEmpty)
+                const _EmptyPanel(
+                  icon: Icons.notifications_none_rounded,
+                  title: 'Sin novedades',
+                  message: 'Cuando ocurra algo importante aparecera aqui.',
+                )
+              else
+                ...notifications.map(
+                  (notification) => Padding(
+                    padding: const EdgeInsets.only(bottom: 10),
+                    child: _NotificationTile(
+                      notification: notification,
+                      onTap: () {
+                        Navigator.pop(sheetContext);
+                        if (notification.referenceId?.isNotEmpty == true) {
+                          context.push(
+                            AppRoutes.activeService,
+                            extra: notification.referenceId,
+                          );
+                        }
+                      },
+                    ),
+                  ),
+                ),
+            ],
+          );
+        },
+      ),
+    );
   }
 
   void _showActiveServiceDialog(
@@ -401,7 +478,12 @@ class _TechnicianHomeScreenState extends ConsumerState<TechnicianHomeScreen> {
               Switch(
                 value: isAvailable,
                 onChanged: _toggleAvailability,
-                activeThumbColor: AppColors.success,
+                thumbColor: WidgetStateProperty.resolveWith<Color>((states) {
+                  if (states.contains(WidgetState.selected)) {
+                    return AppColors.success;
+                  }
+                  return Colors.grey;
+                }),
                 materialTapTargetSize: MaterialTapTargetSize.shrinkWrap,
               ),
             ],
@@ -900,7 +982,8 @@ class _TechnicianHomeScreenState extends ConsumerState<TechnicianHomeScreen> {
   // ── Pending approval UI ───────────────────────────────────────────────────
 
   Widget _buildPendingBody(BuildContext context, String? specialty) {
-    final profileIncomplete = specialty == null || specialty.trim().isEmpty;
+    final profileIncomplete =
+        TechnicianSpecialties.normalizeCode(specialty) == null;
 
     return SafeArea(
       child: Padding(
@@ -1073,7 +1156,9 @@ class _TechnicianHomeScreenState extends ConsumerState<TechnicianHomeScreen> {
               if (_navIndex == 2)
                 _buildProfileCard(
                   technicianName: user?.name ?? 'Tecnico',
-                  specialty: user?.specialty ?? 'Sin especialidad',
+                  specialty: TechnicianSpecialties.labelForCode(
+                    user?.specialty,
+                  ),
                   isApproved: user?.isApproved ?? false,
                   isAvailable: isAvailable,
                   rating: stats?.rating ?? user?.rating ?? 0.0,
@@ -1178,15 +1263,7 @@ class _TechnicianHomeScreenState extends ConsumerState<TechnicianHomeScreen> {
                           ),
                         ),
                         const Spacer(),
-                        Text(
-                          'AutoResQ',
-                          style: TextStyle(
-                            fontSize: 20,
-                            fontWeight: FontWeight.w900,
-                            color: AppColors.onSurface,
-                            letterSpacing: -0.5,
-                          ),
-                        ),
+                        const AppLogo(height: 32, width: 132),
                         const Spacer(),
                         ChatNotificationBell(
                           onTap: _openLatestUnreadChat,
@@ -1394,6 +1471,105 @@ class _ActiveServiceNotice extends StatelessWidget {
               child: const Text('Ver'),
             ),
           ],
+        ),
+      ),
+    );
+  }
+}
+
+class _NotificationTile extends StatelessWidget {
+  final AppNotification notification;
+  final VoidCallback onTap;
+
+  const _NotificationTile({
+    required this.notification,
+    required this.onTap,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final color = switch (notification.type) {
+      'solicitud_cancelada' || 'tecnico_cancelo' => AppColors.error,
+      'nuevo_mensaje' => AppColors.primary,
+      'nueva_solicitud' => AppColors.success,
+      _ => AppColors.secondary,
+    };
+    final icon = switch (notification.type) {
+      'solicitud_cancelada' || 'tecnico_cancelo' => Icons.cancel_rounded,
+      'nuevo_mensaje' => Icons.chat_bubble_rounded,
+      'nueva_solicitud' => Icons.notifications_active_rounded,
+      _ => Icons.notifications_rounded,
+    };
+
+    return Material(
+      color: notification.read
+          ? AppColors.surfaceContainerLow
+          : color.withValues(alpha: 0.08),
+      borderRadius: BorderRadius.circular(18),
+      child: InkWell(
+        borderRadius: BorderRadius.circular(18),
+        onTap: onTap,
+        child: Padding(
+          padding: const EdgeInsets.all(14),
+          child: Row(
+            children: [
+              Container(
+                width: 42,
+                height: 42,
+                decoration: BoxDecoration(
+                  color: color.withValues(alpha: 0.12),
+                  borderRadius: BorderRadius.circular(14),
+                ),
+                child: Icon(icon, color: color, size: 21),
+              ),
+              const Gap(12),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      notification.title,
+                      style: const TextStyle(
+                        fontSize: 14,
+                        fontWeight: FontWeight.w900,
+                        color: AppColors.onSurface,
+                      ),
+                    ),
+                    const Gap(3),
+                    Text(
+                      notification.message,
+                      maxLines: 2,
+                      overflow: TextOverflow.ellipsis,
+                      style: const TextStyle(
+                        fontSize: 12,
+                        color: AppColors.textSecondary,
+                        height: 1.25,
+                      ),
+                    ),
+                    const Gap(5),
+                    Text(
+                      notification.timeLabel,
+                      style: const TextStyle(
+                        fontSize: 11,
+                        color: AppColors.secondary,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+              if (!notification.read) ...[
+                const Gap(8),
+                Container(
+                  width: 9,
+                  height: 9,
+                  decoration: BoxDecoration(
+                    color: color,
+                    shape: BoxShape.circle,
+                  ),
+                ),
+              ],
+            ],
+          ),
         ),
       ),
     );

@@ -32,10 +32,15 @@ class AppButton extends StatelessWidget {
   Widget build(BuildContext context) {
     final h = height ?? 56.0;
 
-    return SizedBox(
-      width: isFullWidth ? double.infinity : null,
-      height: h,
-      child: _buildButton(),
+    return LayoutBuilder(
+      builder: (context, constraints) {
+        final canExpand = isFullWidth && constraints.hasBoundedWidth;
+        return SizedBox(
+          width: canExpand ? double.infinity : null,
+          height: h,
+          child: _buildButton(),
+        );
+      },
     );
   }
 
