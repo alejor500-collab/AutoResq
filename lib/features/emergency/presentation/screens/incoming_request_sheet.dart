@@ -13,6 +13,7 @@ import '../../../../shared/widgets/app_button.dart';
 import '../../../../shared/widgets/star_rating.dart';
 import '../../../../shared/widgets/user_avatar.dart';
 import '../providers/emergency_provider.dart';
+import '../widgets/technician_offer_amount_sheet.dart';
 import '../../domain/entities/emergency_entity.dart';
 
 class IncomingRequestSheet extends ConsumerStatefulWidget {
@@ -118,10 +119,21 @@ class _IncomingRequestSheetState extends ConsumerState<IncomingRequestSheet> {
     );
   }
 
+  Future<double?> _promptOfferAmount(Emergency emergency) {
+    final suggestedAmount = emergency.protectedTotal ?? emergency.estimatedTotal;
+    return showTechnicianOfferAmountSheet(
+      context,
+      suggestedAmount: suggestedAmount,
+      currentOfferAmount: emergency.myOfferedAmount,
+      alreadyOffered: emergency.hasMyOffer,
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     final emergencyState = ref.watch(emergencyNotifierProvider);
     final emergency = widget.emergency;
+    final hasOffer = emergency.hasMyOffer;
 
     return DraggableScrollableSheet(
       initialChildSize: 0.75,
@@ -337,23 +349,72 @@ class _IncomingRequestSheetState extends ConsumerState<IncomingRequestSheet> {
                       ),
                       const Gap(16),
                       _ProtectedPriceCard(emergency: emergency),
+                      if (hasOffer) ...[
+                        const Gap(12),
+                        Container(
+                          width: double.infinity,
+                          padding: const EdgeInsets.all(14),
+                          decoration: BoxDecoration(
+                            color: AppColors.warningContainer,
+                            borderRadius: BorderRadius.circular(14),
+                            border: Border.all(
+                              color: AppColors.warning.withValues(alpha: 0.24),
+                            ),
+                          ),
+                          child: Row(
+                            children: [
+                              const Icon(
+                                Icons.local_offer_rounded,
+                                size: 18,
+                                color: AppColors.warning,
+                              ),
+                              const Gap(8),
+                              Expanded(
+                                child: Text(
+                                  emergency.myOfferedAmount == null
+                                      ? 'Oferta enviada. Puedes actualizarla mientras la solicitud siga pendiente.'
+                                      : 'Oferta enviada por ${AppHelpers.formatCurrency(emergency.myOfferedAmount!)}. Puedes actualizarla si lo necesitas.',
+                                  style: const TextStyle(
+                                    fontSize: 12,
+                                    fontWeight: FontWeight.w700,
+                                    color: AppColors.warning,
+                                    height: 1.35,
+                                  ),
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                      ],
                       const Gap(20),
 
                       // ─── Botón de oferta ──────────────────────────────
                       AppButton(
-                        label: 'Enviar oferta',
+                        label:
+                            hasOffer ? 'Actualizar oferta' : 'Enviar oferta',
                         onPressed: emergencyState.isLoading
                             ? null
                             : () async {
+                                final offeredAmount =
+                                    await _promptOfferAmount(emergency);
+                                if (!context.mounted ||
+                                    offeredAmount == null) {
+                                  return;
+                                }
                                 final ok = await ref
                                     .read(emergencyNotifierProvider.notifier)
-                                    .createTechnicianOffer(emergency.id);
+                                    .createTechnicianOffer(
+                                      emergency.id,
+                                      offeredAmount: offeredAmount,
+                                    );
                                 if (!context.mounted) return;
                                 if (ok) {
                                   context.pop();
                                   AppHelpers.showSnackBar(
                                     context,
-                                    'Oferta enviada. Espera la eleccion del conductor.',
+                                    hasOffer
+                                        ? 'Oferta actualizada. El conductor vera tu nuevo valor.'
+                                        : 'Oferta enviada. Espera la eleccion del conductor.',
                                     isSuccess: true,
                                   );
                                 } else {

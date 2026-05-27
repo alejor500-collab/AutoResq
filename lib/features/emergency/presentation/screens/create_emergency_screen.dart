@@ -8,6 +8,7 @@ import 'package:image_picker/image_picker.dart';
 import 'package:latlong2/latlong.dart';
 import '../../../../core/constants/app_colors.dart';
 import '../../../../core/constants/app_constants.dart';
+import '../../../../core/constants/emergency_match_policy.dart';
 import '../../../../core/constants/payment_methods.dart';
 import '../../../../core/router/app_router.dart';
 import '../../../../core/utils/helpers.dart';
@@ -33,6 +34,69 @@ class CreateEmergencyScreen extends ConsumerStatefulWidget {
 
 class _CreateEmergencyScreenState extends ConsumerState<CreateEmergencyScreen> {
   final _descCtrl = TextEditingController();
+  static const Set<String> _vehicleContextKeywords = {
+    'auto',
+    'carro',
+    'coche',
+    'vehiculo',
+    'vehículo',
+    'camioneta',
+    'camión',
+    'camion',
+    'moto',
+    'motor',
+    'llanta',
+    'llantas',
+    'bateria',
+    'batería',
+    'gasolina',
+    'combustible',
+    'grua',
+    'grúa',
+    'remolque',
+    'llave',
+    'puerta',
+    'freno',
+    'frenos',
+    'radiador',
+  };
+  static const Set<String> _problemKeywords = {
+    'pinchada',
+    'pinchado',
+    'daño',
+    'danio',
+    'falla',
+    'averia',
+    'avería',
+    'enciende',
+    'encender',
+    'apago',
+    'apagó',
+    'apagado',
+    'boto',
+    'botó',
+    'humo',
+    'ruido',
+    'vibracion',
+    'vibración',
+    'calienta',
+    'calentando',
+    'descargada',
+    'descargado',
+    'trabado',
+    'trabada',
+    'cerrado',
+    'cerrada',
+    'abierta',
+    'abierto',
+    'frena',
+    'frenar',
+    'fuga',
+    'fugando',
+    'sin',
+    'quedo',
+    'quedó',
+  };
   int _currentStep = 0;
   EmergencyAiAnalysisModel? _aiResult;
   EmergencyPriceQuote? _pricingQuote;
@@ -59,10 +123,70 @@ class _CreateEmergencyScreenState extends ConsumerState<CreateEmergencyScreen> {
     super.dispose();
   }
 
+  String? _validateEmergencyDescription(String rawValue) {
+    final value = rawValue.trim();
+    if (value.isEmpty) {
+      return 'Describe primero el problema.';
+    }
+
+    final normalized = value
+        .toLowerCase()
+        .replaceAll(RegExp(r'[^\w\sáéíóúüñ]'), ' ')
+        .replaceAll(RegExp(r'\s+'), ' ')
+        .trim();
+    final words = normalized.split(' ').where((word) => word.isNotEmpty).toList();
+
+    if (value.length < 12 || words.length < 3) {
+      return 'Escribe una descripción más clara del problema vehicular.';
+    }
+
+    final uniqueWords = words.toSet().length;
+    if (uniqueWords <= 1) {
+      return 'La descripción no parece válida. Intenta explicar qué le ocurre al vehículo.';
+    }
+
+    final hasRepeatedNoise = RegExp(r'(.)\1{4,}').hasMatch(normalized);
+    if (hasRepeatedNoise) {
+      return 'La descripción parece incoherente. Escribe el problema con palabras normales.';
+    }
+
+    final hasVehicleContext =
+        words.any((word) => _vehicleContextKeywords.contains(word));
+    final hasProblemContext =
+        words.any((word) => _problemKeywords.contains(word));
+
+    if (!hasVehicleContext || !hasProblemContext) {
+      return 'Describe un problema real del vehículo, por ejemplo que no enciende, que la llanta está pinchada o que te quedaste sin batería.';
+    }
+
+    return null;
+  }
+
+  Future<void> _showInvalidDescriptionDialog(String message) async {
+    await showDialog<void>(
+      context: context,
+      builder: (context) {
+        return AlertDialog(
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(24),
+          ),
+          title: const Text('Descripción no válida'),
+          content: Text(message),
+          actions: [
+            FilledButton(
+              onPressed: () => Navigator.pop(context),
+              child: const Text('Entendido'),
+            ),
+          ],
+        );
+      },
+    );
+  }
+
   Future<void> _analyzeAI() async {
-    if (_descCtrl.text.trim().isEmpty) {
-      AppHelpers.showSnackBar(context, 'Describe primero el problema',
-          isError: true);
+    final validationMessage = _validateEmergencyDescription(_descCtrl.text);
+    if (validationMessage != null) {
+      await _showInvalidDescriptionDialog(validationMessage);
       return;
     }
     final mapState = ref.read(mapNotifierProvider);
@@ -115,7 +239,7 @@ class _CreateEmergencyScreenState extends ConsumerState<CreateEmergencyScreen> {
           pricingType: 'diagnostic',
           pricingStatus: 'pending_manual_review',
           displayTitle: 'Tarifa no disponible',
-          displayMessage: 'Se crearÃ¡ la solicitud con revisiÃ³n de diagnÃ³stico.',
+          displayMessage: 'Se creará la solicitud con revisión de diagnóstico.',
           requiresDestination: false,
           requiresManualReview: true,
         );
@@ -136,6 +260,12 @@ class _CreateEmergencyScreenState extends ConsumerState<CreateEmergencyScreen> {
   }
 
   Future<void> _createEmergency() async {
+    final validationMessage = _validateEmergencyDescription(_descCtrl.text);
+    if (validationMessage != null) {
+      await _showInvalidDescriptionDialog(validationMessage);
+      return;
+    }
+
     Map<String, dynamic>? pendingRating;
     try {
       pendingRating = await ref
@@ -496,7 +626,7 @@ class _CreateEmergencyScreenState extends ConsumerState<CreateEmergencyScreen> {
       case 1:
         return 'Paso 2: \u00bfQue sucede?';
       case 2:
-        return 'Paso 3: DiagnÃ³stico preliminar';
+        return 'Paso 3: Diagnóstico preliminar';
       default:
         return '';
     }
@@ -509,7 +639,7 @@ class _CreateEmergencyScreenState extends ConsumerState<CreateEmergencyScreen> {
       case 1:
         return 'Describe el problema con tu vehiculo.';
       case 2:
-        return 'Resultado del anÃ¡lisis inteligente.';
+        return 'Resultado del análisis inteligente.';
       default:
         return '';
     }
@@ -1090,6 +1220,12 @@ class _DiagnosticStep extends StatelessWidget {
     final recomendacion = analysis?.recomendacion ?? '';
     final requiereGrua = analysis?.requiereGrua ?? false;
     final failed = analysis == null;
+    final categoryForeground = _categoryForeground(categoria);
+    final categoryBackground = _categoryBackground(categoria);
+    final categoryIcon = _categoryIcon(categoria);
+    final categoryBandText = EmergencyMatchPolicy.isTowCategory(categoria)
+        ? 'Radio inicial sugerido: 10 km'
+        : 'Radio inicial sugerido: 5 km';
 
     return Container(
       padding: EdgeInsets.all(AppResponsive.cardPadding(context)),
@@ -1120,10 +1256,10 @@ class _DiagnosticStep extends StatelessWidget {
               Container(
                 padding: const EdgeInsets.all(12),
                 decoration: BoxDecoration(
-                  color: AppColors.primary,
+                  color: failed ? AppColors.primary : categoryForeground,
                   borderRadius: BorderRadius.circular(16),
                 ),
-                child: const Icon(Icons.build, color: Colors.white, size: 24),
+                child: Icon(categoryIcon, color: Colors.white, size: 24),
               ),
               const Gap(16),
               Expanded(
@@ -1131,7 +1267,7 @@ class _DiagnosticStep extends StatelessWidget {
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     const Text(
-                      'DIAGNÃ“STICO PRELIMINAR',
+                      'DIAGNÓSTICO PRELIMINAR',
                       style: TextStyle(
                         fontSize: 10,
                         fontWeight: FontWeight.w700,
@@ -1150,13 +1286,53 @@ class _DiagnosticStep extends StatelessWidget {
                         ),
                       )
                     else ...[
-                      Text(
-                        categoria,
-                        style: const TextStyle(
-                          fontSize: 22,
-                          fontWeight: FontWeight.w800,
-                          color: AppColors.onSurface,
-                          height: 1.15,
+                      Container(
+                        width: double.infinity,
+                        padding: const EdgeInsets.all(14),
+                        decoration: BoxDecoration(
+                          color: categoryBackground,
+                          borderRadius: BorderRadius.circular(16),
+                          border: Border.all(
+                            color: categoryForeground.withValues(alpha: 0.18),
+                          ),
+                        ),
+                        child: Row(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Icon(
+                              categoryIcon,
+                              color: categoryForeground,
+                              size: 22,
+                            ),
+                            const Gap(10),
+                            Expanded(
+                              child: Column(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: [
+                                  Text(
+                                    categoria,
+                                    style: TextStyle(
+                                      fontSize: 20,
+                                      fontWeight: FontWeight.w900,
+                                      color: categoryForeground,
+                                      height: 1.15,
+                                    ),
+                                  ),
+                                  const Gap(4),
+                                  Text(
+                                    categoryBandText,
+                                    style: TextStyle(
+                                      fontSize: 12,
+                                      fontWeight: FontWeight.w700,
+                                      color: categoryForeground
+                                          .withValues(alpha: 0.78),
+                                      height: 1.25,
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            ),
+                          ],
                         ),
                       ),
                       const Gap(10),
@@ -1367,6 +1543,35 @@ Color _urgencyBackground(String urgencia) {
     'baja' => const Color(0xFFEAF7EF),
     _ => const Color(0xFFFFF2DE),
   };
+}
+
+IconData _categoryIcon(String categoria) {
+  return switch (categoria) {
+    EmergencyAiAnalysisModel.mecanicaRapida => Icons.build_circle_outlined,
+    EmergencyAiAnalysisModel.sistemaElectricoBateria =>
+      Icons.battery_charging_full_rounded,
+    EmergencyAiAnalysisModel.llantasVulcanizacion => Icons.tire_repair_rounded,
+    EmergencyAiAnalysisModel.gruaRemolque => Icons.local_shipping_outlined,
+    EmergencyAiAnalysisModel.combustible => Icons.local_gas_station_outlined,
+    EmergencyAiAnalysisModel.cerrajeriaVehicular => Icons.key_outlined,
+    _ => Icons.support_agent_rounded,
+  };
+}
+
+Color _categoryForeground(String categoria) {
+  return switch (categoria) {
+    EmergencyAiAnalysisModel.mecanicaRapida => AppColors.primary,
+    EmergencyAiAnalysisModel.sistemaElectricoBateria => AppColors.warning,
+    EmergencyAiAnalysisModel.llantasVulcanizacion => AppColors.tertiary,
+    EmergencyAiAnalysisModel.gruaRemolque => AppColors.emergency,
+    EmergencyAiAnalysisModel.combustible => AppColors.success,
+    EmergencyAiAnalysisModel.cerrajeriaVehicular => AppColors.secondary,
+    _ => AppColors.primary,
+  };
+}
+
+Color _categoryBackground(String categoria) {
+  return _categoryForeground(categoria).withValues(alpha: 0.10);
 }
 
 class _PaymentMethodCard extends StatelessWidget {

@@ -387,7 +387,10 @@ class EmergencyNotifier extends StateNotifier<EmergencyState> {
     }
   }
 
-  Future<bool> createTechnicianOffer(String emergencyId) async {
+  Future<bool> createTechnicianOffer(
+    String emergencyId, {
+    double? offeredAmount,
+  }) async {
     final user = _currentUser;
     if (user == null) return false;
     state = state.copyWith(isLoading: true, error: null);
@@ -412,7 +415,10 @@ class EmergencyNotifier extends StateNotifier<EmergencyState> {
         );
         return false;
       }
-      await _dataSource.createTechnicianOffer(emergencyId);
+      await _dataSource.createTechnicianOffer(
+        emergencyId,
+        offeredAmount: offeredAmount,
+      );
       state = state.copyWith(isLoading: false);
       return true;
     } catch (e) {

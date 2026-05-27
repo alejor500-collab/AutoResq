@@ -21,6 +21,15 @@ type EmergencyRow = {
 type TechnicianRow = {
   usuario_id: string | null;
   especialidad: string | null;
+  ubicacion_lat: number | null;
+  ubicacion_lng: number | null;
+  calificacion_promedio: number | null;
+};
+
+type EmergencyLocationRow = {
+  direccion: string | null;
+  latitud: number | null;
+  longitud: number | null;
 };
 
 const specialtyCatalog = {
@@ -94,9 +103,9 @@ Deno.serve(async (req: Request) => {
     await Promise.all([
       supabase
         .from('ubicaciones')
-        .select('direccion')
+        .select('direccion, latitud, longitud')
         .eq('emergencia_id', emergencyId)
-        .maybeSingle<{ direccion: string | null }>(),
+        .maybeSingle<EmergencyLocationRow>(),
       supabase
         .from('usuarios')
         .select('nombre')
@@ -104,7 +113,7 @@ Deno.serve(async (req: Request) => {
         .maybeSingle<{ nombre: string | null }>(),
       supabase
         .from('tecnicos')
-        .select('usuario_id, especialidad')
+        .select('usuario_id, especialidad, ubicacion_lat, ubicacion_lng, calificacion_promedio')
         .eq('estado_verificacion', 'aprobado')
         .eq('disponible', true)
         .neq('usuario_id', emergency.usuario_id),
@@ -121,9 +130,19 @@ Deno.serve(async (req: Request) => {
   const specialtyMatches = availableTechnicians.filter((technician) =>
     specialtyMatchesEmergencyType(technician.especialidad, emergencyType),
   );
-  const recipients = specialtyMatches.length > 0
+  const compatibleTechnicians = specialtyMatches.length > 0
     ? specialtyMatches
     : availableTechnicians;
+  const recipients = rankAndFilterRecipients({
+    technicians: compatibleTechnicians,
+    emergencyType,
+    emergencyLat: location?.latitud ?? null,
+    emergencyLng: location?.longitud ?? null,
+  });
+
+  if (recipients.length === 0) {
+    return jsonResponse({ ok: true, recipients: 0, push: 'no_technicians_in_range' }, 200);
+  }
 
   const { data: existingNotifications } = await supabase
     .from('notificaciones')
@@ -253,6 +272,89 @@ function specialtyMatchesEmergencyType(
   return specialtyCatalog[
     normalizedSpecialty as keyof typeof specialtyCatalog
   ].includes(emergencyType);
+}
+
+function rankAndFilterRecipients({
+  technicians,
+  emergencyType,
+  emergencyLat,
+  emergencyLng,
+}: {
+  technicians: TechnicianRow[];
+  emergencyType: string | null;
+  emergencyLat: number | null;
+  emergencyLng: number | null;
+}): TechnicianRow[] {
+  const annotated = technicians
+    .map((technician) => {
+      const distanceKm = distanceInKm(
+        emergencyLat,
+        emergencyLng,
+        technician.ubicacion_lat,
+        technician.ubicacion_lng,
+      );
+      const band = distanceBand(emergencyType, distanceKm);
+      return { technician, distanceKm, band };
+    })
+    .filter((entry) => entry.band !== null);
+
+  const hasNearby = annotated.some((entry) => entry.band!.rank <= 1);
+  return annotated
+    .filter((entry) => entry.band!.rank <= 1 || !hasNearby)
+    .sort((a, b) => {
+      const bandCompare = a.band!.rank - b.band!.rank;
+      if (bandCompare !== 0) return bandCompare;
+      const ratingCompare =
+        (b.technician.calificacion_promedio ?? 0) -
+        (a.technician.calificacion_promedio ?? 0);
+      if (ratingCompare !== 0) return ratingCompare;
+      return (a.distanceKm ?? Number.POSITIVE_INFINITY) -
+        (b.distanceKm ?? Number.POSITIVE_INFINITY);
+    })
+    .map((entry) => entry.technician);
+}
+
+function distanceBand(
+  emergencyType: string | null,
+  distanceKm: number | null,
+): { rank: number; maxKm: number } | null {
+  if (distanceKm === null) return { rank: 2, maxKm: 0 };
+  if (distanceKm < 0) return null;
+
+  const normalizedType = (emergencyType ?? '').trim();
+  if (specialtyCatalog.tow_truck.some((value) => value === normalizedType)) {
+    if (distanceKm <= 10) return { rank: 0, maxKm: 10 };
+    if (distanceKm <= 20) return { rank: 1, maxKm: 20 };
+    return null;
+  }
+
+  if (distanceKm <= 5) return { rank: 0, maxKm: 5 };
+  if (distanceKm <= 10) return { rank: 1, maxKm: 10 };
+  if (distanceKm <= 15) return { rank: 2, maxKm: 15 };
+  return null;
+}
+
+function distanceInKm(
+  latA: number | null,
+  lngA: number | null,
+  latB: number | null,
+  lngB: number | null,
+): number | null {
+  if (latA === null || lngA === null || latB === null || lngB === null) {
+    return null;
+  }
+  const earthRadiusKm = 6371;
+  const dLat = toRadians(latB - latA);
+  const dLng = toRadians(lngB - lngA);
+  const a = Math.sin(dLat / 2) ** 2 +
+    Math.cos(toRadians(latA)) *
+      Math.cos(toRadians(latB)) *
+      Math.sin(dLng / 2) ** 2;
+  return earthRadiusKm * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+}
+
+function toRadians(value: number): number {
+  return value * Math.PI / 180;
 }
 
 function serviceNameForType(type: string | null): string {

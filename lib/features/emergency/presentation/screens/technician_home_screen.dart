@@ -30,6 +30,7 @@ import '../../../map/presentation/providers/map_provider.dart';
 import '../../../map/presentation/widgets/map_widget.dart';
 import 'incoming_request_sheet.dart';
 import '../providers/emergency_provider.dart';
+import '../widgets/technician_offer_amount_sheet.dart';
 import '../../domain/entities/emergency_entity.dart';
 
 class TechnicianHomeScreen extends ConsumerStatefulWidget {
@@ -906,6 +907,16 @@ class _TechnicianHomeScreenState extends ConsumerState<TechnicianHomeScreen> {
     });
   }
 
+  Future<double?> _promptOfferAmount(Emergency emergency) {
+    final suggestedAmount = emergency.protectedTotal ?? emergency.estimatedTotal;
+    return showTechnicianOfferAmountSheet(
+      context,
+      suggestedAmount: suggestedAmount,
+      currentOfferAmount: emergency.myOfferedAmount,
+      alreadyOffered: emergency.hasMyOffer,
+    );
+  }
+
   Future<void> _sendOfferFromList(Emergency emergency) async {
     if (!mounted) return;
     final isAvailable = _isAvailable ??
@@ -920,16 +931,24 @@ class _TechnicianHomeScreenState extends ConsumerState<TechnicianHomeScreen> {
       return;
     }
 
+    final offeredAmount = await _promptOfferAmount(emergency);
+    if (!mounted || offeredAmount == null) return;
+
     final ok = await ref
         .read(emergencyNotifierProvider.notifier)
-        .createTechnicianOffer(emergency.id);
+        .createTechnicianOffer(
+          emergency.id,
+          offeredAmount: offeredAmount,
+        );
     if (!mounted) return;
     if (ok) {
       ref.invalidate(technicianPendingEmergenciesProvider);
       ref.invalidate(technicianEmergencyHistoryProvider);
       AppHelpers.showSnackBar(
         context,
-        'Oferta enviada. El conductor decidira si te asigna el servicio.',
+        emergency.hasMyOffer
+            ? 'Oferta actualizada. El conductor vera tu nuevo valor.'
+            : 'Oferta enviada. El conductor decidira si te asigna el servicio.',
         isSuccess: true,
       );
       return;
@@ -2064,6 +2083,8 @@ class _EmergencyRequestCard extends StatelessWidget {
     final description = emergency.aiTechnicianSummary?.trim().isNotEmpty == true
         ? emergency.aiTechnicianSummary!.trim()
         : emergency.descripcion.trim();
+    final hasOffer = emergency.hasMyOffer;
+    final offeredAmount = emergency.myOfferedAmount;
 
     return AnimatedPressable(
       onTap: onTap,
@@ -2133,13 +2154,44 @@ class _EmergencyRequestCard extends StatelessWidget {
                     ),
                   ),
                   const Gap(8),
-                  Text(
-                    amountText,
-                    style: const TextStyle(
-                      fontSize: 14,
-                      fontWeight: FontWeight.w900,
-                      color: AppColors.primary,
-                    ),
+                  Column(
+                    crossAxisAlignment: CrossAxisAlignment.end,
+                    children: [
+                      Text(
+                        amountText,
+                        style: TextStyle(
+                          fontSize: 14,
+                          fontWeight: FontWeight.w900,
+                          color:
+                              hasOffer ? AppColors.warning : AppColors.primary,
+                        ),
+                      ),
+                      if (hasOffer) ...[
+                        const Gap(6),
+                        Container(
+                          padding: const EdgeInsets.symmetric(
+                            horizontal: 10,
+                            vertical: 5,
+                          ),
+                          decoration: BoxDecoration(
+                            color: AppColors.warningContainer,
+                            borderRadius: BorderRadius.circular(999),
+                            border: Border.all(
+                              color:
+                                  AppColors.warning.withValues(alpha: 0.28),
+                            ),
+                          ),
+                          child: const Text(
+                            'Oferta enviada',
+                            style: TextStyle(
+                              fontSize: 11,
+                              fontWeight: FontWeight.w800,
+                              color: AppColors.warning,
+                            ),
+                          ),
+                        ),
+                      ],
+                    ],
                   ),
                 ],
               ),
@@ -2185,6 +2237,46 @@ class _EmergencyRequestCard extends StatelessWidget {
                   ),
                 ],
               ),
+              if (hasOffer) ...[
+                const Gap(12),
+                Container(
+                  width: double.infinity,
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 12,
+                    vertical: 11,
+                  ),
+                  decoration: BoxDecoration(
+                    color: AppColors.warningContainer,
+                    borderRadius: BorderRadius.circular(16),
+                    border: Border.all(
+                      color: AppColors.warning.withValues(alpha: 0.22),
+                    ),
+                  ),
+                  child: Row(
+                    children: [
+                      const Icon(
+                        Icons.local_offer_rounded,
+                        size: 16,
+                        color: AppColors.warning,
+                      ),
+                      const Gap(8),
+                      Expanded(
+                        child: Text(
+                          offeredAmount == null
+                              ? 'Oferta enviada. Puedes editarla antes de que el conductor elija.'
+                              : 'Oferta enviada por ${AppHelpers.formatCurrency(offeredAmount)}. Puedes ajustarla si lo necesitas.',
+                          style: const TextStyle(
+                            fontSize: 12,
+                            fontWeight: FontWeight.w700,
+                            color: AppColors.warning,
+                            height: 1.3,
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ],
               const Gap(14),
               Row(
                 children: [
@@ -2199,10 +2291,13 @@ class _EmergencyRequestCard extends StatelessWidget {
                     child: FilledButton(
                       onPressed: !canAccept || isLoading ? null : onAccept,
                       style: FilledButton.styleFrom(
-                        backgroundColor: AppColors.primary,
+                        backgroundColor:
+                            hasOffer ? AppColors.warning : AppColors.primary,
                         foregroundColor: Colors.white,
                       ),
-                      child: const Text('Ofertar'),
+                      child: Text(
+                        hasOffer ? 'Oferta enviada' : 'Ofertar',
+                      ),
                     ),
                   ),
                 ],

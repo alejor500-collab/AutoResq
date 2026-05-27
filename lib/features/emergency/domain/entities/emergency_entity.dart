@@ -80,6 +80,8 @@ class Emergency extends Equatable {
   final DateTime? asignacionFecha;
   final DateTime? asignacionLlegadaFecha;
   final Map<String, dynamic>? priceSnapshot;
+  final String? myOfferStatus;
+  final double? myOfferedAmount;
 
   const Emergency({
     required this.id,
@@ -117,6 +119,8 @@ class Emergency extends Equatable {
     this.asignacionFecha,
     this.asignacionLlegadaFecha,
     this.priceSnapshot,
+    this.myOfferStatus,
+    this.myOfferedAmount,
   });
 
   bool get hasTechnician => tecnicoId != null;
@@ -127,6 +131,7 @@ class Emergency extends Equatable {
   double? get estimatedTotal =>
       (priceSnapshot?['estimated_total'] as num?)?.toDouble();
   String? get pricingStatus => priceSnapshot?['pricing_status'] as String?;
+  bool get hasMyOffer => myOfferStatus?.trim().isNotEmpty == true;
 
   Emergency copyWith({
     String? id,
@@ -164,6 +169,8 @@ class Emergency extends Equatable {
     DateTime? asignacionFecha,
     DateTime? asignacionLlegadaFecha,
     Map<String, dynamic>? priceSnapshot,
+    String? myOfferStatus,
+    double? myOfferedAmount,
   }) {
     return Emergency(
       id: id ?? this.id,
@@ -204,6 +211,8 @@ class Emergency extends Equatable {
       asignacionLlegadaFecha:
           asignacionLlegadaFecha ?? this.asignacionLlegadaFecha,
       priceSnapshot: priceSnapshot ?? this.priceSnapshot,
+      myOfferStatus: myOfferStatus ?? this.myOfferStatus,
+      myOfferedAmount: myOfferedAmount ?? this.myOfferedAmount,
     );
   }
 
@@ -244,5 +253,7 @@ class Emergency extends Equatable {
         asignacionFecha,
         asignacionLlegadaFecha,
         priceSnapshot,
+        myOfferStatus,
+        myOfferedAmount,
       ];
 }

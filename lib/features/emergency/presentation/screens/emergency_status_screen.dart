@@ -8,6 +8,7 @@ import 'package:latlong2/latlong.dart';
 import 'package:url_launcher/url_launcher.dart';
 import '../../../../core/constants/app_colors.dart';
 import '../../../../core/constants/app_constants.dart';
+import '../../../../core/constants/emergency_match_policy.dart';
 import '../../../../core/router/app_router.dart';
 import '../../../../core/utils/helpers.dart';
 import '../../../chat/presentation/widgets/chat_notification_bell.dart';
@@ -386,6 +387,8 @@ class _StatusBodyState extends ConsumerState<_StatusBody> {
                   else
                     _OfferSelectionCard(
                       offersAsync: offersAsync,
+                      emergencyType:
+                          emergency.aiEmergencyType ?? emergency.clasificacionIa,
                       isChoosing: emergencyState.isLoading,
                       onAccept: _acceptOffer,
                       onCancel: () => _cancelService(context, ref),
@@ -1191,12 +1194,14 @@ class _ActionButton extends StatelessWidget {
 
 class _OfferSelectionCard extends StatefulWidget {
   final AsyncValue<List<TechnicianOffer>> offersAsync;
+  final String? emergencyType;
   final bool isChoosing;
   final ValueChanged<TechnicianOffer> onAccept;
   final VoidCallback onCancel;
 
   const _OfferSelectionCard({
     required this.offersAsync,
+    required this.emergencyType,
     required this.isChoosing,
     required this.onAccept,
     required this.onCancel,
@@ -1245,8 +1250,12 @@ class _OfferSelectionCardState extends State<_OfferSelectionCard>
           message: 'No se pudieron cargar ofertas. Seguimos escuchando.',
         ),
         data: (offers) {
-          final pending =
-              offers.where((offer) => offer.status == 'pendiente').toList();
+          final pending = EmergencyMatchPolicy.visibleRanked<TechnicianOffer>(
+            items: offers.where((offer) => offer.status == 'pendiente'),
+            emergencyType: widget.emergencyType,
+            distanceKm: (offer) => offer.distanceKm,
+            rating: (offer) => offer.rating,
+          );
           if (pending.isEmpty) {
             return _WaitingForOffers(
               animation: _ctrl,
@@ -1304,6 +1313,7 @@ class _OfferSelectionCardState extends State<_OfferSelectionCard>
                   padding: const EdgeInsets.only(bottom: 10),
                   child: _TechnicianOfferTile(
                     offer: offer,
+                    emergencyType: widget.emergencyType,
                     isChoosing: widget.isChoosing,
                     onAccept: () => widget.onAccept(offer),
                   ),
@@ -1403,11 +1413,13 @@ class _WaitingForOffers extends StatelessWidget {
 
 class _TechnicianOfferTile extends StatelessWidget {
   final TechnicianOffer offer;
+  final String? emergencyType;
   final bool isChoosing;
   final VoidCallback onAccept;
 
   const _TechnicianOfferTile({
     required this.offer,
+    required this.emergencyType,
     required this.isChoosing,
     required this.onAccept,
   });
@@ -1417,6 +1429,10 @@ class _TechnicianOfferTile extends StatelessWidget {
     final specialty = offer.specialty?.trim().isNotEmpty == true
         ? offer.specialty!.trim()
         : 'Tecnico verificado';
+    final band = EmergencyMatchPolicy.bandFor(
+      emergencyType: emergencyType,
+      distanceKm: offer.distanceKm,
+    );
 
     return Container(
       padding: const EdgeInsets.all(14),
@@ -1486,6 +1502,33 @@ class _TechnicianOfferTile extends StatelessWidget {
             ],
           ),
           const Gap(12),
+          if (band != null) ...[
+            Row(
+              children: [
+                Icon(
+                  band.rank == 0
+                      ? Icons.near_me_rounded
+                      : Icons.radar_rounded,
+                  size: 16,
+                  color: band.rank == 0 ? AppColors.success : AppColors.primary,
+                ),
+                const Gap(6),
+                Expanded(
+                  child: Text(
+                    band.label,
+                    style: TextStyle(
+                      fontSize: 12,
+                      fontWeight: FontWeight.w800,
+                      color: band.rank == 0
+                          ? AppColors.success
+                          : AppColors.primary,
+                    ),
+                  ),
+                ),
+              ],
+            ),
+            const Gap(10),
+          ],
           Row(
             children: [
               _OfferMetric(

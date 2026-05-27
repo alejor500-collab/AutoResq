@@ -1,7 +1,9 @@
 import 'dart:async';
+import 'dart:math' as math;
 
 import 'package:supabase_flutter/supabase_flutter.dart';
 import '../../../../core/constants/app_constants.dart';
+import '../../../../core/constants/emergency_match_policy.dart';
 import '../../../../core/constants/technician_specialties.dart';
 import '../../../../core/errors/exceptions.dart';
 import '../models/emergency_ai_analysis_model.dart';
@@ -22,7 +24,10 @@ abstract class EmergencyRemoteDataSource {
     EmergencyPriceQuote? priceQuote,
     String paymentMethod = 'cash',
   });
-  Future<void> createTechnicianOffer(String emergencyId);
+  Future<void> createTechnicianOffer(
+    String emergencyId, {
+    double? offeredAmount,
+  });
   Future<void> acceptTechnicianOffer(String offerId);
   Future<List<Map<String, dynamic>>> getTechnicianOffers(String emergencyId);
   Stream<List<Map<String, dynamic>>> watchTechnicianOfferRows(
@@ -433,18 +438,238 @@ class EmergencyRemoteDataSourceImpl implements EmergencyRemoteDataSource {
   ) async {
     final emergencies = await getPendingEmergencies();
     final normalized = TechnicianSpecialties.normalizeCode(specialty);
-    if (normalized == null || normalized.isEmpty) return emergencies;
+    final filtered = normalized == null || normalized.isEmpty
+        ? emergencies
+        : () {
+            final matching = emergencies.where((emergency) {
+              final type = emergency.aiEmergencyType ?? emergency.clasificacionIa;
+              return TechnicianSpecialties.matchesEmergencyType(
+                specialtyCode: normalized,
+                emergencyType: type,
+              );
+            }).toList();
+            return matching.isEmpty ? emergencies : matching;
+          }();
 
-    final matching = emergencies.where((emergency) {
-      final type = emergency.aiEmergencyType ?? emergency.clasificacionIa;
-      return TechnicianSpecialties.matchesEmergencyType(
-        specialtyCode: normalized,
-        emergencyType: type,
+    if (filtered.isEmpty) return filtered;
+
+    final viewerUserId = _client.auth.currentUser?.id;
+    if (viewerUserId == null || viewerUserId.isEmpty) return filtered;
+
+    try {
+      final technician = await _client
+          .from(AppConstants.tableTecnicos)
+          .select('id, ubicacion_lat, ubicacion_lng, calificacion_promedio')
+          .eq('usuario_id', viewerUserId)
+          .maybeSingle();
+      final technicianId = technician?['id']?.toString();
+      if (technicianId == null || technicianId.isEmpty) return filtered;
+
+      final radiusFiltered = await _filterPendingEmergenciesByRadius(
+        emergencies: filtered,
+        currentTechnicianId: technicianId,
+        currentTechnicianLat: (technician?['ubicacion_lat'] as num?)?.toDouble(),
+        currentTechnicianLng: (technician?['ubicacion_lng'] as num?)?.toDouble(),
+        currentTechnicianRating:
+            (technician?['calificacion_promedio'] as num?)?.toDouble() ?? 0,
       );
-    }).toList();
 
-    return matching.isEmpty ? emergencies : matching;
+      final rows = await _client
+          .from(AppConstants.tableTechnicianOffers)
+          .select('emergencia_id, monto_ofertado, estado')
+          .eq('tecnico_id', technicianId)
+          .inFilter(
+            'emergencia_id',
+            radiusFiltered.map((emergency) => emergency.id).toList(),
+          );
+
+      final offersByEmergencyId = <String, Map<String, dynamic>>{};
+      for (final row in rows as List) {
+        final data = Map<String, dynamic>.from(row as Map);
+        final emergencyId = data['emergencia_id']?.toString();
+        if (emergencyId == null || emergencyId.isEmpty) continue;
+        offersByEmergencyId[emergencyId] = data;
+      }
+
+      return radiusFiltered.map((emergency) {
+        final offer = offersByEmergencyId[emergency.id];
+        if (offer == null) return emergency;
+        return emergency.copyWith(
+          myOfferStatus: offer['estado']?.toString(),
+          myOfferedAmount: (offer['monto_ofertado'] as num?)?.toDouble(),
+        );
+      }).toList();
+    } on PostgrestException {
+      return filtered;
+    }
   }
+
+  Future<List<EmergencyModel>> _filterPendingEmergenciesByRadius({
+    required List<EmergencyModel> emergencies,
+    required String currentTechnicianId,
+    required double? currentTechnicianLat,
+    required double? currentTechnicianLng,
+    required double currentTechnicianRating,
+  }) async {
+    if (emergencies.isEmpty) return emergencies;
+
+    final technicians = await _loadAvailableTechnicianLocations();
+    final currentFromRoster = technicians[currentTechnicianId];
+    final current = currentFromRoster ??
+        _TechnicianMatchLocation(
+          id: currentTechnicianId,
+          specialty: null,
+          lat: currentTechnicianLat,
+          lng: currentTechnicianLng,
+          rating: currentTechnicianRating,
+        );
+
+    final visible = <EmergencyModel>[];
+    for (final emergency in emergencies) {
+      final emergencyType = emergency.aiEmergencyType ?? emergency.clasificacionIa;
+      final compatibleTechnicians = technicians.values.where((technician) {
+        return TechnicianSpecialties.matchesEmergencyType(
+          specialtyCode: technician.specialty,
+          emergencyType: emergencyType,
+        );
+      });
+
+      final rankedTechnicians = EmergencyMatchPolicy.visibleRanked<_TechnicianMatchLocation>(
+        items: compatibleTechnicians,
+        emergencyType: emergencyType,
+        distanceKm: (technician) => _distanceKm(
+          emergency.lat,
+          emergency.lng,
+          technician.lat,
+          technician.lng,
+        ),
+        rating: (technician) => technician.rating,
+      );
+
+      final hasCurrentTechnician = rankedTechnicians.any(
+        (technician) => technician.id == currentTechnicianId,
+      );
+      if (hasCurrentTechnician) {
+        visible.add(emergency);
+        continue;
+      }
+
+      final currentDistance = _distanceKm(
+        emergency.lat,
+        emergency.lng,
+        current.lat,
+        current.lng,
+      );
+      final currentBand = EmergencyMatchPolicy.bandFor(
+        emergencyType: emergencyType,
+        distanceKm: currentDistance,
+      );
+      final hasNearbyOptions = rankedTechnicians.any((technician) {
+        final band = EmergencyMatchPolicy.bandFor(
+          emergencyType: emergencyType,
+          distanceKm: _distanceKm(
+            emergency.lat,
+            emergency.lng,
+            technician.lat,
+            technician.lng,
+          ),
+        );
+        return band?.isNearby == true;
+      });
+
+      if (currentBand != null && (currentBand.isNearby || !hasNearbyOptions)) {
+        visible.add(emergency);
+      }
+    }
+
+    visible.sort((a, b) {
+      final aDistance = _distanceKm(a.lat, a.lng, current.lat, current.lng);
+      final bDistance = _distanceKm(b.lat, b.lng, current.lat, current.lng);
+      final aBand = EmergencyMatchPolicy.bandFor(
+        emergencyType: a.aiEmergencyType ?? a.clasificacionIa,
+        distanceKm: aDistance,
+      );
+      final bBand = EmergencyMatchPolicy.bandFor(
+        emergencyType: b.aiEmergencyType ?? b.clasificacionIa,
+        distanceKm: bDistance,
+      );
+      final bandCompare =
+          (aBand?.rank ?? 9).compareTo(bBand?.rank ?? 9);
+      if (bandCompare != 0) return bandCompare;
+      return b.fecha.compareTo(a.fecha);
+    });
+
+    return visible;
+  }
+
+  Future<Map<String, _TechnicianMatchLocation>>
+      _loadAvailableTechnicianLocations() async {
+    final rows = await _client
+        .from(AppConstants.tableTecnicos)
+        .select(
+          'id, especialidad, ubicacion_lat, ubicacion_lng, calificacion_promedio',
+        )
+        .eq('estado_verificacion', 'aprobado')
+        .eq('disponible', true);
+
+    final technicians = <String, _TechnicianMatchLocation>{};
+    for (final row in rows as List) {
+      final data = Map<String, dynamic>.from(row as Map);
+      final id = data['id']?.toString();
+      if (id == null || id.isEmpty) continue;
+      technicians[id] = _TechnicianMatchLocation(
+        id: id,
+        specialty: data['especialidad']?.toString(),
+        lat: (data['ubicacion_lat'] as num?)?.toDouble(),
+        lng: (data['ubicacion_lng'] as num?)?.toDouble(),
+        rating: (data['calificacion_promedio'] as num?)?.toDouble() ?? 0,
+      );
+    }
+
+    try {
+      final locations = await _client
+          .from('ubicaciones_tecnico')
+          .select('tecnico_id, latitud, longitud');
+      for (final row in locations as List) {
+        final data = Map<String, dynamic>.from(row as Map);
+        final id = data['tecnico_id']?.toString();
+        final current = id == null ? null : technicians[id];
+        if (id == null || current == null) continue;
+        technicians[id] = current.copyWith(
+          lat: (data['latitud'] as num?)?.toDouble() ?? current.lat,
+          lng: (data['longitud'] as num?)?.toDouble() ?? current.lng,
+        );
+      }
+    } on PostgrestException {
+      // Stored technician coordinates are enough when live location rows are hidden.
+    }
+
+    return technicians;
+  }
+
+  double? _distanceKm(
+    double? latA,
+    double? lngA,
+    double? latB,
+    double? lngB,
+  ) {
+    if (latA == null || lngA == null || latB == null || lngB == null) {
+      return null;
+    }
+
+    const earthRadiusKm = 6371.0;
+    final dLat = _toRadians(latB - latA);
+    final dLng = _toRadians(lngB - lngA);
+    final a = math.sin(dLat / 2) * math.sin(dLat / 2) +
+        math.cos(_toRadians(latA)) *
+            math.cos(_toRadians(latB)) *
+            math.sin(dLng / 2) *
+            math.sin(dLng / 2);
+    final c = 2 * math.atan2(math.sqrt(a), math.sqrt(1 - a));
+    return earthRadiusKm * c;
+  }
+
+  double _toRadians(double degrees) => degrees * math.pi / 180;
 
   bool _looksLikeMissingAiColumns(PostgrestException error) {
     final text = '${error.message} ${error.details ?? ''}'.toLowerCase();
@@ -588,11 +813,17 @@ class EmergencyRemoteDataSourceImpl implements EmergencyRemoteDataSource {
   }
 
   @override
-  Future<void> createTechnicianOffer(String emergencyId) async {
+  Future<void> createTechnicianOffer(
+    String emergencyId, {
+    double? offeredAmount,
+  }) async {
     try {
       await _client.rpc(
         'create_technician_offer',
-        params: {'p_emergency_id': emergencyId},
+        params: {
+          'p_emergency_id': emergencyId,
+          'p_offered_amount': offeredAmount,
+        },
       );
     } on PostgrestException catch (e) {
       throw ServerException(message: e.message);
@@ -696,5 +927,34 @@ class EmergencyRemoteDataSourceImpl implements EmergencyRemoteDataSource {
     } on PostgrestException catch (e) {
       throw ServerException(message: e.message);
     }
+  }
+}
+
+class _TechnicianMatchLocation {
+  final String id;
+  final String? specialty;
+  final double? lat;
+  final double? lng;
+  final double rating;
+
+  const _TechnicianMatchLocation({
+    required this.id,
+    required this.specialty,
+    required this.lat,
+    required this.lng,
+    required this.rating,
+  });
+
+  _TechnicianMatchLocation copyWith({
+    double? lat,
+    double? lng,
+  }) {
+    return _TechnicianMatchLocation(
+      id: id,
+      specialty: specialty,
+      lat: lat ?? this.lat,
+      lng: lng ?? this.lng,
+      rating: rating,
+    );
   }
 }
