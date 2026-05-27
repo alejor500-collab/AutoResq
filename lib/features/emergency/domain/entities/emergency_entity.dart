@@ -1,38 +1,41 @@
 import 'package:equatable/equatable.dart';
 
 class AiAnalysis extends Equatable {
-  final bool isValidEmergency;
-  final String emergencyType;
-  final String priority;
-  final String userMessage;
-  final String safetyRecommendation;
-  final String technicianSummary;
-  final List<String> detectedRisks;
-  final bool requiresImmediateAttention;
+  final String categoria;
+  final String tipoDanio;
+  final String resumenTecnico;
+  final String urgencia;
+  final bool requiereGrua;
+  final String recomendacion;
   final double confidence;
 
   const AiAnalysis({
-    required this.isValidEmergency,
-    required this.emergencyType,
-    required this.priority,
-    required this.userMessage,
-    required this.safetyRecommendation,
-    required this.technicianSummary,
-    required this.detectedRisks,
-    required this.requiresImmediateAttention,
+    required this.categoria,
+    required this.tipoDanio,
+    required this.resumenTecnico,
+    required this.urgencia,
+    required this.requiereGrua,
+    required this.recomendacion,
     required this.confidence,
   });
 
+  bool get isValidEmergency => true;
+  String get emergencyType => categoria;
+  String get priority => urgencia;
+  String get userMessage => tipoDanio;
+  String get safetyRecommendation => recomendacion;
+  String get technicianSummary => resumenTecnico;
+  List<String> get detectedRisks => const <String>[];
+  bool get requiresImmediateAttention => urgencia == 'alta' || requiereGrua;
+
   @override
   List<Object?> get props => [
-        isValidEmergency,
-        emergencyType,
-        priority,
-        userMessage,
-        safetyRecommendation,
-        technicianSummary,
-        detectedRisks,
-        requiresImmediateAttention,
+        categoria,
+        tipoDanio,
+        resumenTecnico,
+        urgencia,
+        requiereGrua,
+        recomendacion,
         confidence,
       ];
 }
@@ -57,6 +60,7 @@ class Emergency extends Equatable {
   final String
       estado; // pendiente | en_proceso | atendida | finalizada | cancelada
   final DateTime fecha;
+  final String paymentMethod;
 
   // Joined data (not in emergencias table directly)
   final String? driverName;
@@ -96,6 +100,7 @@ class Emergency extends Equatable {
     this.aiAnalyzedAt,
     required this.estado,
     required this.fecha,
+    this.paymentMethod = 'cash',
     this.driverName,
     this.driverPhone,
     this.lat,
@@ -142,6 +147,7 @@ class Emergency extends Equatable {
     DateTime? aiAnalyzedAt,
     String? estado,
     DateTime? fecha,
+    String? paymentMethod,
     String? driverName,
     String? driverPhone,
     double? lat,
@@ -180,6 +186,7 @@ class Emergency extends Equatable {
       aiAnalyzedAt: aiAnalyzedAt ?? this.aiAnalyzedAt,
       estado: estado ?? this.estado,
       fecha: fecha ?? this.fecha,
+      paymentMethod: paymentMethod ?? this.paymentMethod,
       driverName: driverName ?? this.driverName,
       driverPhone: driverPhone ?? this.driverPhone,
       lat: lat ?? this.lat,
@@ -220,6 +227,7 @@ class Emergency extends Equatable {
         aiAnalyzedAt,
         estado,
         fecha,
+        paymentMethod,
         driverName,
         driverPhone,
         lat,

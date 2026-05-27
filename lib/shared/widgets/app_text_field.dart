@@ -153,14 +153,16 @@ class _AppTextFieldState extends State<AppTextField>
             child: Row(
               children: [
                 Text(
-                  widget.label.toUpperCase(),
+                  widget.label,
                   style: TextStyle(
-                    fontSize: 10,
+                    fontSize: 12,
                     fontWeight: FontWeight.w700,
-                    letterSpacing: 0.5,
+                    letterSpacing: 0.1,
                     color: _fieldState == _FieldState.valid
                         ? AppColors.success
-                        : AppColors.secondary,
+                        : _hasFocus
+                            ? AppColors.primary
+                            : AppColors.secondary,
                   ),
                 ),
                 if (_fieldState == _FieldState.valid) ...[
@@ -178,6 +180,15 @@ class _AppTextFieldState extends State<AppTextField>
             decoration: BoxDecoration(
               borderRadius: BorderRadius.circular(24),
               color: _fillColor,
+              boxShadow: _hasFocus
+                  ? [
+                      BoxShadow(
+                        color: AppColors.primary.withValues(alpha: 0.08),
+                        blurRadius: 16,
+                        offset: const Offset(0, 8),
+                      ),
+                    ]
+                  : null,
             ),
             child: TextFormField(
               controller: widget.controller,
@@ -215,7 +226,7 @@ class _AppTextFieldState extends State<AppTextField>
               autofocus: widget.autofocus,
               style: const TextStyle(
                 fontSize: 15,
-                fontWeight: FontWeight.w500,
+                fontWeight: FontWeight.w600,
                 color: AppColors.onSurface,
               ),
               cursorColor: AppColors.primary,

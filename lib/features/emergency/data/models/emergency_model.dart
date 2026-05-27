@@ -20,6 +20,7 @@ class EmergencyModel extends Emergency {
     super.aiAnalyzedAt,
     required super.estado,
     required super.fecha,
+    super.paymentMethod,
     super.driverName,
     super.driverPhone,
     super.lat,
@@ -126,6 +127,7 @@ class EmergencyModel extends Emergency {
           : DateTime.parse(json['ai_analyzed_at'] as String),
       estado: json['estado'] as String? ?? 'pendiente',
       fecha: DateTime.parse(json['fecha'] as String),
+      paymentMethod: json['payment_method'] as String? ?? 'cash',
       driverName: _firstMap(json['usuarios'])['nombre'] as String?,
       driverPhone: _firstMap(json['usuarios'])['telefono'] as String?,
       lat: lat,
@@ -167,6 +169,7 @@ class EmergencyModel extends Emergency {
       if (aiAnalyzedAt != null)
         'ai_analyzed_at': aiAnalyzedAt!.toIso8601String(),
       'estado': estado,
+      'payment_method': paymentMethod,
     };
   }
 

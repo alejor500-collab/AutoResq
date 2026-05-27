@@ -4,6 +4,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:gap/gap.dart';
 import '../../../../core/constants/app_colors.dart';
+import '../../../../core/constants/payment_methods.dart';
 import '../../../../core/constants/app_constants.dart';
 import '../../../../core/router/app_router.dart';
 import '../../../../core/utils/helpers.dart';
@@ -460,6 +461,27 @@ class _ProtectedPriceCard extends StatelessWidget {
               color: AppColors.textSecondary,
               height: 1.35,
             ),
+          ),
+          const Gap(10),
+          Row(
+            children: [
+              Icon(
+                PaymentMethods.icon(emergency.paymentMethod),
+                size: 16,
+                color: AppColors.primary,
+              ),
+              const Gap(8),
+              Expanded(
+                child: Text(
+                  'Forma de pago: ${PaymentMethods.label(emergency.paymentMethod)}',
+                  style: const TextStyle(
+                    fontSize: 12,
+                    fontWeight: FontWeight.w800,
+                    color: AppColors.onSurface,
+                  ),
+                ),
+              ),
+            ],
           ),
           if (snapshot?['includes_text'] is String) ...[
             const Gap(6),

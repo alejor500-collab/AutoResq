@@ -11,7 +11,7 @@ class StarRating extends StatelessWidget {
     super.key,
     required this.rating,
     this.size = 20,
-    this.activeColor = const Color(0xFFFFC107),
+    this.activeColor = AppColors.warning,
     this.inactiveColor = AppColors.border,
   });
 
@@ -82,9 +82,7 @@ class _InteractiveStarRatingState extends State<InteractiveStarRating> {
             child: Icon(
               _value >= starValue ? Icons.star_rounded : Icons.star_outline_rounded,
               size: widget.size,
-              color: _value >= starValue
-                  ? const Color(0xFFFFC107)
-                  : AppColors.border,
+              color: _value >= starValue ? AppColors.warning : AppColors.border,
             ),
           ),
         );

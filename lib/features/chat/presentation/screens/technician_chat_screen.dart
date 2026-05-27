@@ -162,7 +162,7 @@ class _TechnicianChatScreenState extends ConsumerState<TechnicianChatScreen> {
                                 style: const TextStyle(
                                   fontSize: 16,
                                   fontWeight: FontWeight.w600,
-                                  letterSpacing: -0.3,
+                                  letterSpacing: 0,
                                   color: AppColors.onBackground,
                                 ),
                               ),

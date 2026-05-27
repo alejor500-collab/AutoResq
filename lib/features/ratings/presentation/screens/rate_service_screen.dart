@@ -142,14 +142,15 @@ class _RateServiceScreenState extends ConsumerState<RateServiceScreen> {
             UserAvatar(
               name: widget.technicianName,
               radius: 40,
-              backgroundColor: AppColors.secondary,
+              backgroundColor: AppColors.primaryFixed,
             ),
             const Gap(16),
             Text(
               widget.technicianName,
               style: const TextStyle(
                 fontSize: 20,
-                fontWeight: FontWeight.w700,
+                fontWeight: FontWeight.w800,
+                color: AppColors.textPrimary,
               ),
             ),
             const Gap(4),
@@ -173,7 +174,7 @@ class _RateServiceScreenState extends ConsumerState<RateServiceScreen> {
               style: const TextStyle(
                 fontSize: 14,
                 color: AppColors.textSecondary,
-                fontWeight: FontWeight.w500,
+                fontWeight: FontWeight.w700,
               ),
             ),
             const Gap(32),

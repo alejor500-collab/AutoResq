@@ -47,15 +47,15 @@ extension ServiceCategoryX on ServiceCategory {
   Color get color {
     switch (this) {
       case ServiceCategory.fuel:
-        return const Color(0xFF1E88E5); // blue
+        return AppColors.primary;
       case ServiceCategory.carRepair:
-        return AppColors.primary; // brand orange/red
+        return AppColors.primary;
       case ServiceCategory.tires:
-        return const Color(0xFF43A047); // green
+        return AppColors.success;
       case ServiceCategory.carWash:
-        return const Color(0xFF00ACC1); // cyan
+        return AppColors.tertiary;
       case ServiceCategory.charging:
-        return const Color(0xFF8E24AA); // purple
+        return AppColors.warning;
     }
   }
 

@@ -222,14 +222,15 @@ class _RateDriverScreenState extends ConsumerState<RateDriverScreen> {
                       width: double.infinity,
                       padding: const EdgeInsets.all(24),
                       decoration: BoxDecoration(
-                        color: Colors.white,
+                        color: AppColors.surfaceContainerLowest,
                         borderRadius: BorderRadius.circular(
                             AppConstants.borderRadiusCard),
+                        border: Border.all(color: AppColors.outlineVariant),
                         boxShadow: [
                           BoxShadow(
                             color: AppColors.onSurface.withValues(alpha: 0.06),
-                            blurRadius: 16,
-                            offset: const Offset(0, 2),
+                            blurRadius: 20,
+                            offset: const Offset(0, 8),
                           ),
                         ],
                       ),

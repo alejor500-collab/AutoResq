@@ -1,133 +1,215 @@
 class EmergencyAiAnalysisModel {
-  static const allowedEmergencyTypes = {
-    'tire_change',
-    'flat_tire_no_spare',
-    'battery_jumpstart',
-    'tow_service',
-    'minor_mechanic',
-    'locksmith_vehicle',
-    'fuel_delivery',
-    'battery',
-    'tire',
-    'fuel',
-    'engine',
-    'overheating',
-    'accident',
-    'lockout',
-    'electrical',
-    'brakes',
-    'unknown',
-    'not_emergency',
+  static const mecanicaRapida = 'Mecánica rápida';
+  static const sistemaElectricoBateria = 'Sistema eléctrico y batería';
+  static const llantasVulcanizacion = 'Llantas y vulcanización';
+  static const gruaRemolque = 'Grúa / remolque';
+  static const combustible = 'Combustible';
+  static const cerrajeriaVehicular = 'Cerrajería vehicular';
+  static const auxilioGeneral = 'Auxilio general';
+
+  static const urgenciaBaja = 'baja';
+  static const urgenciaMedia = 'media';
+  static const urgenciaAlta = 'alta';
+
+  static const allowedCategories = {
+    mecanicaRapida,
+    sistemaElectricoBateria,
+    llantasVulcanizacion,
+    gruaRemolque,
+    combustible,
+    cerrajeriaVehicular,
+    auxilioGeneral,
   };
 
-  static const allowedPriorities = {
-    'low',
-    'medium',
-    'high',
-    'critical',
+  static const allowedUrgencies = {
+    urgenciaBaja,
+    urgenciaMedia,
+    urgenciaAlta,
   };
 
-  static const allowedRisks = {
-    'vehicle_disabled_in_road',
-    'possible_accident',
-    'traffic_blockage',
-    'severe_visible_damage',
-    'smoke',
-    'fire',
-    'fuel_leak',
-    'injury',
-    'crash',
-    'electrical_risk',
-    'brake_failure',
-    'severe_overheating',
-    'none',
-  };
-
-  final bool isValidEmergency;
-  final String emergencyType;
-  final String priority;
-  final String userMessage;
-  final String safetyRecommendation;
-  final String technicianSummary;
-  final List<String> detectedRisks;
-  final bool requiresImmediateAttention;
+  final String categoria;
+  final String tipoDanio;
+  final String resumenTecnico;
+  final String urgencia;
+  final bool requiereGrua;
+  final String recomendacion;
   final double confidence;
+  final bool isFallback;
 
   const EmergencyAiAnalysisModel({
-    required this.isValidEmergency,
-    required this.emergencyType,
-    required this.priority,
-    required this.userMessage,
-    required this.safetyRecommendation,
-    required this.technicianSummary,
-    required this.detectedRisks,
-    required this.requiresImmediateAttention,
-    required this.confidence,
+    required this.categoria,
+    required this.tipoDanio,
+    required this.resumenTecnico,
+    required this.urgencia,
+    required this.requiereGrua,
+    required this.recomendacion,
+    this.confidence = 1,
+    this.isFallback = false,
   });
 
-  factory EmergencyAiAnalysisModel.fromJson(Map<String, dynamic> json) {
-    final type = _safeEnum(
-      json['emergency_type_code'] ?? json['emergency_type'],
-      allowedEmergencyTypes,
-      fallback: 'unknown',
-    );
-    final priority = _safeEnum(
-      json['priority'],
-      allowedPriorities,
-      fallback: 'medium',
-    );
-    final risks =
-        ((json['important_risks'] ?? json['detected_risks']) as List? ??
-                const ['none'])
-        .map((risk) => _safeEnum(risk, allowedRisks, fallback: 'none'))
-        .toSet()
-        .toList();
+  factory EmergencyAiAnalysisModel.fromJson(
+    Map<String, dynamic> json, {
+    String? fallbackDescription,
+  }) {
+    if (_looksLikeNewFormat(json)) {
+      return _fromNewFormat(json, fallbackDescription: fallbackDescription);
+    }
+    return _fromLegacyFormat(json, fallbackDescription: fallbackDescription);
+  }
 
+  factory EmergencyAiAnalysisModel.fallback(String description) {
+    final cleaned = _safeText(description);
+    final shortDescription = _truncate(
+      cleaned.isEmpty ? 'Solicitud vehicular reportada por el conductor.' : cleaned,
+      140,
+    );
     return EmergencyAiAnalysisModel(
-      isValidEmergency: json['is_valid_emergency'] as bool? ?? false,
-      emergencyType: type,
-      priority: priority,
-      userMessage: _safeText(
-        json['user_friendly_summary'] ?? json['user_message'],
+      categoria: auxilioGeneral,
+      tipoDanio: _truncate(
+        cleaned.isEmpty ? 'Problema vehicular por confirmar.' : cleaned,
+        90,
       ),
-      safetyRecommendation: _safeText(json['safety_recommendation']),
-      technicianSummary: _safeText(json['technician_summary']),
-      detectedRisks: risks.isEmpty ? const ['none'] : risks,
-      requiresImmediateAttention:
-          json['requires_immediate_attention'] as bool? ?? false,
-      confidence: ((json['confidence'] as num?)?.toDouble() ?? 0)
+      resumenTecnico:
+          'Conductor reporta: $shortDescription Revisar en sitio y confirmar diagnostico.',
+      urgencia: urgenciaMedia,
+      requiereGrua: false,
+      recomendacion:
+          'Mantente en un lugar seguro y espera la revision inicial del tecnico.',
+      confidence: 0.25,
+      isFallback: true,
+    );
+  }
+
+  static EmergencyAiAnalysisModel _fromNewFormat(
+    Map<String, dynamic> json, {
+    String? fallbackDescription,
+  }) {
+    final fallback = EmergencyAiAnalysisModel.fallback(fallbackDescription ?? '');
+    return EmergencyAiAnalysisModel(
+      categoria: _safeEnum(
+        json['categoria'],
+        allowedCategories,
+        fallback: fallback.categoria,
+      ),
+      tipoDanio: _safeText(json['tipo_danio'], fallback: fallback.tipoDanio),
+      resumenTecnico: _safeText(
+        json['resumen_tecnico'],
+        fallback: fallback.resumenTecnico,
+      ),
+      urgencia: _safeEnum(
+        json['urgencia'],
+        allowedUrgencies,
+        fallback: fallback.urgencia,
+      ),
+      requiereGrua: json['requiere_grua'] as bool? ?? fallback.requiereGrua,
+      recomendacion: _safeText(
+        json['recomendacion'],
+        fallback: fallback.recomendacion,
+      ),
+      confidence: ((json['confidence'] as num?)?.toDouble() ?? 0.9)
           .clamp(0, 1)
           .toDouble(),
+      isFallback: json['is_fallback'] as bool? ?? fallback.isFallback,
+    );
+  }
+
+  static EmergencyAiAnalysisModel _fromLegacyFormat(
+    Map<String, dynamic> json, {
+    String? fallbackDescription,
+  }) {
+    final fallback = EmergencyAiAnalysisModel.fallback(fallbackDescription ?? '');
+    final rawType =
+        (json['emergency_type_code'] ?? json['emergency_type'])?.toString();
+    final rawPriority = json['priority']?.toString();
+    return EmergencyAiAnalysisModel(
+      categoria: _legacyTypeToCategory(rawType) ?? fallback.categoria,
+      tipoDanio: _safeText(
+        json['user_friendly_summary'] ?? json['user_message'],
+        fallback: fallback.tipoDanio,
+      ),
+      resumenTecnico: _safeText(
+        json['technician_summary'],
+        fallback: fallback.resumenTecnico,
+      ),
+      urgencia: _legacyPriorityToUrgency(rawPriority) ?? fallback.urgencia,
+      requiereGrua:
+          (json['requires_immediate_attention'] as bool? ?? false) &&
+          _legacyTypeToCategory(rawType) == gruaRemolque,
+      recomendacion: _safeText(
+        json['safety_recommendation'],
+        fallback: fallback.recomendacion,
+      ),
+      confidence: ((json['confidence'] as num?)?.toDouble() ?? 0.5)
+          .clamp(0, 1)
+          .toDouble(),
+      isFallback: false,
     );
   }
 
   Map<String, dynamic> toJson() {
     return {
-      'is_valid_emergency': isValidEmergency,
-      'emergency_type_code': emergencyType,
-      'priority': priority,
-      'user_friendly_summary': userMessage,
-      'safety_recommendation': safetyRecommendation,
-      'technician_summary': technicianSummary,
-      'important_risks': detectedRisks,
-      'requires_immediate_attention': requiresImmediateAttention,
-      'confidence': confidence,
+      'categoria': categoria,
+      'tipo_danio': tipoDanio,
+      'resumen_tecnico': resumenTecnico,
+      'urgencia': urgencia,
+      'requiere_grua': requiereGrua,
+      'recomendacion': recomendacion,
     };
   }
 
   Map<String, dynamic> toEmergencyInsertJson({required String status}) {
     return {
-      'clasificacion_ia': emergencyType,
-      'ai_emergency_type': emergencyType,
-      'ai_priority': priority,
-      'ai_user_message': userMessage,
-      'ai_safety_recommendation': safetyRecommendation,
-      'ai_technician_summary': technicianSummary,
-      'ai_detected_risks': detectedRisks,
+      'clasificacion_ia': categoria,
+      'ai_emergency_type': categoria,
+      'ai_priority': urgencia,
+      'ai_user_message': tipoDanio,
+      'ai_safety_recommendation': recomendacion,
+      'ai_technician_summary': resumenTecnico,
+      'ai_detected_risks': const <String>[],
       'ai_requires_immediate_attention': requiresImmediateAttention,
       'ai_confidence': confidence,
       'ai_analysis_status': status,
       'ai_analyzed_at': DateTime.now().toIso8601String(),
+    };
+  }
+
+  bool get isValidEmergency => true;
+  String get emergencyType => categoria;
+  String get priority => urgencia;
+  String get userMessage => tipoDanio;
+  String get safetyRecommendation => recomendacion;
+  String get technicianSummary => resumenTecnico;
+  List<String> get detectedRisks => const <String>[];
+  bool get requiresImmediateAttention => urgencia == urgenciaAlta || requiereGrua;
+
+  static bool isAllowedCategory(String? value) => allowedCategories.contains(value);
+  static bool isAllowedUrgency(String? value) => allowedUrgencies.contains(value);
+
+  static bool _looksLikeNewFormat(Map<String, dynamic> json) {
+    return json.containsKey('categoria') ||
+        json.containsKey('tipo_danio') ||
+        json.containsKey('resumen_tecnico');
+  }
+
+  static String? _legacyTypeToCategory(String? value) {
+    return switch (value?.trim()) {
+      'minor_mechanic' || 'engine' || 'overheating' || 'brakes' => mecanicaRapida,
+      'battery_jumpstart' || 'battery' || 'electrical' => sistemaElectricoBateria,
+      'tire_change' || 'flat_tire_no_spare' || 'tire' => llantasVulcanizacion,
+      'tow_service' || 'accident' => gruaRemolque,
+      'fuel_delivery' || 'fuel' => combustible,
+      'locksmith_vehicle' || 'lockout' => cerrajeriaVehicular,
+      'unknown' || 'not_emergency' => auxilioGeneral,
+      _ => null,
+    };
+  }
+
+  static String? _legacyPriorityToUrgency(String? value) {
+    return switch (value?.trim()) {
+      'low' => urgenciaBaja,
+      'medium' => urgenciaMedia,
+      'high' || 'critical' => urgenciaAlta,
+      _ => null,
     };
   }
 
@@ -143,7 +225,13 @@ class EmergencyAiAnalysisModel {
     return fallback;
   }
 
-  static String _safeText(Object? value) {
-    return value?.toString().trim() ?? '';
+  static String _safeText(Object? value, {String fallback = ''}) {
+    final text = value?.toString().trim() ?? '';
+    return text.isEmpty ? fallback : text;
+  }
+
+  static String _truncate(String value, int maxLength) {
+    if (value.length <= maxLength) return value;
+    return '${value.substring(0, maxLength - 1).trim()}…';
   }
 }

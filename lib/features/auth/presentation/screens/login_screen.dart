@@ -253,7 +253,7 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
                       style: TextStyle(
                         fontSize: 32,
                         fontWeight: FontWeight.w800,
-                        letterSpacing: -1,
+                        letterSpacing: 0,
                         color: AppColors.onSurface,
                       ),
                     ),
@@ -426,7 +426,7 @@ class _GoogleSignInButton extends StatelessWidget {
                     fontSize: 15,
                     fontWeight: FontWeight.w600,
                     color: Color(0xFF3C4043),
-                    letterSpacing: -0.2,
+                    letterSpacing: 0,
                   ),
                 ),
               ],

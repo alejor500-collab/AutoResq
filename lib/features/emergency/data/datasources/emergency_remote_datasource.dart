@@ -20,6 +20,7 @@ abstract class EmergencyRemoteDataSource {
     EmergencyAiAnalysisModel? aiAnalysis,
     String aiAnalysisStatus = 'pending',
     EmergencyPriceQuote? priceQuote,
+    String paymentMethod = 'cash',
   });
   Future<void> createTechnicianOffer(String emergencyId);
   Future<void> acceptTechnicianOffer(String offerId);
@@ -83,6 +84,7 @@ class EmergencyRemoteDataSourceImpl implements EmergencyRemoteDataSource {
     EmergencyAiAnalysisModel? aiAnalysis,
     String aiAnalysisStatus = 'pending',
     EmergencyPriceQuote? priceQuote,
+    String paymentMethod = 'cash',
   }) async {
     try {
       final resolvedTipoProblemaId =
@@ -96,6 +98,7 @@ class EmergencyRemoteDataSourceImpl implements EmergencyRemoteDataSource {
       };
       final insertData = {
         ...baseInsertData,
+        'payment_method': paymentMethod,
         if (aiAnalysis != null)
           ...aiAnalysis.toEmergencyInsertJson(status: aiAnalysisStatus)
         else
@@ -111,7 +114,10 @@ class EmergencyRemoteDataSourceImpl implements EmergencyRemoteDataSource {
             .select()
             .single();
       } on PostgrestException catch (e) {
-        if (!_looksLikeMissingAiColumns(e)) rethrow;
+        if (!_looksLikeMissingAiColumns(e) &&
+            !_looksLikeMissingPaymentColumns(e)) {
+          rethrow;
+        }
         emergencyData = await _client
             .from(AppConstants.tableEmergencias)
             .insert(baseInsertData)
@@ -170,6 +176,21 @@ class EmergencyRemoteDataSourceImpl implements EmergencyRemoteDataSource {
     }
   }
 
+  Future<void> _notifyDriverAboutAcceptedEmergency(String? emergencyId) async {
+    if (emergencyId == null || emergencyId.isEmpty) return;
+    try {
+      await _client.functions.invoke(
+        'notify-emergency-update',
+        body: {
+          'emergency_id': emergencyId,
+          'type': 'solicitud_aceptada',
+        },
+      );
+    } catch (_) {
+      // La aceptacion del tecnico no debe fallar si el canal push aun no esta desplegado.
+    }
+  }
+
   @override
   Future<EmergencyAiAnalysisModel> analyzeEmergency({
     required String description,
@@ -196,6 +217,7 @@ class EmergencyRemoteDataSourceImpl implements EmergencyRemoteDataSource {
 
       return EmergencyAiAnalysisModel.fromJson(
         Map<String, dynamic>.from(data),
+        fallbackDescription: description,
       );
     } on FunctionException catch (e) {
       throw ServerException(
@@ -438,8 +460,19 @@ class EmergencyRemoteDataSourceImpl implements EmergencyRemoteDataSource {
         (text.contains('relation') && text.contains('does not exist'));
   }
 
+  bool _looksLikeMissingPaymentColumns(PostgrestException error) {
+    final text = '${error.message} ${error.details ?? ''}'.toLowerCase();
+    return text.contains('payment_method') && text.contains('column');
+  }
+
   int? _tipoProblemaIdForAiType(String? type) {
     return switch (type) {
+      'Sistema eléctrico y batería' => 3,
+      'Llantas y vulcanización' => 4,
+      'Combustible' => 5,
+      'Mecánica rápida' => 1,
+      'Grúa / remolque' => 6,
+      'Cerrajería vehicular' || 'Auxilio general' => 6,
       'battery' || 'battery_jumpstart' => 3,
       'tire' || 'tire_change' || 'flat_tire_no_spare' => 4,
       'fuel' || 'fuel_delivery' => 5,
@@ -547,6 +580,8 @@ class EmergencyRemoteDataSourceImpl implements EmergencyRemoteDataSource {
       // Update emergency status
       await _client.from(AppConstants.tableEmergencias).update(
           {'estado': AppConstants.statusInProgress}).eq('id', emergencyId);
+
+      unawaited(_notifyDriverAboutAcceptedEmergency(emergencyId));
     } on PostgrestException catch (e) {
       throw ServerException(message: e.message);
     }

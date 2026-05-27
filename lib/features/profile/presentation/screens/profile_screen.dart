@@ -195,7 +195,7 @@ class ProfileScreen extends ConsumerWidget {
                             fontSize: 20,
                             fontWeight: FontWeight.w900,
                             color: AppColors.onSurface,
-                            letterSpacing: -0.5,
+                            letterSpacing: 0,
                           ),
                         ),
                         const Spacer(),
@@ -446,7 +446,7 @@ class _ProfileHero extends StatelessWidget {
             fontSize: 24,
             fontWeight: FontWeight.w800,
             color: AppColors.onSurface,
-            letterSpacing: -0.5,
+            letterSpacing: 0,
           ),
         ),
         const Gap(8),
@@ -918,13 +918,13 @@ class _AccountSettings extends ConsumerWidget {
         _SettingsItem(
           icon: Icons.payments,
           label: 'Metodos de Pago',
-          onTap: () {},
+          onTap: () => context.push(AppRoutes.paymentMethods),
         ),
         const Gap(8),
         _SettingsItem(
           icon: Icons.shield,
           label: 'Seguridad y Privacidad',
-          onTap: () {},
+          onTap: () => context.push(AppRoutes.securityPrivacy),
         ),
         const Gap(8),
         _SettingsItem(

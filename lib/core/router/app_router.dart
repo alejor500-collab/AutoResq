@@ -27,6 +27,8 @@ import '../../features/ratings/presentation/screens/rate_driver_screen.dart';
 import '../../features/profile/presentation/screens/profile_screen.dart';
 import '../../features/profile/presentation/screens/edit_profile_screen.dart';
 import '../../features/profile/presentation/screens/edit_vehicle_screen.dart';
+import '../../features/profile/presentation/screens/payment_methods_screen.dart';
+import '../../features/profile/presentation/screens/security_privacy_screen.dart';
 import '../../features/admin/presentation/screens/admin_dashboard_screen.dart';
 import '../../features/admin/presentation/screens/user_management_screen.dart';
 import '../../features/admin/presentation/screens/technician_validation_screen.dart';
@@ -64,6 +66,8 @@ abstract class AppRoutes {
   static const String profile = '/profile';
   static const String editProfile = '/profile/edit';
   static const String editVehicle = '/profile/vehicle/edit';
+  static const String paymentMethods = '/profile/payment-methods';
+  static const String securityPrivacy = '/profile/security-privacy';
   static const String emergencyHistory = '/history';
 
   // Admin
@@ -333,6 +337,14 @@ final appRouterProvider = Provider<GoRouter>((ref) {
       GoRoute(
         path: AppRoutes.editVehicle,
         builder: (context, state) => const EditVehicleScreen(),
+      ),
+      GoRoute(
+        path: AppRoutes.paymentMethods,
+        builder: (context, state) => const PaymentMethodsScreen(),
+      ),
+      GoRoute(
+        path: AppRoutes.securityPrivacy,
+        builder: (context, state) => const SecurityPrivacyScreen(),
       ),
       GoRoute(
         path: AppRoutes.emergencyHistory,

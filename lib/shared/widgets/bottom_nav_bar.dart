@@ -81,31 +81,26 @@ class AppBottomNavBar extends StatelessWidget {
               filter: ImageFilter.blur(sigmaX: 28, sigmaY: 28),
               child: Container(
                 height: 68,
-                padding: const EdgeInsets.all(6),
+                padding: const EdgeInsets.all(7),
                 decoration: BoxDecoration(
                   gradient: LinearGradient(
                     begin: Alignment.topLeft,
                     end: Alignment.bottomRight,
                     colors: [
-                      Colors.white.withValues(alpha: 0.88),
-                      Colors.white.withValues(alpha: 0.68),
+                      Colors.white.withValues(alpha: 0.94),
+                      AppColors.surfaceContainerLowest.withValues(alpha: 0.84),
                     ],
                   ),
                   borderRadius: BorderRadius.circular(32),
                   border: Border.all(
-                    color: Colors.white.withValues(alpha: 0.72),
-                    width: 1.2,
+                    color: AppColors.outlineVariant.withValues(alpha: 0.82),
+                    width: 1,
                   ),
                   boxShadow: [
                     BoxShadow(
-                      color: AppColors.onSurface.withValues(alpha: 0.10),
-                      blurRadius: 30,
-                      offset: const Offset(0, 14),
-                    ),
-                    BoxShadow(
-                      color: Colors.white.withValues(alpha: 0.55),
-                      blurRadius: 8,
-                      offset: const Offset(0, -2),
+                      color: AppColors.shadow.withValues(alpha: 0.10),
+                      blurRadius: 26,
+                      offset: const Offset(0, 12),
                     ),
                   ],
                 ),
@@ -176,21 +171,29 @@ class _NavItemWidget extends StatelessWidget {
               margin: const EdgeInsets.symmetric(horizontal: 2),
               padding: EdgeInsets.symmetric(horizontal: isActive ? 10 : 0),
               decoration: BoxDecoration(
-                color: isActive
-                    ? AppColors.primary.withValues(alpha: 0.12)
-                    : Colors.transparent,
+                gradient: isActive
+                    ? LinearGradient(
+                        begin: Alignment.topLeft,
+                        end: Alignment.bottomRight,
+                        colors: [
+                          AppColors.primary.withValues(alpha: 0.14),
+                          AppColors.primary.withValues(alpha: 0.08),
+                        ],
+                      )
+                    : null,
+                color: isActive ? null : Colors.transparent,
                 borderRadius: BorderRadius.circular(26),
                 border: Border.all(
                   color: isActive
-                      ? AppColors.primary.withValues(alpha: 0.18)
+                      ? AppColors.primary.withValues(alpha: 0.16)
                       : Colors.transparent,
                 ),
                 boxShadow: isActive
                     ? [
                         BoxShadow(
-                          color: AppColors.primary.withValues(alpha: 0.12),
-                          blurRadius: 18,
-                          offset: const Offset(0, 8),
+                          color: AppColors.primary.withValues(alpha: 0.10),
+                          blurRadius: 16,
+                          offset: const Offset(0, 6),
                         ),
                       ]
                     : const [],
@@ -205,8 +208,9 @@ class _NavItemWidget extends StatelessWidget {
                     width: isActive ? 34 : 42,
                     height: isActive ? 34 : 42,
                     decoration: BoxDecoration(
+                      gradient: isActive ? AppColors.primaryGradient : null,
                       color: isActive
-                          ? AppColors.primary
+                          ? null
                           : AppColors.secondary.withValues(alpha: 0.08),
                       shape: BoxShape.circle,
                     ),

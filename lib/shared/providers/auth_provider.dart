@@ -125,6 +125,11 @@ class AuthNotifier extends StateNotifier<AsyncValue<AppUser?>> {
     return result.fold((_) => false, (_) => true);
   }
 
+  Future<bool> updatePassword(String newPassword) async {
+    final result = await _repo.updatePassword(newPassword);
+    return result.fold((_) => false, (_) => true);
+  }
+
   Future<bool> updateProfile(AppUser user) async {
     final result = await _repo.updateProfile(user);
     return result.fold(

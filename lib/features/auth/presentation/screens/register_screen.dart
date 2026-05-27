@@ -288,8 +288,8 @@ class _RegisterScreenState extends ConsumerState<RegisterScreen> {
                           height: 56,
                           decoration: BoxDecoration(
                             color: (widget.initialRole == 0
-                                    ? const Color(0xFFE53935)
-                                    : const Color(0xFF1E88E5))
+                                    ? AppColors.primary
+                                    : AppColors.tertiary)
                                 .withValues(alpha: 0.12),
                             borderRadius: BorderRadius.circular(16),
                           ),
@@ -298,8 +298,8 @@ class _RegisterScreenState extends ConsumerState<RegisterScreen> {
                                 ? Icons.directions_car_rounded
                                 : Icons.build_rounded,
                             color: widget.initialRole == 0
-                                ? const Color(0xFFE53935)
-                                : const Color(0xFF1E88E5),
+                                ? AppColors.primary
+                                : AppColors.tertiary,
                             size: 28,
                           ),
                         ),
@@ -313,7 +313,7 @@ class _RegisterScreenState extends ConsumerState<RegisterScreen> {
                       style: TextStyle(
                         fontSize: 32,
                         fontWeight: FontWeight.w800,
-                        letterSpacing: -1,
+                        letterSpacing: 0,
                         color: AppColors.onSurface,
                       ),
                     ),
@@ -396,12 +396,12 @@ class _RegisterScreenState extends ConsumerState<RegisterScreen> {
                           padding: const EdgeInsets.all(20),
                           decoration: BoxDecoration(
                             color: _cedulaBytes != null
-                                ? const Color(0xFF1E88E5).withValues(alpha: 0.08)
+                                ? AppColors.primary.withValues(alpha: 0.08)
                                 : AppColors.surfaceContainerLow,
                             borderRadius: BorderRadius.circular(16),
                             border: Border.all(
                               color: _cedulaBytes != null
-                                  ? const Color(0xFF1E88E5).withValues(alpha: 0.3)
+                                  ? AppColors.primary.withValues(alpha: 0.3)
                                   : AppColors.surfaceContainerHigh,
                               width: 1.5,
                             ),
@@ -413,7 +413,7 @@ class _RegisterScreenState extends ConsumerState<RegisterScreen> {
                                 height: 44,
                                 decoration: BoxDecoration(
                                   color: (_cedulaBytes != null
-                                          ? const Color(0xFF1E88E5)
+                                          ? AppColors.primary
                                           : AppColors.secondary)
                                       .withValues(alpha: 0.1),
                                   borderRadius: BorderRadius.circular(12),
@@ -423,7 +423,7 @@ class _RegisterScreenState extends ConsumerState<RegisterScreen> {
                                       ? Icons.check_circle_outline
                                       : Icons.badge_outlined,
                                   color: _cedulaBytes != null
-                                      ? const Color(0xFF1E88E5)
+                                      ? AppColors.primary
                                       : AppColors.secondary,
                                   size: 22,
                                 ),
@@ -441,7 +441,7 @@ class _RegisterScreenState extends ConsumerState<RegisterScreen> {
                                         fontSize: 14,
                                         fontWeight: FontWeight.w700,
                                         color: _cedulaBytes != null
-                                            ? const Color(0xFF1E88E5)
+                                            ? AppColors.primary
                                             : AppColors.onSurface,
                                       ),
                                     ),
@@ -669,7 +669,7 @@ class _GoogleRegisterButton extends StatelessWidget {
                   fontSize: 15,
                   fontWeight: FontWeight.w600,
                   color: Color(0xFF3C4043),
-                  letterSpacing: -0.2,
+                  letterSpacing: 0,
                 ),
               ),
             ],

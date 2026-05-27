@@ -186,7 +186,9 @@ class AuthRemoteDataSourceImpl implements AuthRemoteDataSource {
           data['creado_en']?.toString() ?? DateTime.now().toIso8601String(),
       'verification_status': verificationStatus,
       'rejection_reason': rejectionReason,
-      'account_disabled_reason': data['account_disabled_reason'] as String?,
+        'account_disabled_reason': data['account_disabled_reason'] as String?,
+        'preferred_payment_method':
+            data['preferred_payment_method'] as String?,
     });
   }
 
@@ -407,6 +409,7 @@ class AuthRemoteDataSourceImpl implements AuthRemoteDataSource {
         'nombre': user.name,
         'telefono': user.phone,
         'avatar_url': user.avatarUrl,
+        'preferred_payment_method': user.preferredPaymentMethod,
       }).eq('id', user.id);
 
       if (user.role == AppConstants.roleTechnician && user.specialty != null) {
@@ -436,6 +439,7 @@ class AuthRemoteDataSourceImpl implements AuthRemoteDataSource {
         verificationStatus: fresh.verificationStatus,
         rejectionReason: fresh.rejectionReason,
         accountDisabledReason: fresh.accountDisabledReason,
+        preferredPaymentMethod: fresh.preferredPaymentMethod,
       );
     } on PostgrestException catch (e) {
       throw core_exceptions.ServerException(message: e.message);

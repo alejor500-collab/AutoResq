@@ -208,7 +208,7 @@ class _MonitorAppBar extends StatelessWidget {
               fontSize: 16,
               fontWeight: FontWeight.w700,
               color: AppColors.textPrimary,
-              letterSpacing: -0.2,
+              letterSpacing: 0,
             ),
           ),
           const Gap(8),

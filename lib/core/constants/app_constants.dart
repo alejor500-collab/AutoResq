@@ -3,7 +3,7 @@ abstract class AppConstants {
   static const String supabaseUrl = 'https://sseqsmgvovppuzktochd.supabase.co';
   static const String supabaseAnonKey = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InNzZXFzbWd2b3ZwcHV6a3RvY2hkIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzYyNTU2MDUsImV4cCI6MjA5MTgzMTYwNX0.NZeeBH5Djmm6TO4ZNK2Hda-TbYaVWTrDzqf9LJcF37Y';
 
-  // ─── OpenAI ────────────────────────────────────────────────────────────────
+  // ─── AI Provider ───────────────────────────────────────────────────────────
   // ─── App ───────────────────────────────────────────────────────────────────
   static const String appName = 'AutoResQ';
   static const String appVersion = '1.0.0';

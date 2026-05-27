@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:shimmer/shimmer.dart';
 import '../../core/constants/app_colors.dart';
+import 'app_surface.dart';
 
 class LoadingOverlay extends StatelessWidget {
   final Widget child;
@@ -18,12 +19,31 @@ class LoadingOverlay extends StatelessWidget {
     return Stack(
       children: [
         child,
-        const ModalBarrier(dismissible: false, color: Colors.black26),
+        const ModalBarrier(dismissible: false, color: AppColors.scrim),
         const Center(
-          child: Card(
-            child: Padding(
-              padding: EdgeInsets.all(24),
-              child: CircularProgressIndicator(color: AppColors.primary),
+          child: AppSurface(
+            padding: EdgeInsets.symmetric(horizontal: 26, vertical: 22),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                SizedBox(
+                  width: 34,
+                  height: 34,
+                  child: CircularProgressIndicator(
+                    color: AppColors.primary,
+                    strokeWidth: 3,
+                  ),
+                ),
+                SizedBox(height: 14),
+                Text(
+                  'Cargando...',
+                  style: TextStyle(
+                    fontSize: 14,
+                    fontWeight: FontWeight.w700,
+                    color: AppColors.textPrimary,
+                  ),
+                ),
+              ],
             ),
           ),
         ),
@@ -50,7 +70,7 @@ class ShimmerCard extends StatelessWidget {
         margin: const EdgeInsets.only(bottom: 12),
         decoration: BoxDecoration(
           color: AppColors.surfaceVariant,
-          borderRadius: BorderRadius.circular(12),
+          borderRadius: BorderRadius.circular(18),
         ),
       ),
     );
@@ -91,28 +111,45 @@ class ErrorStateWidget extends StatelessWidget {
     return Center(
       child: Padding(
         padding: const EdgeInsets.all(32),
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            const Icon(Icons.error_outline, size: 56, color: AppColors.error),
-            const SizedBox(height: 16),
-            Text(
-              message,
-              textAlign: TextAlign.center,
-              style: const TextStyle(
-                color: AppColors.textSecondary,
-                fontSize: 14,
+        child: AppSurface(
+          padding: const EdgeInsets.all(24),
+          border: Border.all(color: AppColors.error.withValues(alpha: 0.18)),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Container(
+                width: 56,
+                height: 56,
+                decoration: BoxDecoration(
+                  color: AppColors.error.withValues(alpha: 0.10),
+                  shape: BoxShape.circle,
+                ),
+                child: const Icon(
+                  Icons.error_outline,
+                  size: 32,
+                  color: AppColors.error,
+                ),
               ),
-            ),
-            if (onRetry != null) ...[
               const SizedBox(height: 16),
-              TextButton.icon(
-                onPressed: onRetry,
-                icon: const Icon(Icons.refresh),
-                label: const Text('Reintentar'),
+              Text(
+                message,
+                textAlign: TextAlign.center,
+                style: const TextStyle(
+                  color: AppColors.textPrimary,
+                  fontSize: 14,
+                  height: 1.45,
+                ),
               ),
+              if (onRetry != null) ...[
+                const SizedBox(height: 16),
+                TextButton.icon(
+                  onPressed: onRetry,
+                  icon: const Icon(Icons.refresh),
+                  label: const Text('Reintentar'),
+                ),
+              ],
             ],
-          ],
+          ),
         ),
       ),
     );
@@ -137,32 +174,44 @@ class EmptyStateWidget extends StatelessWidget {
     return Center(
       child: Padding(
         padding: const EdgeInsets.all(32),
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            Icon(icon, size: 56, color: AppColors.textHint),
-            const SizedBox(height: 16),
-            Text(
-              message,
-              textAlign: TextAlign.center,
-              style: const TextStyle(
-                fontSize: 16,
-                fontWeight: FontWeight.w500,
-                color: AppColors.textSecondary,
+        child: AppSurface(
+          padding: const EdgeInsets.all(24),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Container(
+                width: 56,
+                height: 56,
+                decoration: const BoxDecoration(
+                  color: AppColors.primaryFixed,
+                  shape: BoxShape.circle,
+                ),
+                child: Icon(icon, size: 30, color: AppColors.primary),
               ),
-            ),
-            if (subtitle != null) ...[
               const SizedBox(height: 8),
               Text(
-                subtitle!,
+                message,
                 textAlign: TextAlign.center,
                 style: const TextStyle(
-                  fontSize: 13,
-                  color: AppColors.textHint,
+                  fontSize: 16,
+                  fontWeight: FontWeight.w700,
+                  color: AppColors.textPrimary,
                 ),
               ),
+              if (subtitle != null) ...[
+                const SizedBox(height: 8),
+                Text(
+                  subtitle!,
+                  textAlign: TextAlign.center,
+                  style: TextStyle(
+                    fontSize: 13,
+                    height: 1.45,
+                    color: AppColors.textSecondary,
+                  ),
+                ),
+              ],
             ],
-          ],
+          ),
         ),
       ),
     );

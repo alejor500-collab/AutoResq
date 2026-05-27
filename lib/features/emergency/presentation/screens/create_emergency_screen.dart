@@ -1,4 +1,4 @@
-import 'dart:ui';
+﻿import 'dart:ui';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_map/flutter_map.dart';
@@ -8,8 +8,12 @@ import 'package:image_picker/image_picker.dart';
 import 'package:latlong2/latlong.dart';
 import '../../../../core/constants/app_colors.dart';
 import '../../../../core/constants/app_constants.dart';
+import '../../../../core/constants/payment_methods.dart';
 import '../../../../core/router/app_router.dart';
 import '../../../../core/utils/helpers.dart';
+import '../../../../shared/providers/auth_provider.dart';
+import '../../../../shared/utils/app_responsive.dart';
+import '../../../../shared/widgets/app_motion.dart';
 import '../../../map/domain/entities/location_entity.dart';
 import '../../../map/presentation/providers/map_provider.dart';
 import '../../../map/presentation/widgets/location_picker_sheet.dart';
@@ -35,6 +39,7 @@ class _CreateEmergencyScreenState extends ConsumerState<CreateEmergencyScreen> {
   LocationEntity? _destinationLocation;
   bool _aiAnalysisAttempted = false;
   bool _isPricingLoading = false;
+  String _paymentMethod = PaymentMethods.cash;
 
   @override
   void initState() {
@@ -44,6 +49,8 @@ class _CreateEmergencyScreenState extends ConsumerState<CreateEmergencyScreen> {
         ref.read(mapNotifierProvider.notifier).getCurrentLocation();
       }
     });
+    final user = ref.read(authNotifierProvider).valueOrNull;
+    _paymentMethod = PaymentMethods.normalize(user?.preferredPaymentMethod);
   }
 
   @override
@@ -108,7 +115,7 @@ class _CreateEmergencyScreenState extends ConsumerState<CreateEmergencyScreen> {
           pricingType: 'diagnostic',
           pricingStatus: 'pending_manual_review',
           displayTitle: 'Tarifa no disponible',
-          displayMessage: 'Se creara la solicitud con revision de diagnostico.',
+          displayMessage: 'Se crearÃ¡ la solicitud con revisiÃ³n de diagnÃ³stico.',
           requiresDestination: false,
           requiresManualReview: true,
         );
@@ -181,14 +188,12 @@ class _CreateEmergencyScreenState extends ConsumerState<CreateEmergencyScreen> {
     AiAnalysis? aiAnalysis;
     if (_aiResult != null) {
       aiAnalysis = AiAnalysis(
-        isValidEmergency: _aiResult!.isValidEmergency,
-        emergencyType: _aiResult!.emergencyType,
-        priority: _aiResult!.priority,
-        userMessage: _aiResult!.userMessage,
-        safetyRecommendation: _aiResult!.safetyRecommendation,
-        technicianSummary: _aiResult!.technicianSummary,
-        detectedRisks: _aiResult!.detectedRisks,
-        requiresImmediateAttention: _aiResult!.requiresImmediateAttention,
+        categoria: _aiResult!.categoria,
+        tipoDanio: _aiResult!.tipoDanio,
+        resumenTecnico: _aiResult!.resumenTecnico,
+        urgencia: _aiResult!.urgencia,
+        requiereGrua: _aiResult!.requiereGrua,
+        recomendacion: _aiResult!.recomendacion,
         confidence: _aiResult!.confidence,
       );
     }
@@ -202,6 +207,7 @@ class _CreateEmergencyScreenState extends ConsumerState<CreateEmergencyScreen> {
               aiAnalysis: aiAnalysis,
               skipAiAnalysis: _aiAnalysisAttempted && aiAnalysis == null,
               priceQuote: quote,
+              paymentMethod: _paymentMethod,
             );
 
     if (!mounted) return;
@@ -276,11 +282,20 @@ class _CreateEmergencyScreenState extends ConsumerState<CreateEmergencyScreen> {
   Widget build(BuildContext context) {
     final emergencyState = ref.watch(emergencyNotifierProvider);
     final mapState = ref.watch(mapNotifierProvider);
+    final horizontal = AppResponsive.horizontalPadding(context);
+    final topInset = MediaQuery.of(context).padding.top;
 
     return Scaffold(
       backgroundColor: AppColors.background,
       body: Stack(
         children: [
+          const Positioned.fill(
+            child: DecoratedBox(
+              decoration: BoxDecoration(
+                gradient: AppColors.pageBackgroundGradient,
+              ),
+            ),
+          ),
           // Glass AppBar
           Positioned(
             top: 0,
@@ -292,7 +307,7 @@ class _CreateEmergencyScreenState extends ConsumerState<CreateEmergencyScreen> {
                 child: Container(
                   height: 64 + MediaQuery.of(context).padding.top,
                   padding:
-                      EdgeInsets.only(top: MediaQuery.of(context).padding.top),
+                      EdgeInsets.only(top: topInset),
                   decoration: BoxDecoration(
                     color: Colors.white.withValues(alpha: 0.8),
                     boxShadow: [
@@ -304,7 +319,7 @@ class _CreateEmergencyScreenState extends ConsumerState<CreateEmergencyScreen> {
                     ],
                   ),
                   child: Padding(
-                    padding: const EdgeInsets.symmetric(horizontal: 20),
+                    padding: EdgeInsets.symmetric(horizontal: horizontal),
                     child: Row(
                       children: [
                         SizedBox(
@@ -337,7 +352,7 @@ class _CreateEmergencyScreenState extends ConsumerState<CreateEmergencyScreen> {
                             style: TextStyle(
                               fontSize: 18,
                               fontWeight: FontWeight.w600,
-                              letterSpacing: -0.3,
+                              letterSpacing: 0,
                               color: AppColors.onSurface,
                             ),
                           ),
@@ -363,13 +378,14 @@ class _CreateEmergencyScreenState extends ConsumerState<CreateEmergencyScreen> {
 
           // Content
           Positioned.fill(
-            top: 64 + MediaQuery.of(context).padding.top,
+            top: 64 + topInset,
             bottom: 0,
             child: SingleChildScrollView(
-              padding: const EdgeInsets.fromLTRB(24, 24, 24, 120),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
+              padding: EdgeInsets.fromLTRB(horizontal, 24, horizontal, 120),
+              child: AppResponsiveContent(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
                   // Progress Indicator
                   _StepProgress(currentStep: _currentStep),
                   const Gap(16),
@@ -377,11 +393,11 @@ class _CreateEmergencyScreenState extends ConsumerState<CreateEmergencyScreen> {
                   // Step Title
                   Text(
                     _stepTitle,
-                    style: const TextStyle(
-                      fontSize: 28,
+                    style: TextStyle(
+                      fontSize: AppResponsive.titleSize(context),
                       fontWeight: FontWeight.w800,
                       color: AppColors.onSurface,
-                      letterSpacing: -0.5,
+                      letterSpacing: 0,
                       height: 1.2,
                     ),
                   ),
@@ -397,25 +413,36 @@ class _CreateEmergencyScreenState extends ConsumerState<CreateEmergencyScreen> {
                   const Gap(24),
 
                   // Step Content
-                  if (_currentStep == 0)
-                    _LocationStep(
-                      mapState: mapState,
-                      onEdit: _editEmergencyLocation,
+                  AppStepSwitcher(
+                    value: _currentStep,
+                    child: switch (_currentStep) {
+                      0 => _LocationStep(
+                          mapState: mapState,
+                          onEdit: _editEmergencyLocation,
+                        ),
+                      1 => _DescriptionStep(
+                          controller: _descCtrl,
+                          isAnalyzing: emergencyState.isAnalyzingAI,
+                        ),
+                      2 => _DiagnosticStep(
+                          result: _aiResult,
+                          pricingQuote: _pricingQuote,
+                          isPricingLoading: _isPricingLoading,
+                          destination: _destinationLocation,
+                          onSelectDestination: _selectTowDestination,
+                          paymentMethod: _paymentMethod,
+                          onPaymentMethodChanged: (value) {
+                            setState(
+                              () => _paymentMethod =
+                                  PaymentMethods.normalize(value),
+                            );
+                          },
+                        ),
+                      _ => const SizedBox.shrink(),
+                    },
                     ),
-                  if (_currentStep == 1)
-                    _DescriptionStep(
-                      controller: _descCtrl,
-                      isAnalyzing: emergencyState.isAnalyzingAI,
-                    ),
-                  if (_currentStep == 2)
-                    _DiagnosticStep(
-                      result: _aiResult,
-                      pricingQuote: _pricingQuote,
-                      isPricingLoading: _isPricingLoading,
-                      destination: _destinationLocation,
-                      onSelectDestination: _selectTowDestination,
-                    ),
-                ],
+                  ],
+                ),
               ),
             ),
           ),
@@ -432,7 +459,11 @@ class _CreateEmergencyScreenState extends ConsumerState<CreateEmergencyScreen> {
                 filter: ImageFilter.blur(sigmaX: 20, sigmaY: 20),
                 child: Container(
                   padding: EdgeInsets.fromLTRB(
-                      24, 24, 24, MediaQuery.of(context).padding.bottom + 24),
+                    horizontal,
+                    18,
+                    horizontal,
+                    MediaQuery.of(context).padding.bottom + 18,
+                  ),
                   decoration: BoxDecoration(
                     color: Colors.white.withValues(alpha: 0.9),
                     borderRadius:
@@ -445,7 +476,10 @@ class _CreateEmergencyScreenState extends ConsumerState<CreateEmergencyScreen> {
                       ),
                     ],
                   ),
-                  child: _buildBottomButton(emergencyState),
+                  child: AppResponsiveContent(
+                    maxWidth: AppResponsive.actionMaxWidth(context),
+                    child: _buildBottomButton(emergencyState),
+                  ),
                 ),
               ),
             ),
@@ -462,7 +496,7 @@ class _CreateEmergencyScreenState extends ConsumerState<CreateEmergencyScreen> {
       case 1:
         return 'Paso 2: \u00bfQue sucede?';
       case 2:
-        return 'Paso 3: Diagnostico Preliminar';
+        return 'Paso 3: DiagnÃ³stico preliminar';
       default:
         return '';
     }
@@ -475,7 +509,7 @@ class _CreateEmergencyScreenState extends ConsumerState<CreateEmergencyScreen> {
       case 1:
         return 'Describe el problema con tu vehiculo.';
       case 2:
-        return 'Resultado del analisis inteligente.';
+        return 'Resultado del anÃ¡lisis inteligente.';
       default:
         return '';
     }
@@ -510,6 +544,7 @@ class _CreateEmergencyScreenState extends ConsumerState<CreateEmergencyScreen> {
                       ? 'Seleccionar destino'
                       : 'Publicar solicitud',
           icon: needsDestination ? Icons.map_outlined : Icons.arrow_forward,
+          isEmergency: !needsDestination,
           isLoading: emergencyState.isLoading || _isPricingLoading,
           onPressed: emergencyState.isLoading || _isPricingLoading
               ? null
@@ -523,7 +558,7 @@ class _CreateEmergencyScreenState extends ConsumerState<CreateEmergencyScreen> {
   }
 }
 
-// ─── Step Progress Indicator ──────────────────────────────────────────────────
+// â”€â”€â”€ Step Progress Indicator â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
 class _StepProgress extends StatelessWidget {
   final int currentStep;
@@ -535,7 +570,9 @@ class _StepProgress extends StatelessWidget {
     return Row(
       children: List.generate(3, (i) {
         return Expanded(
-          child: Container(
+          child: AnimatedContainer(
+            duration: AppConstants.animFast,
+            curve: Curves.easeOutCubic,
             height: 6,
             margin: EdgeInsets.only(right: i < 2 ? 8 : 0),
             decoration: BoxDecoration(
@@ -551,7 +588,7 @@ class _StepProgress extends StatelessWidget {
   }
 }
 
-// ─── Step 1: Location ─────────────────────────────────────────────────────────
+// â”€â”€â”€ Step 1: Location â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
 class _LocationStep extends StatelessWidget {
   final dynamic mapState;
@@ -570,7 +607,8 @@ class _LocationStep extends StatelessWidget {
     return Container(
       decoration: BoxDecoration(
         color: AppColors.surfaceContainerLowest,
-        borderRadius: BorderRadius.circular(16),
+        borderRadius: BorderRadius.circular(22),
+        border: Border.all(color: AppColors.outlineVariant.withValues(alpha: 0.7)),
         boxShadow: [
           BoxShadow(
             color: AppColors.onSurface.withValues(alpha: 0.04),
@@ -584,7 +622,12 @@ class _LocationStep extends StatelessWidget {
         children: [
           // Map
           SizedBox(
-            height: 200,
+            height: AppResponsive.mapHeight(
+              context,
+              compact: 180,
+              regular: 220,
+              tablet: 260,
+            ),
             child: Stack(
               children: [
                 FlutterMap(
@@ -681,7 +724,7 @@ class _LocationStep extends StatelessWidget {
           ),
           // Address info
           Padding(
-            padding: const EdgeInsets.all(24),
+            padding: EdgeInsets.all(AppResponsive.cardPadding(context)),
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
@@ -748,7 +791,7 @@ class _LocationStep extends StatelessWidget {
   }
 }
 
-// ─── Step 2: Description ──────────────────────────────────────────────────────
+// â”€â”€â”€ Step 2: Description â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
 class _DescriptionStep extends StatefulWidget {
   final TextEditingController controller;
@@ -840,10 +883,20 @@ class _DescriptionStepState extends State<_DescriptionStep> {
 
         // Description field
         Container(
-          padding: const EdgeInsets.all(24),
+          padding: EdgeInsets.all(AppResponsive.cardPadding(context)),
           decoration: BoxDecoration(
-            color: AppColors.surfaceContainerLow,
-            borderRadius: BorderRadius.circular(16),
+            color: AppColors.surfaceContainerLowest,
+            borderRadius: BorderRadius.circular(22),
+            border: Border.all(
+              color: AppColors.outlineVariant.withValues(alpha: 0.75),
+            ),
+            boxShadow: [
+              BoxShadow(
+                color: AppColors.shadow.withValues(alpha: 0.05),
+                blurRadius: 18,
+                offset: const Offset(0, 10),
+              ),
+            ],
           ),
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
@@ -877,7 +930,7 @@ class _DescriptionStepState extends State<_DescriptionStep> {
                     height: 1.35,
                   ),
                   filled: true,
-                  fillColor: AppColors.surface,
+                  fillColor: AppColors.surfaceContainerLow,
                   border: OutlineInputBorder(
                     borderRadius: BorderRadius.circular(14),
                     borderSide: BorderSide(
@@ -1005,7 +1058,7 @@ class _ActionChip extends StatelessWidget {
   }
 }
 
-// ─── Step 3: AI Diagnostic ────────────────────────────────────────────────────
+// â”€â”€â”€ Step 3: AI Diagnostic â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
 class _DiagnosticStep extends StatelessWidget {
   final EmergencyAiAnalysisModel? result;
@@ -1013,6 +1066,8 @@ class _DiagnosticStep extends StatelessWidget {
   final bool isPricingLoading;
   final LocationEntity? destination;
   final VoidCallback onSelectDestination;
+  final String paymentMethod;
+  final ValueChanged<String> onPaymentMethodChanged;
 
   const _DiagnosticStep({
     required this.result,
@@ -1020,20 +1075,24 @@ class _DiagnosticStep extends StatelessWidget {
     required this.isPricingLoading,
     required this.destination,
     required this.onSelectDestination,
+    required this.paymentMethod,
+    required this.onPaymentMethodChanged,
   });
 
   @override
   Widget build(BuildContext context) {
     final analysis = result;
-    final tipo = analysis?.emergencyType ?? 'unknown';
-    final priority = analysis?.priority ?? 'medium';
-    final message = analysis?.userMessage ??
+    final categoria = analysis?.categoria ?? 'Auxilio general';
+    final urgencia = analysis?.urgencia ?? 'media';
+    final tipoDanio = analysis?.tipoDanio ??
         'Crearemos la emergencia con tu descripcion original.';
-    final safety = analysis?.safetyRecommendation ?? '';
+    final resumenTecnico = analysis?.resumenTecnico ?? '';
+    final recomendacion = analysis?.recomendacion ?? '';
+    final requiereGrua = analysis?.requiereGrua ?? false;
     final failed = analysis == null;
 
     return Container(
-      padding: const EdgeInsets.all(24),
+      padding: EdgeInsets.all(AppResponsive.cardPadding(context)),
       decoration: BoxDecoration(
         gradient: LinearGradient(
           begin: Alignment.topLeft,
@@ -1043,7 +1102,7 @@ class _DiagnosticStep extends StatelessWidget {
             Colors.white,
           ],
         ),
-        borderRadius: BorderRadius.circular(16),
+        borderRadius: BorderRadius.circular(22),
         border: Border.all(color: AppColors.primary.withValues(alpha: 0.10)),
         boxShadow: [
           BoxShadow(
@@ -1072,7 +1131,7 @@ class _DiagnosticStep extends StatelessWidget {
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     const Text(
-                      'DIAGNOSTICO PRELIMINAR',
+                      'DIAGNÃ“STICO PRELIMINAR',
                       style: TextStyle(
                         fontSize: 10,
                         fontWeight: FontWeight.w700,
@@ -1080,24 +1139,48 @@ class _DiagnosticStep extends StatelessWidget {
                         letterSpacing: 1.5,
                       ),
                     ),
-                    const Gap(4),
-                    Text(
-                      failed ? 'Analisis no disponible' : '$tipo - $priority',
-                      style: const TextStyle(
-                        fontSize: 20,
-                        fontWeight: FontWeight.w700,
-                        color: AppColors.onSurface,
-                      ),
-                    ),
-                    if (message.isNotEmpty || safety.isNotEmpty) ...[
-                      const Gap(6),
-                      Text(
-                        safety.isNotEmpty ? '$message $safety' : message,
-                        style: const TextStyle(
-                          fontSize: 13,
-                          color: AppColors.secondary,
-                          height: 1.4,
+                    const Gap(10),
+                    if (failed)
+                      const Text(
+                        'Análisis no disponible',
+                        style: TextStyle(
+                          fontSize: 20,
+                          fontWeight: FontWeight.w700,
+                          color: AppColors.onSurface,
                         ),
+                      )
+                    else ...[
+                      Text(
+                        categoria,
+                        style: const TextStyle(
+                          fontSize: 22,
+                          fontWeight: FontWeight.w800,
+                          color: AppColors.onSurface,
+                          height: 1.15,
+                        ),
+                      ),
+                      const Gap(10),
+                      Wrap(
+                        spacing: 8,
+                        runSpacing: 8,
+                        children: [
+                          _AnalysisPill(
+                            icon: Icons.flag_outlined,
+                            label: _urgencyLabel(urgencia),
+                            foreground: _urgencyForeground(urgencia),
+                            background: _urgencyBackground(urgencia),
+                          ),
+                          _AnalysisPill(
+                            icon: requiereGrua
+                                ? Icons.local_shipping_outlined
+                                : Icons.directions_car_outlined,
+                            label: requiereGrua
+                                ? 'Requiere grúa'
+                                : 'Sin grúa inicial',
+                            foreground: AppColors.onSurface,
+                            background: AppColors.surfaceContainerLow,
+                          ),
+                        ],
                       ),
                     ],
                   ],
@@ -1106,13 +1189,45 @@ class _DiagnosticStep extends StatelessWidget {
             ],
           ),
           const Gap(20),
+          if (!failed) ...[
+            _AnalysisSection(
+              label: 'POSIBLE DAÑO',
+              value: tipoDanio,
+            ),
+            if (resumenTecnico.isNotEmpty) ...[
+              const Gap(12),
+              _AnalysisSection(
+                label: 'RESUMEN TÉCNICO',
+                value: resumenTecnico,
+                emphasize: true,
+              ),
+            ],
+            if (recomendacion.isNotEmpty) ...[
+              const Gap(12),
+              _AnalysisSection(
+                label: 'RECOMENDACIÓN INICIAL',
+                value: recomendacion,
+              ),
+            ],
+            const Gap(18),
+          ] else ...[
+            const Text(
+              'Continuaremos con tu descripción original y un técnico validará el caso en sitio.',
+              style: TextStyle(
+                fontSize: 13,
+                color: AppColors.secondary,
+                height: 1.45,
+              ),
+            ),
+            const Gap(18),
+          ],
           const Row(
             children: [
               Expanded(
                 child: _MiniInfoCard(
                   icon: Icons.timer,
                   label: 'TIEMPO ESTIMADO',
-                  value: '15 - 20 min',
+                  value: '15 a 20 min',
                 ),
               ),
             ],
@@ -1124,7 +1239,252 @@ class _DiagnosticStep extends StatelessWidget {
             destination: destination,
             onSelectDestination: onSelectDestination,
           ),
+          const Gap(14),
+          _PaymentMethodCard(
+            selected: paymentMethod,
+            onChanged: onPaymentMethodChanged,
+          ),
         ],
+      ),
+    );
+  }
+}
+
+class _AnalysisSection extends StatelessWidget {
+  final String label;
+  final String value;
+  final bool emphasize;
+
+  const _AnalysisSection({
+    required this.label,
+    required this.value,
+    this.emphasize = false,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        color: emphasize
+            ? AppColors.primary.withValues(alpha: 0.06)
+            : Colors.white,
+        borderRadius: BorderRadius.circular(14),
+        border: Border.all(
+          color: emphasize
+              ? AppColors.primary.withValues(alpha: 0.16)
+              : AppColors.outlineVariant.withValues(alpha: 0.35),
+        ),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(
+            label,
+            style: TextStyle(
+              fontSize: 10,
+              fontWeight: FontWeight.w800,
+              letterSpacing: 0.9,
+              color: emphasize ? AppColors.primary : AppColors.secondary,
+            ),
+          ),
+          const Gap(8),
+          Text(
+            value,
+            style: const TextStyle(
+              fontSize: 14,
+              fontWeight: FontWeight.w600,
+              color: AppColors.onSurface,
+              height: 1.45,
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _AnalysisPill extends StatelessWidget {
+  final IconData icon;
+  final String label;
+  final Color foreground;
+  final Color background;
+
+  const _AnalysisPill({
+    required this.icon,
+    required this.label,
+    required this.foreground,
+    required this.background,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+      decoration: BoxDecoration(
+        color: background,
+        borderRadius: BorderRadius.circular(999),
+      ),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Icon(icon, size: 15, color: foreground),
+          const Gap(6),
+          Text(
+            label,
+            style: TextStyle(
+              fontSize: 12,
+              fontWeight: FontWeight.w700,
+              color: foreground,
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+String _urgencyLabel(String urgencia) {
+  return switch (urgencia) {
+    'alta' => 'Urgencia alta',
+    'baja' => 'Urgencia baja',
+    _ => 'Urgencia media',
+  };
+}
+
+Color _urgencyForeground(String urgencia) {
+  return switch (urgencia) {
+    'alta' => const Color(0xFF9F2D20),
+    'baja' => const Color(0xFF246B45),
+    _ => const Color(0xFF8A5A12),
+  };
+}
+
+Color _urgencyBackground(String urgencia) {
+  return switch (urgencia) {
+    'alta' => const Color(0xFFFDE8E4),
+    'baja' => const Color(0xFFEAF7EF),
+    _ => const Color(0xFFFFF2DE),
+  };
+}
+
+class _PaymentMethodCard extends StatelessWidget {
+  final String selected;
+  final ValueChanged<String> onChanged;
+
+  const _PaymentMethodCard({
+    required this.selected,
+    required this.onChanged,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.all(18),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(color: AppColors.primary.withValues(alpha: 0.12)),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          const Text(
+            'FORMA DE PAGO',
+            style: TextStyle(
+              fontSize: 10,
+              fontWeight: FontWeight.w800,
+              letterSpacing: 0.8,
+              color: AppColors.primary,
+            ),
+          ),
+          const Gap(10),
+          for (final method in PaymentMethods.values) ...[
+            _PaymentOption(
+              method: method,
+              selected: PaymentMethods.normalize(selected) == method,
+              onTap: () => onChanged(method),
+            ),
+            if (method != PaymentMethods.values.last) const Gap(8),
+          ],
+        ],
+      ),
+    );
+  }
+}
+
+class _PaymentOption extends StatelessWidget {
+  final String method;
+  final bool selected;
+  final VoidCallback onTap;
+
+  const _PaymentOption({
+    required this.method,
+    required this.selected,
+    required this.onTap,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return InkWell(
+      onTap: onTap,
+      borderRadius: BorderRadius.circular(14),
+      child: Container(
+        padding: const EdgeInsets.all(12),
+        decoration: BoxDecoration(
+          color: selected
+              ? AppColors.primary.withValues(alpha: 0.08)
+              : AppColors.surfaceContainerLow,
+          borderRadius: BorderRadius.circular(14),
+          border: Border.all(
+            color: selected
+                ? AppColors.primary
+                : AppColors.outlineVariant.withValues(alpha: 0.45),
+          ),
+        ),
+        child: Row(
+          children: [
+            Icon(
+              PaymentMethods.icon(method),
+              color: selected ? AppColors.primary : AppColors.secondary,
+              size: 20,
+            ),
+            const Gap(10),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    PaymentMethods.label(method),
+                    style: const TextStyle(
+                      fontSize: 13,
+                      fontWeight: FontWeight.w800,
+                      color: AppColors.onSurface,
+                    ),
+                  ),
+                  const Gap(2),
+                  Text(
+                    PaymentMethods.description(method),
+                    style: const TextStyle(
+                      fontSize: 11,
+                      color: AppColors.secondary,
+                      height: 1.3,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+            Icon(
+              selected
+                  ? Icons.radio_button_checked_rounded
+                  : Icons.radio_button_unchecked_rounded,
+              color: selected ? AppColors.primary : AppColors.secondary,
+              size: 20,
+            ),
+          ],
+        ),
       ),
     );
   }
@@ -1217,9 +1577,7 @@ class _PricingCard extends StatelessWidget {
             Gap(12),
             Expanded(
               child: Text(
-                'Calculando tarifa desde AutoResQ...',
-                maxLines: 1,
-                overflow: TextOverflow.ellipsis,
+                'Calculando posible cuota desde AutoResQ...',
               ),
             ),
           ],
@@ -1283,7 +1641,7 @@ class _PricingCard extends StatelessWidget {
                         fontSize: 24,
                         fontWeight: FontWeight.w800,
                         color: AppColors.onSurface,
-                        letterSpacing: -0.4,
+                        letterSpacing: 0,
                       ),
                     ),
                   ],
@@ -1295,7 +1653,7 @@ class _PricingCard extends StatelessWidget {
           if (current.pricingStatus == 'pending_destination') ...[
             Text(
               current.destinationRequiredMessage ??
-                  'Selecciona el destino para calcular un estimado mas preciso.',
+                  'Selecciona el destino para calcular una cuota referencial más precisa.',
               style: const TextStyle(
                 fontSize: 13,
                 color: AppColors.secondary,
@@ -1328,19 +1686,19 @@ class _PricingCard extends StatelessWidget {
               ),
             _PricingLine(
               icon: Icons.lock_outline,
-              text: current.pricingType == 'diagnostic'
-                  ? 'Cualquier reparacion, repuesto o servicio adicional debera ser aprobado por ti.'
-                  : 'El tecnico no podra cobrar adicionales sin tu aprobacion.',
+                text: current.pricingType == 'diagnostic'
+                  ? 'Cualquier reparación, repuesto o servicio adicional deberá ser aprobado por ti.'
+                  : 'El técnico no podrá cobrar adicionales sin tu aprobación.',
             ),
             if (current.distanceSource == 'haversine')
               const _PricingLine(
                 icon: Icons.near_me_outlined,
-                text: 'Estimado segun distancia aproximada.',
+                text: 'Cuota referencial según distancia aproximada.',
               ),
             if (current.requiresManualReview)
               const _PricingLine(
                 icon: Icons.warning_amber_rounded,
-                text: 'Esta tarifa requiere revision manual antes de cerrar el valor final.',
+                text: 'Esta es solo una cuota referencial y requiere revisión manual antes de confirmar un valor final.',
               ),
           ],
           if (destination != null) ...[
@@ -1413,19 +1771,21 @@ class _PricingLine extends StatelessWidget {
   }
 }
 
-// ─── Gradient Action Button ───────────────────────────────────────────────────
+// â”€â”€â”€ Gradient Action Button â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
 class _GradientActionButton extends StatelessWidget {
   final String label;
   final IconData icon;
   final VoidCallback? onPressed;
   final bool isLoading;
+  final bool isEmergency;
 
   const _GradientActionButton({
     required this.label,
     required this.icon,
     this.onPressed,
     this.isLoading = false,
+    this.isEmergency = false,
   });
 
   @override
@@ -1438,11 +1798,14 @@ class _GradientActionButton extends StatelessWidget {
         child: Container(
           height: 56,
           decoration: BoxDecoration(
-            gradient: AppColors.primaryGradient,
+            gradient: isEmergency
+                ? AppColors.emergencyGradient
+                : AppColors.primaryGradient,
             borderRadius: BorderRadius.circular(9999),
             boxShadow: [
               BoxShadow(
-                color: AppColors.primary.withValues(alpha: 0.2),
+                color: (isEmergency ? AppColors.emergency : AppColors.primary)
+                    .withValues(alpha: 0.2),
                 blurRadius: 40,
                 offset: const Offset(0, 20),
               ),

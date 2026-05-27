@@ -4,8 +4,8 @@ import '../../../../core/constants/app_colors.dart';
 import '../../../../core/router/app_router.dart';
 import '../../../../core/utils/navigation_utils.dart';
 
-const _kConductorColor = Color(0xFFE53935);
-const _kTechnicianColor = Color(0xFF1E88E5);
+const _kConductorColor = AppColors.primary;
+const _kTechnicianColor = AppColors.tertiary;
 
 class RoleSelectionScreen extends StatefulWidget {
   const RoleSelectionScreen({super.key});
@@ -170,7 +170,7 @@ class _RoleSelectionScreenState extends State<RoleSelectionScreen>
                               fontSize: 36,
                               fontWeight: FontWeight.w900,
                               color: AppColors.onSurface,
-                              letterSpacing: -1.2,
+                              letterSpacing: 0,
                               height: 1.1,
                             ),
                           ),
@@ -377,7 +377,7 @@ class _RoleCardState extends State<_RoleCard>
                   fontSize: 18,
                   fontWeight: FontWeight.w800,
                   color: AppColors.onSurface,
-                  letterSpacing: -0.3,
+                  letterSpacing: 0,
                 ),
               ),
               const SizedBox(height: 6),

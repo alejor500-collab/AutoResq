@@ -531,8 +531,8 @@ class _UserCard extends StatelessWidget {
   Color _roleColor(String role) {
     switch (role) {
       case AppConstants.roleDriver:     return AppColors.primary;
-      case AppConstants.roleTechnician: return AppColors.secondary;
-      case AppConstants.roleAdmin:      return AppColors.warning;
+      case AppConstants.roleTechnician: return AppColors.tertiary;
+      case AppConstants.roleAdmin:      return AppColors.primaryContainer;
       default:                          return AppColors.textSecondary;
     }
   }

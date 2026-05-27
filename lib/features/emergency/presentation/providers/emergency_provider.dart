@@ -202,6 +202,7 @@ class EmergencyNotifier extends StateNotifier<EmergencyState> {
     AiAnalysis? aiAnalysis,
     bool skipAiAnalysis = false,
     EmergencyPriceQuote? priceQuote,
+    String paymentMethod = 'cash',
   }) async {
     final user = _currentUser;
     if (user == null) return null;
@@ -234,14 +235,12 @@ class EmergencyNotifier extends StateNotifier<EmergencyState> {
       var analysisStatus = 'pending';
       if (aiAnalysis != null) {
         analysisModel = EmergencyAiAnalysisModel(
-          isValidEmergency: aiAnalysis.isValidEmergency,
-          emergencyType: aiAnalysis.emergencyType,
-          priority: aiAnalysis.priority,
-          userMessage: aiAnalysis.userMessage,
-          safetyRecommendation: aiAnalysis.safetyRecommendation,
-          technicianSummary: aiAnalysis.technicianSummary,
-          detectedRisks: aiAnalysis.detectedRisks,
-          requiresImmediateAttention: aiAnalysis.requiresImmediateAttention,
+          categoria: aiAnalysis.categoria,
+          tipoDanio: aiAnalysis.tipoDanio,
+          resumenTecnico: aiAnalysis.resumenTecnico,
+          urgencia: aiAnalysis.urgencia,
+          requiereGrua: aiAnalysis.requiereGrua,
+          recomendacion: aiAnalysis.recomendacion,
           confidence: aiAnalysis.confidence,
         );
         analysisStatus = 'completed';
@@ -270,6 +269,7 @@ class EmergencyNotifier extends StateNotifier<EmergencyState> {
         aiAnalysis: analysisModel,
         aiAnalysisStatus: analysisStatus,
         priceQuote: priceQuote,
+        paymentMethod: paymentMethod,
       );
       state = state.copyWith(
         isLoading: false,

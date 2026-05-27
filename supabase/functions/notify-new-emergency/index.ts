@@ -24,13 +24,23 @@ type TechnicianRow = {
 };
 
 const specialtyCatalog = {
-  mechanical_quick: ['minor_mechanic', 'engine', 'overheating', 'brakes'],
-  battery_electrical: ['battery_jumpstart', 'battery', 'electrical'],
-  tires_vulcanization: ['tire_change', 'flat_tire_no_spare', 'tire'],
-  tow_truck: ['tow_service', 'accident'],
-  fuel_delivery: ['fuel_delivery', 'fuel'],
-  vehicle_locksmith: ['locksmith_vehicle', 'lockout'],
-  general_assistance: ['unknown', 'not_emergency'],
+  mechanical_quick: ['Mecánica rápida', 'minor_mechanic', 'engine', 'overheating', 'brakes'],
+  battery_electrical: [
+    'Sistema eléctrico y batería',
+    'battery_jumpstart',
+    'battery',
+    'electrical',
+  ],
+  tires_vulcanization: [
+    'Llantas y vulcanización',
+    'tire_change',
+    'flat_tire_no_spare',
+    'tire',
+  ],
+  tow_truck: ['Grúa / remolque', 'tow_service', 'accident'],
+  fuel_delivery: ['Combustible', 'fuel_delivery', 'fuel'],
+  vehicle_locksmith: ['Cerrajería vehicular', 'locksmith_vehicle', 'lockout'],
+  general_assistance: ['Auxilio general', 'unknown', 'not_emergency'],
 } as const;
 
 const validSpecialtyCodes = new Set(Object.keys(specialtyCatalog));
@@ -247,6 +257,14 @@ function specialtyMatchesEmergencyType(
 
 function serviceNameForType(type: string | null): string {
   switch (type) {
+    case 'Mecánica rápida':
+    case 'Sistema eléctrico y batería':
+    case 'Llantas y vulcanización':
+    case 'Grúa / remolque':
+    case 'Combustible':
+    case 'Cerrajería vehicular':
+    case 'Auxilio general':
+      return type;
     case 'tire_change':
       return 'Cambio de llanta';
     case 'flat_tire_no_spare':

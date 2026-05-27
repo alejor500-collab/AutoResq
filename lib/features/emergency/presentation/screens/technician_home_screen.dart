@@ -8,18 +8,21 @@ import 'package:flutter_map/flutter_map.dart';
 import 'package:latlong2/latlong.dart';
 import '../../../../core/constants/app_colors.dart';
 import '../../../../core/constants/app_constants.dart';
+import '../../../../core/constants/payment_methods.dart';
 import '../../../../core/constants/technician_specialties.dart';
 import '../../../../core/router/app_router.dart';
 import '../../../../core/utils/helpers.dart';
 import '../../../../shared/providers/auth_provider.dart';
-import '../../../../shared/providers/notification_provider.dart';
 import '../../../../shared/providers/role_provider.dart';
 import '../../../../shared/providers/technician_stats_provider.dart';
+import '../../../../shared/utils/app_responsive.dart';
 import '../../../../shared/widgets/animated_pressable.dart';
 import '../../../../shared/widgets/app_drawer.dart';
 import '../../../../shared/widgets/app_logo.dart';
+import '../../../../shared/widgets/app_motion.dart';
 import '../../../../shared/widgets/bottom_nav_bar.dart';
 import '../../../../shared/widgets/in_app_message_notice.dart';
+import '../../../../shared/widgets/notification_center_sheet.dart';
 import '../../../../shared/widgets/user_avatar.dart';
 import '../../../chat/presentation/providers/chat_provider.dart';
 import '../../../chat/presentation/widgets/chat_notification_bell.dart';
@@ -64,6 +67,7 @@ class _TechnicianHomeScreenState extends ConsumerState<TechnicianHomeScreen> {
         ref.listenManual<AsyncValue<List<Emergency>>>(
       technicianPendingEmergenciesProvider,
       (previous, next) {
+        if (!mounted) return;
         final available = _isAvailable ??
             ref.read(authNotifierProvider).value?.isAvailable ??
             false;
@@ -86,10 +90,12 @@ class _TechnicianHomeScreenState extends ConsumerState<TechnicianHomeScreen> {
       fireImmediately: true,
     );
     WidgetsBinding.instance.addPostFrameCallback((_) async {
+      if (!mounted) return;
       final user = ref.read(authNotifierProvider).value ??
           ref.read(authStateProvider).valueOrNull;
       if (user?.isApproved != true) return;
       await ref.read(mapNotifierProvider.notifier).getCurrentLocation();
+      if (!mounted) return;
       final active = await ref
           .read(emergencyNotifierProvider.notifier)
           .loadActiveTechnicianEmergency();
@@ -117,12 +123,13 @@ class _TechnicianHomeScreenState extends ConsumerState<TechnicianHomeScreen> {
   ) {
     final active = next.valueOrNull;
     final previousActive = previous?.valueOrNull;
+    if (!mounted) return;
     if (active == null) {
       _activeWarningShown = false;
       return;
     }
 
-    if (!mounted || previousActive?.id == active.id) return;
+    if (previousActive?.id == active.id) return;
     ref.invalidate(technicianEmergencyHistoryProvider);
     WidgetsBinding.instance.addPostFrameCallback((_) {
       if (!mounted) return;
@@ -157,13 +164,6 @@ class _TechnicianHomeScreenState extends ConsumerState<TechnicianHomeScreen> {
   }
 
   Future<void> _openLatestUnreadChat() async {
-    final notifications =
-        ref.read(notificationsProvider).valueOrNull ?? const [];
-    if (notifications.isNotEmpty) {
-      _showNotificationsSheet();
-      return;
-    }
-
     final active = await ref
         .read(emergencyNotifierProvider.notifier)
         .loadActiveTechnicianEmergency();
@@ -175,70 +175,33 @@ class _TechnicianHomeScreenState extends ConsumerState<TechnicianHomeScreen> {
     setState(() => _navIndex = 3);
   }
 
-  void _showNotificationsSheet() {
-    final notifications =
-        ref.read(notificationsProvider).valueOrNull ?? const [];
-    ref.read(notificationActionsProvider).markAllRead();
-    showModalBottomSheet<void>(
+  Future<void> _openNotifications() async {
+    if (!mounted) return;
+    await showNotificationCenterSheet(
       context: context,
-      showDragHandle: true,
-      isScrollControlled: true,
-      backgroundColor: AppColors.surfaceContainerLowest,
-      builder: (sheetContext) => DraggableScrollableSheet(
-        expand: false,
-        initialChildSize: 0.72,
-        minChildSize: 0.36,
-        maxChildSize: 0.92,
-        builder: (context, scrollController) {
-          return ListView(
-            controller: scrollController,
-            padding: const EdgeInsets.fromLTRB(20, 4, 20, 28),
-            children: [
-              const Text(
-                'Notificaciones',
-                style: TextStyle(
-                  fontSize: 22,
-                  fontWeight: FontWeight.w900,
-                  color: AppColors.onSurface,
-                ),
-              ),
-              const Gap(6),
-              const Text(
-                'Aqui veras cancelaciones, mensajes y nuevas solicitudes.',
-                style: TextStyle(
-                  fontSize: 13,
-                  color: AppColors.textSecondary,
-                ),
-              ),
-              const Gap(18),
-              if (notifications.isEmpty)
-                const _EmptyPanel(
-                  icon: Icons.notifications_none_rounded,
-                  title: 'Sin novedades',
-                  message: 'Cuando ocurra algo importante aparecera aqui.',
-                )
-              else
-                ...notifications.map(
-                  (notification) => Padding(
-                    padding: const EdgeInsets.only(bottom: 10),
-                    child: _NotificationTile(
-                      notification: notification,
-                      onTap: () {
-                        Navigator.pop(sheetContext);
-                        if (notification.referenceId?.isNotEmpty == true) {
-                          context.push(
-                            AppRoutes.activeService,
-                            extra: notification.referenceId,
-                          );
-                        }
-                      },
-                    ),
-                  ),
-                ),
-            ],
-          );
-        },
-      ),
+      ref: ref,
+      onNotificationTap: (notification) async {
+        if (!mounted) return;
+        final referenceId = notification.referenceId;
+        switch (notification.type) {
+          case 'nuevo_mensaje':
+            if (referenceId?.isNotEmpty == true) {
+              context.push(AppRoutes.technicianChat, extra: referenceId);
+            } else {
+              setState(() => _navIndex = 3);
+            }
+            return;
+          case 'nueva_solicitud':
+          case 'solicitud_cancelada':
+            ref.invalidate(technicianPendingEmergenciesProvider);
+            setState(() => _navIndex = 1);
+            return;
+          default:
+            if (referenceId?.isNotEmpty == true) {
+              context.push(AppRoutes.activeService, extra: referenceId);
+            }
+        }
+      },
     );
   }
 
@@ -291,8 +254,9 @@ class _TechnicianHomeScreenState extends ConsumerState<TechnicianHomeScreen> {
 
   Future<void> _recenterToCurrentLocation() async {
     await ref.read(mapNotifierProvider.notifier).getCurrentLocation();
+    if (!mounted) return;
     final location = ref.read(mapNotifierProvider).currentLocation;
-    if (!mounted || location == null) return;
+    if (location == null) return;
     _mapController.move(LatLng(location.lat, location.lng), 15.5);
   }
 
@@ -310,14 +274,15 @@ class _TechnicianHomeScreenState extends ConsumerState<TechnicianHomeScreen> {
   }
 
   Future<void> _toggleAvailability(bool val) async {
+    if (!mounted) return;
     final user = ref.read(authNotifierProvider).value;
     if (user == null) return;
     if (val) {
       final pending = await ref
           .read(emergencyNotifierProvider.notifier)
           .getPendingRating('technician');
+      if (!mounted) return;
       if (pending != null) {
-        if (!mounted) return;
         _showPendingRatingDialog(pending);
         return;
       }
@@ -330,6 +295,7 @@ class _TechnicianHomeScreenState extends ConsumerState<TechnicianHomeScreen> {
           .update({'disponible': val})
           .eq('usuario_id', user.id)
           .select('disponible');
+      if (!mounted) return;
       if (rows.isEmpty) {
         setState(() => _isAvailable = !val);
         if (mounted) {
@@ -352,11 +318,13 @@ class _TechnicianHomeScreenState extends ConsumerState<TechnicianHomeScreen> {
                 const <Emergency>[];
         if (pending.isNotEmpty) {
           WidgetsBinding.instance.addPostFrameCallback((_) {
+            if (!mounted) return;
             _showNewEmergencyBanner(pending);
           });
         }
       }
     } catch (e) {
+      if (!mounted) return;
       debugPrint('[AutoResQ] toggleAvailability ERROR: $e');
       setState(() => _isAvailable = !val);
       if (mounted) {
@@ -386,6 +354,7 @@ class _TechnicianHomeScreenState extends ConsumerState<TechnicianHomeScreen> {
           FilledButton(
             onPressed: () {
               Navigator.pop(context);
+              if (!mounted) return;
               context.push(
                 AppRoutes.rateDriver,
                 extra: {
@@ -492,7 +461,7 @@ class _TechnicianHomeScreenState extends ConsumerState<TechnicianHomeScreen> {
                   if (states.contains(WidgetState.selected)) {
                     return AppColors.success;
                   }
-                  return Colors.grey;
+                  return AppColors.disabled;
                 }),
                 materialTapTargetSize: MaterialTapTargetSize.shrinkWrap,
               ),
@@ -604,7 +573,7 @@ class _TechnicianHomeScreenState extends ConsumerState<TechnicianHomeScreen> {
                     fontSize: 20,
                     fontWeight: FontWeight.w900,
                     color: AppColors.onSurface,
-                    letterSpacing: -0.2,
+                    letterSpacing: 0,
                   ),
                 ),
               ),
@@ -709,7 +678,7 @@ class _TechnicianHomeScreenState extends ConsumerState<TechnicianHomeScreen> {
                         fontSize: 20,
                         fontWeight: FontWeight.w900,
                         color: AppColors.onSurface,
-                        letterSpacing: -0.2,
+                        letterSpacing: 0,
                       ),
                     ),
                   ),
@@ -805,7 +774,7 @@ class _TechnicianHomeScreenState extends ConsumerState<TechnicianHomeScreen> {
                         fontSize: 20,
                         fontWeight: FontWeight.w900,
                         color: AppColors.onSurface,
-                        letterSpacing: -0.2,
+                        letterSpacing: 0,
                       ),
                     ),
                   ),
@@ -874,6 +843,7 @@ class _TechnicianHomeScreenState extends ConsumerState<TechnicianHomeScreen> {
     List<Emergency> emergencies, {
     required bool isAvailable,
   }) {
+    if (!mounted) return;
     final currentIds = emergencies.map((emergency) => emergency.id).toSet();
     if (!_pendingEmergencyFeedSeeded) {
       _pendingEmergencyFeedSeeded = true;
@@ -882,6 +852,7 @@ class _TechnicianHomeScreenState extends ConsumerState<TechnicianHomeScreen> {
         ..addAll(currentIds);
       if (emergencies.isNotEmpty && isAvailable) {
         WidgetsBinding.instance.addPostFrameCallback((_) {
+          if (!mounted) return;
           _showNewEmergencyBanner(emergencies);
         });
       }
@@ -897,6 +868,7 @@ class _TechnicianHomeScreenState extends ConsumerState<TechnicianHomeScreen> {
 
     if (newEmergencies.isEmpty || !isAvailable) return;
     WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!mounted) return;
       _showNewEmergencyBanner(newEmergencies);
     });
   }
@@ -935,6 +907,7 @@ class _TechnicianHomeScreenState extends ConsumerState<TechnicianHomeScreen> {
   }
 
   Future<void> _sendOfferFromList(Emergency emergency) async {
+    if (!mounted) return;
     final isAvailable = _isAvailable ??
         ref.read(authNotifierProvider).value?.isAvailable ??
         false;
@@ -1021,7 +994,7 @@ class _TechnicianHomeScreenState extends ConsumerState<TechnicianHomeScreen> {
                 fontSize: 24,
                 fontWeight: FontWeight.w800,
                 color: AppColors.onSurface,
-                letterSpacing: -0.5,
+                letterSpacing: 0,
               ),
               textAlign: TextAlign.center,
             ),
@@ -1148,10 +1121,13 @@ class _TechnicianHomeScreenState extends ConsumerState<TechnicianHomeScreen> {
       ),
     ];
 
+    final horizontal = AppResponsive.horizontalPadding(context);
+    final topInset = MediaQuery.of(context).padding.top;
+
     return Scaffold(
       key: _scaffoldKey,
       drawer: const AppDrawer(),
-      backgroundColor: AppColors.surface,
+      backgroundColor: AppColors.background,
       bottomNavigationBar: AppBottomNavBar(
         currentIndex: _navIndex,
         onTap: _onNavTap,
@@ -1159,26 +1135,35 @@ class _TechnicianHomeScreenState extends ConsumerState<TechnicianHomeScreen> {
       ),
       body: Stack(
         children: [
+          const Positioned.fill(
+            child: DecoratedBox(
+              decoration: BoxDecoration(
+                gradient: AppColors.pageBackgroundGradient,
+              ),
+            ),
+          ),
           // ── Content: spacer + profile card + map ──────────────────────
           Column(
             children: [
-              SizedBox(height: 64 + MediaQuery.of(context).padding.top),
+              SizedBox(height: 64 + topInset),
               if (_navIndex == 2)
-                _buildProfileCard(
-                  technicianName: user?.name ?? 'Tecnico',
-                  specialty: TechnicianSpecialties.labelForCode(
-                    user?.specialty,
+                AppFadeSlideIn(
+                  child: _buildProfileCard(
+                    technicianName: user?.name ?? 'Tecnico',
+                    specialty: TechnicianSpecialties.labelForCode(
+                      user?.specialty,
+                    ),
+                    isApproved: user?.isApproved ?? false,
+                    isAvailable: isAvailable,
+                    rating: stats?.rating ?? user?.rating ?? 0.0,
+                    totalServices:
+                        stats?.totalServices ?? user?.totalServices ?? 0,
+                    pendingCount: pendingEmergencies.length,
                   ),
-                  isApproved: user?.isApproved ?? false,
-                  isAvailable: isAvailable,
-                  rating: stats?.rating ?? user?.rating ?? 0.0,
-                  totalServices:
-                      stats?.totalServices ?? user?.totalServices ?? 0,
-                  pendingCount: pendingEmergencies.length,
                 ),
               if (_navIndex == 2 && activeEmergency != null)
                 Padding(
-                  padding: const EdgeInsets.fromLTRB(16, 0, 16, 12),
+                  padding: EdgeInsets.fromLTRB(horizontal, 0, horizontal, 12),
                   child: _ActiveServiceNotice(
                     emergency: activeEmergency,
                     onOpen: () => context.push(
@@ -1233,9 +1218,8 @@ class _TechnicianHomeScreenState extends ConsumerState<TechnicianHomeScreen> {
               child: BackdropFilter(
                 filter: ImageFilter.blur(sigmaX: 20, sigmaY: 20),
                 child: Container(
-                  height: 64 + MediaQuery.of(context).padding.top,
-                  padding:
-                      EdgeInsets.only(top: MediaQuery.of(context).padding.top),
+                  height: 64 + topInset,
+                  padding: EdgeInsets.only(top: topInset),
                   decoration: BoxDecoration(
                     color: Colors.white.withValues(alpha: 0.82),
                     border: Border(
@@ -1252,7 +1236,7 @@ class _TechnicianHomeScreenState extends ConsumerState<TechnicianHomeScreen> {
                     ],
                   ),
                   child: Padding(
-                    padding: const EdgeInsets.symmetric(horizontal: 24),
+                    padding: EdgeInsets.symmetric(horizontal: horizontal),
                     child: Row(
                       children: [
                         // Menu
@@ -1276,7 +1260,7 @@ class _TechnicianHomeScreenState extends ConsumerState<TechnicianHomeScreen> {
                         const AppLogo(height: 32, width: 132),
                         const Spacer(),
                         ChatNotificationBell(
-                          onTap: _openLatestUnreadChat,
+                          onTap: _openNotifications,
                           iconColor: AppColors.secondary,
                         ),
                         const Gap(8),
@@ -1317,9 +1301,9 @@ class _TechnicianHomeScreenState extends ConsumerState<TechnicianHomeScreen> {
           ),
           if (_bannerEmergencies.isNotEmpty)
             Positioned(
-              top: 72 + MediaQuery.of(context).padding.top,
-              left: 16,
-              right: 16,
+              top: 72 + topInset,
+              left: horizontal,
+              right: horizontal,
               child: _NewEmergencyBanner(
                 emergencies: _bannerEmergencies,
                 onOpen: _openBannerEmergency,
@@ -1447,7 +1431,7 @@ class _ActiveServiceNotice extends StatelessWidget {
                       color: Colors.white,
                       fontSize: 16,
                       fontWeight: FontWeight.w900,
-                      letterSpacing: -0.2,
+                      letterSpacing: 0,
                     ),
                   ),
                   const Gap(3),
@@ -1481,105 +1465,6 @@ class _ActiveServiceNotice extends StatelessWidget {
               child: const Text('Ver'),
             ),
           ],
-        ),
-      ),
-    );
-  }
-}
-
-class _NotificationTile extends StatelessWidget {
-  final AppNotification notification;
-  final VoidCallback onTap;
-
-  const _NotificationTile({
-    required this.notification,
-    required this.onTap,
-  });
-
-  @override
-  Widget build(BuildContext context) {
-    final color = switch (notification.type) {
-      'solicitud_cancelada' || 'tecnico_cancelo' => AppColors.error,
-      'nuevo_mensaje' => AppColors.primary,
-      'nueva_solicitud' => AppColors.success,
-      _ => AppColors.secondary,
-    };
-    final icon = switch (notification.type) {
-      'solicitud_cancelada' || 'tecnico_cancelo' => Icons.cancel_rounded,
-      'nuevo_mensaje' => Icons.chat_bubble_rounded,
-      'nueva_solicitud' => Icons.notifications_active_rounded,
-      _ => Icons.notifications_rounded,
-    };
-
-    return Material(
-      color: notification.read
-          ? AppColors.surfaceContainerLow
-          : color.withValues(alpha: 0.08),
-      borderRadius: BorderRadius.circular(18),
-      child: InkWell(
-        borderRadius: BorderRadius.circular(18),
-        onTap: onTap,
-        child: Padding(
-          padding: const EdgeInsets.all(14),
-          child: Row(
-            children: [
-              Container(
-                width: 42,
-                height: 42,
-                decoration: BoxDecoration(
-                  color: color.withValues(alpha: 0.12),
-                  borderRadius: BorderRadius.circular(14),
-                ),
-                child: Icon(icon, color: color, size: 21),
-              ),
-              const Gap(12),
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(
-                      notification.title,
-                      style: const TextStyle(
-                        fontSize: 14,
-                        fontWeight: FontWeight.w900,
-                        color: AppColors.onSurface,
-                      ),
-                    ),
-                    const Gap(3),
-                    Text(
-                      notification.message,
-                      maxLines: 2,
-                      overflow: TextOverflow.ellipsis,
-                      style: const TextStyle(
-                        fontSize: 12,
-                        color: AppColors.textSecondary,
-                        height: 1.25,
-                      ),
-                    ),
-                    const Gap(5),
-                    Text(
-                      notification.timeLabel,
-                      style: const TextStyle(
-                        fontSize: 11,
-                        color: AppColors.secondary,
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-              if (!notification.read) ...[
-                const Gap(8),
-                Container(
-                  width: 9,
-                  height: 9,
-                  decoration: BoxDecoration(
-                    color: color,
-                    shape: BoxShape.circle,
-                  ),
-                ),
-              ],
-            ],
-          ),
         ),
       ),
     );
@@ -1697,6 +1582,21 @@ class _TechnicianHistoryCard extends StatelessWidget {
                 ),
               ),
               const Spacer(),
+              Icon(
+                PaymentMethods.icon(emergency.paymentMethod),
+                size: 15,
+                color: AppColors.secondary,
+              ),
+              const Gap(5),
+              Text(
+                PaymentMethods.label(emergency.paymentMethod),
+                style: const TextStyle(
+                  fontSize: 12,
+                  fontWeight: FontWeight.w800,
+                  color: AppColors.textSecondary,
+                ),
+              ),
+              const Gap(12),
               Text(
                 amount == null
                     ? 'Revision pendiente'
@@ -2257,6 +2157,11 @@ class _EmergencyRequestCard extends StatelessWidget {
                 ),
                 const Gap(10),
               ],
+              _RequestMetaLine(
+                icon: PaymentMethods.icon(emergency.paymentMethod),
+                text: 'Pago: ${PaymentMethods.label(emergency.paymentMethod)}',
+              ),
+              const Gap(8),
               Row(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
@@ -2347,6 +2252,38 @@ class _EmptyEmergencyRequests extends StatelessWidget {
           ),
         ],
       ),
+    );
+  }
+}
+
+class _RequestMetaLine extends StatelessWidget {
+  final IconData icon;
+  final String text;
+
+  const _RequestMetaLine({
+    required this.icon,
+    required this.text,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return Row(
+      children: [
+        Icon(icon, size: 16, color: AppColors.secondary),
+        const Gap(6),
+        Expanded(
+          child: Text(
+            text,
+            maxLines: 1,
+            overflow: TextOverflow.ellipsis,
+            style: const TextStyle(
+              fontSize: 12,
+              fontWeight: FontWeight.w800,
+              color: AppColors.textSecondary,
+            ),
+          ),
+        ),
+      ],
     );
   }
 }

@@ -156,7 +156,7 @@ class _SplashScreenState extends ConsumerState<SplashScreen>
                               fontSize: 18,
                               fontWeight: FontWeight.w500,
                               color: AppColors.secondary,
-                              letterSpacing: -0.3,
+                              letterSpacing: 0,
                             ),
                           ),
                         ],

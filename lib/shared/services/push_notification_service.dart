@@ -1,13 +1,62 @@
+import 'dart:async';
+
 import 'package:flutter/foundation.dart';
 import 'package:onesignal_flutter/onesignal_flutter.dart';
 
 import '../../features/auth/domain/entities/user_entity.dart';
 
+typedef PushNotificationOpenHandler =
+    Future<void> Function(PushNotificationRoute route);
+
+class PushNotificationRoute {
+  final String type;
+  final String? emergencyId;
+  final String? referenceId;
+  final Map<String, dynamic> data;
+
+  const PushNotificationRoute({
+    required this.type,
+    required this.data,
+    this.emergencyId,
+    this.referenceId,
+  });
+
+  String? get targetId {
+    final emergency = emergencyId?.trim();
+    if (emergency != null && emergency.isNotEmpty) return emergency;
+    final reference = referenceId?.trim();
+    if (reference != null && reference.isNotEmpty) return reference;
+    return null;
+  }
+
+  static PushNotificationRoute? fromNotification(OSNotification notification) {
+    final data = notification.additionalData;
+    if (data == null || data.isEmpty) return null;
+
+    final type = data['type']?.toString().trim();
+    if (type == null || type.isEmpty) return null;
+
+    return PushNotificationRoute(
+      type: type,
+      emergencyId: data['emergency_id']?.toString(),
+      referenceId: data['reference_id']?.toString(),
+      data: Map<String, dynamic>.from(data),
+    );
+  }
+}
+
 class PushNotificationService {
-  static const _appId = String.fromEnvironment('ONESIGNAL_APP_ID');
+  static const _fallbackAppId = 'd0cacba5-7d95-4959-851c-95bdc9336494';
+  static const _appId = String.fromEnvironment(
+    'ONESIGNAL_APP_ID',
+    defaultValue: _fallbackAppId,
+  );
 
   static bool _initialized = false;
+  static bool _listenersAttached = false;
   static String? _syncedUserId;
+  static PushNotificationOpenHandler? _openHandler;
+  static PushNotificationRoute? _pendingRoute;
 
   static bool get isConfigured => _appId.trim().isNotEmpty;
 
@@ -17,12 +66,42 @@ class PushNotificationService {
       if (kDebugMode) {
         OneSignal.Debug.setLogLevel(OSLogLevel.verbose);
       }
-      OneSignal.initialize(_appId);
+      await OneSignal.initialize(_appId);
+      _attachListeners();
       await OneSignal.Notifications.requestPermission(false);
       _initialized = true;
     } catch (error) {
       debugPrint('[AutoResQ] OneSignal init skipped: $error');
     }
+  }
+
+  static Future<void> registerOpenHandler(
+    PushNotificationOpenHandler handler,
+  ) async {
+    _openHandler = handler;
+    final pendingRoute = _pendingRoute;
+    if (pendingRoute == null) return;
+    _pendingRoute = null;
+    await handler(pendingRoute);
+  }
+
+  static void _attachListeners() {
+    if (_listenersAttached) return;
+
+    OneSignal.Notifications.addClickListener((event) {
+      final route = PushNotificationRoute.fromNotification(event.notification);
+      if (route == null) return;
+
+      final handler = _openHandler;
+      if (handler == null) {
+        _pendingRoute = route;
+        return;
+      }
+
+      unawaited(handler(route));
+    });
+
+    _listenersAttached = true;
   }
 
   static Future<void> syncUser(AppUser? user) async {

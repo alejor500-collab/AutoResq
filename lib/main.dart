@@ -58,11 +58,51 @@ class _AutoResQAppState extends ConsumerState<AutoResQApp> {
   @override
   void initState() {
     super.initState();
+    PushNotificationService.registerOpenHandler(_handlePushOpen);
     _authSubscription = ref.listenManual<AsyncValue<AppUser?>>(
       authNotifierProvider,
       (_, next) => PushNotificationService.syncUser(next.valueOrNull),
       fireImmediately: true,
     );
+  }
+
+  Future<void> _handlePushOpen(PushNotificationRoute route) async {
+    if (!mounted) return;
+
+    final router = ref.read(appRouterProvider);
+    final user = ref.read(authNotifierProvider).valueOrNull ??
+        ref.read(authStateProvider).valueOrNull;
+    if (user == null) return;
+
+    final targetId = route.targetId;
+    switch (route.type) {
+      case 'nueva_solicitud':
+      case 'solicitud_cancelada':
+        router.go(AppRoutes.technicianHome, extra: 1);
+        return;
+      case 'nuevo_mensaje':
+        if (targetId == null || targetId.isEmpty) return;
+        if (user.isTechnician) {
+          router.push(AppRoutes.technicianChat, extra: targetId);
+        } else {
+          router.push(AppRoutes.driverChat, extra: targetId);
+        }
+        return;
+      case 'solicitud_aceptada':
+      case 'tecnico_en_ruta':
+      case 'servicio_finalizado':
+      case 'tecnico_cancelo':
+        if (targetId == null || targetId.isEmpty) return;
+        router.go(AppRoutes.emergencyStatus, extra: targetId);
+        return;
+      default:
+        if (targetId == null || targetId.isEmpty) return;
+        if (user.isTechnician) {
+          router.go(AppRoutes.activeService, extra: targetId);
+        } else {
+          router.go(AppRoutes.emergencyStatus, extra: targetId);
+        }
+    }
   }
 
   @override
@@ -119,39 +159,39 @@ class _AutoResQAppState extends ConsumerState<AutoResQApp> {
         fontSize: 44,
         fontWeight: FontWeight.w800,
         color: AppColors.onSurface,
-        letterSpacing: -1.5,
+        letterSpacing: 0,
         height: 1.1,
       ),
       displayMedium: TextStyle(
         fontSize: 36,
         fontWeight: FontWeight.w800,
         color: AppColors.onSurface,
-        letterSpacing: -1.0,
+        letterSpacing: 0,
         height: 1.1,
       ),
       displaySmall: TextStyle(
         fontSize: 28,
         fontWeight: FontWeight.w800,
         color: AppColors.onSurface,
-        letterSpacing: -0.5,
+        letterSpacing: 0,
       ),
       headlineLarge: TextStyle(
         fontSize: 24,
         fontWeight: FontWeight.w700,
         color: AppColors.onSurface,
-        letterSpacing: -0.5,
+        letterSpacing: 0,
       ),
       headlineSmall: TextStyle(
         fontSize: 20,
         fontWeight: FontWeight.w700,
         color: AppColors.onSurface,
-        letterSpacing: -0.3,
+        letterSpacing: 0,
       ),
       titleLarge: TextStyle(
         fontSize: 18,
         fontWeight: FontWeight.w700,
         color: AppColors.onSurface,
-        letterSpacing: -0.2,
+        letterSpacing: 0,
       ),
       titleMedium: TextStyle(
         fontSize: 16,
@@ -204,6 +244,7 @@ class _AutoResQAppState extends ConsumerState<AutoResQApp> {
       useMaterial3: true,
       colorScheme: colorScheme,
       textTheme: textTheme,
+      fontFamilyFallback: const ['Segoe UI', 'Roboto', 'Arial'],
       pageTransitionsTheme: const PageTransitionsTheme(
         builders: {
           TargetPlatform.android: ZoomPageTransitionsBuilder(),
@@ -214,6 +255,7 @@ class _AutoResQAppState extends ConsumerState<AutoResQApp> {
         },
       ),
       scaffoldBackgroundColor: AppColors.background,
+      canvasColor: Colors.transparent,
       appBarTheme: AppBarTheme(
         backgroundColor: Colors.transparent,
         elevation: 0,
@@ -221,11 +263,11 @@ class _AutoResQAppState extends ConsumerState<AutoResQApp> {
         centerTitle: true,
         iconTheme: const IconThemeData(color: AppColors.secondary),
         titleTextStyle: TextStyle(
-          fontSize: 18,
-          fontWeight: FontWeight.w700,
-          color: AppColors.onSurface,
-          letterSpacing: -0.5,
-        ),
+        fontSize: 18,
+        fontWeight: FontWeight.w700,
+        color: AppColors.onSurface,
+        letterSpacing: 0,
+      ),
       ),
       dividerTheme: const DividerThemeData(
         color: AppColors.surfaceContainerLow,
@@ -235,8 +277,12 @@ class _AutoResQAppState extends ConsumerState<AutoResQApp> {
       cardTheme: CardThemeData(
         color: AppColors.surfaceContainerLowest,
         elevation: 0,
+        shadowColor: AppColors.shadow,
         shape: RoundedRectangleBorder(
-          borderRadius: BorderRadius.circular(AppConstants.borderRadiusCard),
+          borderRadius: BorderRadius.circular(AppConstants.borderRadiusCard + 6),
+          side: BorderSide(
+            color: AppColors.outlineVariant.withValues(alpha: 0.7),
+          ),
         ),
         margin: EdgeInsets.zero,
       ),
@@ -245,16 +291,20 @@ class _AutoResQAppState extends ConsumerState<AutoResQApp> {
         fillColor: AppColors.surfaceContainerLow,
         border: OutlineInputBorder(
           borderRadius: BorderRadius.circular(AppConstants.borderRadiusInput),
-          borderSide: BorderSide.none,
+          borderSide: BorderSide(
+            color: AppColors.outlineVariant.withValues(alpha: 0.85),
+          ),
         ),
         enabledBorder: OutlineInputBorder(
           borderRadius: BorderRadius.circular(AppConstants.borderRadiusInput),
-          borderSide: BorderSide.none,
+          borderSide: BorderSide(
+            color: AppColors.outlineVariant.withValues(alpha: 0.85),
+          ),
         ),
         focusedBorder: OutlineInputBorder(
           borderRadius: BorderRadius.circular(AppConstants.borderRadiusInput),
           borderSide: BorderSide(
-            color: AppColors.primary.withValues(alpha: 0.2),
+            color: AppColors.primary.withValues(alpha: 0.35),
             width: 2,
           ),
         ),
@@ -276,6 +326,8 @@ class _AutoResQAppState extends ConsumerState<AutoResQApp> {
             borderRadius: BorderRadius.circular(22),
           ),
           elevation: 0,
+          shadowColor: Colors.transparent,
+          padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 16),
           textStyle: TextStyle(
             fontSize: 16,
             fontWeight: FontWeight.w700,
@@ -294,6 +346,7 @@ class _AutoResQAppState extends ConsumerState<AutoResQApp> {
             fontSize: 15,
             fontWeight: FontWeight.w800,
           ),
+          padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 15),
         ),
       ),
       outlinedButtonTheme: OutlinedButtonThemeData(
@@ -308,6 +361,7 @@ class _AutoResQAppState extends ConsumerState<AutoResQApp> {
             fontSize: 15,
             fontWeight: FontWeight.w800,
           ),
+          padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 15),
         ),
       ),
       textButtonTheme: TextButtonThemeData(
@@ -342,14 +396,62 @@ class _AutoResQAppState extends ConsumerState<AutoResQApp> {
           return AppColors.surfaceContainerHigh;
         }),
       ),
+      chipTheme: ChipThemeData(
+        backgroundColor: AppColors.surfaceContainerLow,
+        selectedColor: AppColors.primaryFixed,
+        disabledColor: AppColors.disabledContainer,
+        checkmarkColor: AppColors.primary,
+        labelStyle: const TextStyle(
+          color: AppColors.textPrimary,
+          fontWeight: FontWeight.w700,
+          letterSpacing: 0,
+        ),
+        secondaryLabelStyle: const TextStyle(
+          color: AppColors.primaryContainer,
+          fontWeight: FontWeight.w800,
+          letterSpacing: 0,
+        ),
+        side: const BorderSide(color: AppColors.outlineVariant),
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(999),
+        ),
+        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
+      ),
+      listTileTheme: ListTileThemeData(
+        contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
+        iconColor: AppColors.secondary,
+        textColor: AppColors.textPrimary,
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(16),
+        ),
+      ),
+      progressIndicatorTheme: const ProgressIndicatorThemeData(
+        color: AppColors.primary,
+        linearTrackColor: AppColors.surfaceContainerHigh,
+        circularTrackColor: AppColors.surfaceContainerHigh,
+      ),
       dialogTheme: DialogThemeData(
         backgroundColor: AppColors.surfaceContainerLowest,
+        surfaceTintColor: Colors.transparent,
         shape: RoundedRectangleBorder(
           borderRadius: BorderRadius.circular(28),
+        ),
+        titleTextStyle: const TextStyle(
+          fontSize: 20,
+          fontWeight: FontWeight.w800,
+          color: AppColors.textPrimary,
+          letterSpacing: 0,
+        ),
+        contentTextStyle: const TextStyle(
+          fontSize: 14,
+          color: AppColors.textSecondary,
+          height: 1.45,
         ),
       ),
       bottomSheetTheme: const BottomSheetThemeData(
         backgroundColor: AppColors.surfaceContainerLowest,
+        surfaceTintColor: Colors.transparent,
+        modalBackgroundColor: AppColors.surfaceContainerLowest,
         shape: RoundedRectangleBorder(
           borderRadius: BorderRadius.vertical(top: Radius.circular(40)),
         ),
@@ -372,6 +474,7 @@ class _AutoResQAppState extends ConsumerState<AutoResQApp> {
           borderRadius: BorderRadius.circular(16),
         ),
         behavior: SnackBarBehavior.floating,
+        elevation: 0,
       ),
     );
   }

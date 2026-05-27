@@ -20,6 +20,7 @@ class AppUser extends Equatable {
   final String? verificationStatus; // pendiente | aprobado | rechazado
   final String? rejectionReason;
   final String? accountDisabledReason;
+  final String preferredPaymentMethod;
 
   const AppUser({
     required this.id,
@@ -40,6 +41,7 @@ class AppUser extends Equatable {
     this.verificationStatus,
     this.rejectionReason,
     this.accountDisabledReason,
+    this.preferredPaymentMethod = 'cash',
   });
 
   bool get isDriver => role == 'conductor';
@@ -65,6 +67,7 @@ class AppUser extends Equatable {
     String? verificationStatus,
     String? rejectionReason,
     String? accountDisabledReason,
+    String? preferredPaymentMethod,
   }) {
     return AppUser(
       id: id ?? this.id,
@@ -86,6 +89,8 @@ class AppUser extends Equatable {
       rejectionReason: rejectionReason ?? this.rejectionReason,
       accountDisabledReason:
           accountDisabledReason ?? this.accountDisabledReason,
+      preferredPaymentMethod:
+          preferredPaymentMethod ?? this.preferredPaymentMethod,
     );
   }
 
@@ -109,5 +114,6 @@ class AppUser extends Equatable {
         verificationStatus,
         rejectionReason,
         accountDisabledReason,
+        preferredPaymentMethod,
       ];
 }

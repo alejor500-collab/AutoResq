@@ -26,6 +26,7 @@ abstract class TechnicianSpecialties {
       code: mechanicalQuick,
       name: 'Mecánica rápida',
       emergencyTypeCodes: [
+        'Mecánica rápida',
         'minor_mechanic',
         'engine',
         'overheating',
@@ -43,6 +44,7 @@ abstract class TechnicianSpecialties {
       code: batteryElectrical,
       name: 'Sistema eléctrico y batería',
       emergencyTypeCodes: [
+        'Sistema eléctrico y batería',
         'battery_jumpstart',
         'battery',
         'electrical',
@@ -58,6 +60,7 @@ abstract class TechnicianSpecialties {
       code: tiresVulcanization,
       name: 'Llantas y vulcanización',
       emergencyTypeCodes: [
+        'Llantas y vulcanización',
         'tire_change',
         'flat_tire_no_spare',
         'tire',
@@ -73,6 +76,7 @@ abstract class TechnicianSpecialties {
       code: towTruck,
       name: 'Grúa / remolque',
       emergencyTypeCodes: [
+        'Grúa / remolque',
         'tow_service',
         'accident',
       ],
@@ -86,6 +90,7 @@ abstract class TechnicianSpecialties {
       code: fuelDelivery,
       name: 'Combustible',
       emergencyTypeCodes: [
+        'Combustible',
         'fuel_delivery',
         'fuel',
       ],
@@ -99,6 +104,7 @@ abstract class TechnicianSpecialties {
       code: vehicleLocksmith,
       name: 'Cerrajería vehicular',
       emergencyTypeCodes: [
+        'Cerrajería vehicular',
         'locksmith_vehicle',
         'lockout',
       ],
@@ -112,6 +118,7 @@ abstract class TechnicianSpecialties {
       code: generalAssistance,
       name: 'Auxilio general',
       emergencyTypeCodes: [
+        'Auxilio general',
         'unknown',
         'not_emergency',
       ],

@@ -8,11 +8,14 @@ import '../../../../core/constants/app_colors.dart';
 import '../../../../core/constants/app_constants.dart';
 import '../../../../core/router/app_router.dart';
 import '../../../../shared/providers/auth_provider.dart';
+import '../../../../shared/utils/app_responsive.dart';
 import '../../../../shared/widgets/animated_pressable.dart';
 import '../../../../shared/widgets/app_drawer.dart';
 import '../../../../shared/widgets/app_logo.dart';
+import '../../../../shared/widgets/app_motion.dart';
 import '../../../../shared/widgets/bottom_nav_bar.dart';
 import '../../../../shared/widgets/in_app_message_notice.dart';
+import '../../../../shared/widgets/notification_center_sheet.dart';
 import '../../../../shared/widgets/user_avatar.dart';
 import '../../../chat/presentation/providers/chat_provider.dart';
 import '../../../chat/presentation/widgets/chat_notification_bell.dart';
@@ -86,6 +89,25 @@ class _DriverHomeScreenState extends ConsumerState<DriverHomeScreen> {
       return;
     }
     context.push(AppRoutes.driverChatHistory);
+  }
+
+  Future<void> _openNotifications() async {
+    await showNotificationCenterSheet(
+      context: context,
+      ref: ref,
+      onNotificationTap: (notification) async {
+        if (!mounted) return;
+        final referenceId = notification.referenceId;
+        if (notification.type == 'nuevo_mensaje' &&
+            referenceId?.isNotEmpty == true) {
+          context.push(AppRoutes.driverChat, extra: referenceId);
+          return;
+        }
+        if (referenceId?.isNotEmpty == true) {
+          context.push(AppRoutes.emergencyStatus, extra: referenceId);
+        }
+      },
+    );
   }
 
   Future<void> _restoreActiveEmergency() async {
@@ -250,27 +272,37 @@ class _DriverHomeScreenState extends ConsumerState<DriverHomeScreen> {
     final lng = mapState.currentLocation?.lng ?? AppConstants.defaultLng;
     final address =
         mapState.error ?? mapState.currentLocation?.address ?? 'Ecuador';
+    final horizontal = AppResponsive.horizontalPadding(context);
+    final topInset = MediaQuery.of(context).padding.top;
 
     return Scaffold(
       key: _scaffoldKey,
-      backgroundColor: AppColors.surface,
+      backgroundColor: AppColors.background,
       extendBody: true,
       drawer: const AppDrawer(),
       body: Stack(
         children: [
+          const Positioned.fill(
+            child: DecoratedBox(
+              decoration: BoxDecoration(
+                gradient: AppColors.pageBackgroundGradient,
+              ),
+            ),
+          ),
           // ─── Content ────────────────────────────────────────────────────
           Positioned.fill(
             child: SingleChildScrollView(
               padding: EdgeInsets.only(
-                top: 64 + MediaQuery.of(context).padding.top,
+                top: 64 + topInset,
                 bottom: 160,
               ),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
+              child: AppResponsiveContent(
+                maxWidth: 720,
+                child: AppStaggeredColumn(
                 children: [
                   // Driver hero
                   Padding(
-                    padding: const EdgeInsets.fromLTRB(16, 20, 16, 12),
+                    padding: EdgeInsets.fromLTRB(horizontal, 20, horizontal, 12),
                     child: Container(
                       width: double.infinity,
                       padding: const EdgeInsets.all(18),
@@ -308,10 +340,10 @@ class _DriverHomeScreenState extends ConsumerState<DriverHomeScreen> {
                           Text(
                             'Hola, ${user?.name.split(' ').first ?? 'Conductor'}',
                             style: TextStyle(
-                              fontSize: 34,
+                              fontSize: AppResponsive.heroTitleSize(context),
                               fontWeight: FontWeight.w800,
                               color: Colors.white,
-                              letterSpacing: -0.5,
+                              letterSpacing: 0,
                               height: 1.1,
                             ),
                           ),
@@ -376,6 +408,7 @@ class _DriverHomeScreenState extends ConsumerState<DriverHomeScreen> {
                   // Nearby Services
                   _buildNearbyServices(lat, lng),
                 ],
+                ),
               ),
             ),
           ),
@@ -386,44 +419,60 @@ class _DriverHomeScreenState extends ConsumerState<DriverHomeScreen> {
             left: 0,
             right: 0,
             child: Center(
-              child: AnimatedPressable(
-                onTap: _openCreateEmergency,
-                borderRadius: BorderRadius.circular(9999),
-                pressedScale: 0.94,
-                hoverScale: 1.02,
-                child: Container(
-                  padding:
-                      const EdgeInsets.symmetric(horizontal: 32, vertical: 16),
-                  decoration: BoxDecoration(
-                    gradient: AppColors.primaryGradient,
-                    borderRadius: BorderRadius.circular(9999),
-                    border: Border.all(
-                      color: Colors.white.withValues(alpha: 0.45),
-                      width: 1.2,
+              child: ConstrainedBox(
+                constraints: BoxConstraints(
+                  maxWidth: AppResponsive.actionMaxWidth(context),
+                ),
+                child: AnimatedPressable(
+                  onTap: _openCreateEmergency,
+                  borderRadius: BorderRadius.circular(9999),
+                  pressedScale: 0.94,
+                  hoverScale: 1.02,
+                  child: Container(
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 24,
+                      vertical: 16,
                     ),
-                    boxShadow: [
-                      BoxShadow(
-                        color: AppColors.primary.withValues(alpha: 0.25),
-                        blurRadius: 40,
-                        offset: const Offset(0, 20),
+                    decoration: BoxDecoration(
+                      gradient: AppColors.emergencyGradient,
+                      borderRadius: BorderRadius.circular(9999),
+                      border: Border.all(
+                        color: Colors.white.withValues(alpha: 0.45),
+                        width: 1.2,
                       ),
-                    ],
-                  ),
-                  child: const Row(
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
-                      Icon(Icons.report_problem, color: Colors.white, size: 22),
-                      SizedBox(width: 12),
-                      Text(
-                        'REPORTAR EMERGENCIA',
-                        style: TextStyle(
-                          color: Colors.white,
-                          fontSize: 14,
-                          fontWeight: FontWeight.w700,
-                          letterSpacing: 1,
+                      boxShadow: [
+                        BoxShadow(
+                          color: AppColors.emergency.withValues(alpha: 0.25),
+                          blurRadius: 40,
+                          offset: const Offset(0, 20),
                         ),
-                      ),
-                    ],
+                      ],
+                    ),
+                    child: const Row(
+                      mainAxisAlignment: MainAxisAlignment.center,
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        Icon(
+                          Icons.report_problem_rounded,
+                          color: Colors.white,
+                          size: 22,
+                        ),
+                        SizedBox(width: 10),
+                        Flexible(
+                          child: Text(
+                            'REPORTAR EMERGENCIA',
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                            style: TextStyle(
+                              color: Colors.white,
+                              fontSize: 13,
+                              fontWeight: FontWeight.w800,
+                              letterSpacing: 0.4,
+                            ),
+                          ),
+                        ),
+                      ],
+                    ),
                   ),
                 ),
               ),
@@ -469,7 +518,7 @@ class _DriverHomeScreenState extends ConsumerState<DriverHomeScreen> {
                     ],
                   ),
                   child: Padding(
-                    padding: const EdgeInsets.symmetric(horizontal: 24),
+                    padding: EdgeInsets.symmetric(horizontal: horizontal),
                     child: Row(
                       children: [
                         Material(
@@ -491,7 +540,7 @@ class _DriverHomeScreenState extends ConsumerState<DriverHomeScreen> {
                         const AppLogo(height: 32, width: 132),
                         const Spacer(),
                         ChatNotificationBell(
-                          onTap: _openLatestUnreadChat,
+                          onTap: _openNotifications,
                           iconColor: AppColors.secondary,
                         ),
                         const SizedBox(width: 8),
@@ -536,6 +585,7 @@ class _DriverHomeScreenState extends ConsumerState<DriverHomeScreen> {
   Widget _buildNearbyServices(double lat, double lng) {
     final nearbyAsync = ref.watch(nearbyServicesProvider((lat, lng)));
     final selectedCat = ref.watch(selectedCategoryProvider);
+    final horizontal = AppResponsive.horizontalPadding(context);
 
     return Padding(
       padding: const EdgeInsets.fromLTRB(0, 8, 0, 8),
@@ -544,7 +594,7 @@ class _DriverHomeScreenState extends ConsumerState<DriverHomeScreen> {
         children: [
           // Header row
           Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 24),
+            padding: EdgeInsets.symmetric(horizontal: horizontal),
             child: Row(
               children: [
                 const Text(
@@ -592,7 +642,7 @@ class _DriverHomeScreenState extends ConsumerState<DriverHomeScreen> {
                 height: 36,
                 child: ListView.separated(
                   scrollDirection: Axis.horizontal,
-                  padding: const EdgeInsets.symmetric(horizontal: 24),
+                  padding: EdgeInsets.symmetric(horizontal: horizontal),
                   itemCount: available.length + 1, // +1 for "Todos"
                   separatorBuilder: (_, __) => const SizedBox(width: 8),
                   itemBuilder: (_, i) {
@@ -634,7 +684,7 @@ class _DriverHomeScreenState extends ConsumerState<DriverHomeScreen> {
               height: 150,
               child: ListView.separated(
                 scrollDirection: Axis.horizontal,
-                padding: const EdgeInsets.symmetric(horizontal: 24),
+                padding: EdgeInsets.symmetric(horizontal: horizontal),
                 itemCount: 4,
                 separatorBuilder: (_, __) => const SizedBox(width: 12),
                 itemBuilder: (_, __) => Container(
@@ -653,7 +703,7 @@ class _DriverHomeScreenState extends ConsumerState<DriverHomeScreen> {
                   : services.where((s) => s.category == selectedCat).toList();
               if (filtered.isEmpty) {
                 return Padding(
-                  padding: const EdgeInsets.symmetric(horizontal: 24),
+                  padding: EdgeInsets.symmetric(horizontal: horizontal),
                   child: Container(
                     width: double.infinity,
                     padding: const EdgeInsets.all(20),
@@ -674,7 +724,7 @@ class _DriverHomeScreenState extends ConsumerState<DriverHomeScreen> {
                 height: 150,
                 child: ListView.separated(
                   scrollDirection: Axis.horizontal,
-                  padding: const EdgeInsets.symmetric(horizontal: 24),
+                  padding: EdgeInsets.symmetric(horizontal: horizontal),
                   itemCount: filtered.length,
                   separatorBuilder: (_, __) => const SizedBox(width: 12),
                   itemBuilder: (_, i) => _NearbyServiceCard(
@@ -735,7 +785,12 @@ class _MapSection extends ConsumerWidget {
     return Padding(
       padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
       child: Container(
-        height: 380,
+        height: AppResponsive.mapHeight(
+          context,
+          compact: 260,
+          regular: 340,
+          tablet: 380,
+        ),
         decoration: BoxDecoration(
           color: AppColors.surfaceContainerLowest,
           borderRadius: BorderRadius.circular(24),

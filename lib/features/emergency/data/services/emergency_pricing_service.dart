@@ -66,11 +66,11 @@ class EmergencyPricingService {
       pricingStatus: 'protected',
       estimatedTotal: total,
       protectedTotal: total,
-      displayTitle: 'Precio inicial protegido',
-      displayMessage: AppHelpers.formatCurrency(total),
+      displayTitle: 'Cuota referencial inicial',
+      displayMessage: _fixedDisplayMessage(tariff.code, total),
       calculationFormula: _moneyText(total),
       calculationBreakdown: {'base_price': total, 'total': total},
-      isEstimate: false,
+      isEstimate: true,
     );
   }
 
@@ -82,9 +82,8 @@ class EmergencyPricingService {
       pricingStatus: 'estimated',
       estimatedTotalMin: min,
       estimatedTotalMax: max,
-      displayTitle: 'Rango estimado',
-      displayMessage:
-          '${AppHelpers.formatCurrency(min)} - ${AppHelpers.formatCurrency(max)}',
+      displayTitle: 'Rango de cuota referencial',
+      displayMessage: _rangeDisplayMessage(tariff.code, min, max),
       calculationFormula: 'range:$min-$max',
       calculationBreakdown: {'min_price': min, 'max_price': max},
       isEstimate: true,
@@ -98,9 +97,9 @@ class EmergencyPricingService {
       pricingStatus: 'estimated',
       estimatedTotal: total,
       protectedTotal: total > 0 ? total : null,
-      displayTitle: 'Tarifa de diagnostico',
+      displayTitle: 'Cuota referencial de diagnóstico',
       displayMessage:
-          '${AppHelpers.formatCurrency(total)}. Costos adicionales requieren aprobacion.',
+          '${AppHelpers.formatCurrency(total)} aprox. Cualquier reparación o repuesto se cotiza aparte con tu aprobación.',
       calculationFormula: '${_moneyText(total)} diagnostic',
       calculationBreakdown: {'diagnostic_price': total, 'total': total},
       isEstimate: true,
@@ -123,9 +122,9 @@ class EmergencyPricingService {
         pricingStatus: 'pending_destination',
         originLat: originLat,
         originLng: originLng,
-        displayTitle: 'Servicio de Grua',
+        displayTitle: 'Cuota referencial de grúa',
         displayMessage:
-            'Desde ${AppHelpers.formatCurrency(base)} + ${AppHelpers.formatCurrency(pricePerKm)}/km adicional',
+            'Desde ${AppHelpers.formatCurrency(base)} aprox. + ${AppHelpers.formatCurrency(pricePerKm)}/km adicional',
         calculationFormula:
             '${_moneyText(base)} + max(0, tow_distance_km - ${_kmText(includedKm)}) * ${_moneyText(pricePerKm)}',
         calculationBreakdown: {
@@ -170,8 +169,8 @@ class EmergencyPricingService {
       estimatedTotalMin: total,
       estimatedTotalMax: total,
       protectedTotal: requiresManualReview ? null : total,
-      displayTitle: 'Estimado de grua',
-      displayMessage: AppHelpers.formatCurrency(total),
+      displayTitle: 'Cuota referencial de grúa',
+      displayMessage: '${AppHelpers.formatCurrency(total)} aprox.',
       requiresManualReview: requiresManualReview,
       calculationFormula:
           '${_moneyText(base)} + max(0, ${_kmText(pricedDistance)} - ${_kmText(includedKm)}) * ${_moneyText(pricePerKm)}',
@@ -194,8 +193,8 @@ class EmergencyPricingService {
       serviceName: 'Servicio por revisar',
       pricingType: 'diagnostic',
       pricingStatus: 'pending_manual_review',
-      displayTitle: 'Tarifa no disponible',
-      displayMessage: 'Se creara la solicitud con revision de diagnostico.',
+      displayTitle: 'Cuota referencial no disponible',
+      displayMessage: 'Se creará la solicitud con revisión de diagnóstico para estimar un valor.',
       requiresDestination: false,
       requiresUserApprovalForExtras: true,
       requiresManualReview: true,
@@ -283,6 +282,13 @@ class EmergencyPricingService {
     if (_knownServiceCodes.contains(type)) return type;
 
     return switch (type) {
+      'Mecánica rápida' => 'minor_mechanic',
+      'Sistema eléctrico y batería' => 'battery_jumpstart',
+      'Llantas y vulcanización' => _tireServiceCode(normalized),
+      'Grúa / remolque' => 'tow_service',
+      'Combustible' => 'fuel_delivery',
+      'Cerrajería vehicular' => 'locksmith_vehicle',
+      'Auxilio general' => wantsTow ? 'tow_service' : 'unknown',
       'battery' => 'battery_jumpstart',
       'fuel' => 'fuel_delivery',
       'lockout' => 'locksmith_vehicle',
@@ -375,4 +381,21 @@ class EmergencyPricingService {
     'locksmith_vehicle',
     'fuel_delivery',
   };
+
+  String _fixedDisplayMessage(String serviceCode, double total) {
+    if (serviceCode == 'tire_change') {
+      return '${AppHelpers.formatCurrency(total)} aprox. por cambio simple con repuesto del usuario.';
+    }
+    return '${AppHelpers.formatCurrency(total)} aprox.';
+  }
+
+  String _rangeDisplayMessage(String serviceCode, double min, double max) {
+    if (serviceCode == 'tire_change') {
+      return '${AppHelpers.formatCurrency(min)} - ${AppHelpers.formatCurrency(max)} aprox. si solo se requiere cambio de llanta con repuesto.';
+    }
+    if (serviceCode == 'flat_tire_no_spare') {
+      return '${AppHelpers.formatCurrency(min)} - ${AppHelpers.formatCurrency(max)} aprox. si aplica vulcanización o reparación básica.';
+    }
+    return '${AppHelpers.formatCurrency(min)} - ${AppHelpers.formatCurrency(max)} aprox.';
+  }
 }

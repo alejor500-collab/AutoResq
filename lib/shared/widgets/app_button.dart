@@ -2,7 +2,7 @@ import 'package:flutter/material.dart';
 import '../../core/constants/app_colors.dart';
 import 'animated_pressable.dart';
 
-enum AppButtonVariant { primary, secondary, outline, ghost, danger }
+enum AppButtonVariant { primary, secondary, outline, ghost, success, danger }
 
 class AppButton extends StatelessWidget {
   final String label;
@@ -71,6 +71,7 @@ class AppButton extends StatelessWidget {
           onPressed: isLoading ? null : onPressed,
           isLoading: isLoading,
           prefixIcon: prefixIcon,
+          suffixIcon: suffixIcon,
           fontSize: fontSize,
           style: _ButtonStyle.outline,
         );
@@ -80,8 +81,20 @@ class AppButton extends StatelessWidget {
           onPressed: isLoading ? null : onPressed,
           isLoading: isLoading,
           prefixIcon: prefixIcon,
+          suffixIcon: suffixIcon,
           fontSize: fontSize,
           style: _ButtonStyle.ghost,
+        );
+      case AppButtonVariant.success:
+        return _AnimatedPillButton(
+          label: label,
+          onPressed: isLoading ? null : onPressed,
+          isLoading: isLoading,
+          prefixIcon: prefixIcon,
+          suffixIcon: suffixIcon,
+          fontSize: fontSize,
+          gradient: AppColors.successGradient,
+          shadowColor: AppColors.success,
         );
       case AppButtonVariant.danger:
         return _AnimatedPillButton(
@@ -91,9 +104,8 @@ class AppButton extends StatelessWidget {
           prefixIcon: prefixIcon,
           suffixIcon: suffixIcon,
           fontSize: fontSize,
-          gradient: const LinearGradient(
-            colors: [AppColors.error, Color(0xFF8B0000)],
-          ),
+          gradient: AppColors.emergencyGradient,
+          shadowColor: AppColors.emergency,
         );
     }
   }
@@ -109,6 +121,7 @@ class _AnimatedPillButton extends StatefulWidget {
   final Widget? suffixIcon;
   final double? fontSize;
   final LinearGradient? gradient;
+  final Color? shadowColor;
   final _ButtonStyle style;
 
   const _AnimatedPillButton({
@@ -119,6 +132,7 @@ class _AnimatedPillButton extends StatefulWidget {
     this.suffixIcon,
     this.fontSize,
     this.gradient,
+    this.shadowColor,
     this.style = _ButtonStyle.primary,
   });
 
@@ -168,7 +182,8 @@ class _AnimatedPillButtonState extends State<_AnimatedPillButton> {
         borderRadius: BorderRadius.circular(9999),
         boxShadow: [
           BoxShadow(
-            color: AppColors.primary.withValues(alpha: 0.2),
+            color: (widget.shadowColor ?? AppColors.primary)
+                .withValues(alpha: 0.20),
             blurRadius: 24,
             offset: const Offset(0, 10),
           ),
@@ -224,13 +239,17 @@ class _AnimatedPillButtonState extends State<_AnimatedPillButton> {
           widget.prefixIcon!,
           const SizedBox(width: 10),
         ],
-        Text(
-          widget.label,
-          style: TextStyle(
-            color: textColor,
-            fontSize: widget.fontSize ?? 16,
-            fontWeight: FontWeight.w700,
-            letterSpacing: 0.3,
+        Flexible(
+          child: Text(
+            widget.label,
+            maxLines: 1,
+            overflow: TextOverflow.ellipsis,
+            style: TextStyle(
+              color: textColor,
+              fontSize: widget.fontSize ?? 16,
+              fontWeight: FontWeight.w800,
+              letterSpacing: 0,
+            ),
           ),
         ),
         if (widget.suffixIcon != null) ...[

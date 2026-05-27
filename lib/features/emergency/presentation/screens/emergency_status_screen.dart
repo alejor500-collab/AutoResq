@@ -11,7 +11,10 @@ import '../../../../core/constants/app_constants.dart';
 import '../../../../core/router/app_router.dart';
 import '../../../../core/utils/helpers.dart';
 import '../../../chat/presentation/widgets/chat_notification_bell.dart';
+import '../../../../shared/utils/app_responsive.dart';
 import '../../../../shared/widgets/bottom_nav_bar.dart';
+import '../../../../shared/widgets/app_motion.dart';
+import '../../../../shared/widgets/notification_center_sheet.dart';
 import '../providers/emergency_provider.dart';
 import '../../domain/entities/emergency_entity.dart';
 
@@ -69,6 +72,27 @@ class _StatusBody extends ConsumerStatefulWidget {
 
 class _StatusBodyState extends ConsumerState<_StatusBody> {
   bool _ratingDialogShown = false;
+
+  Future<void> _openNotifications(Emergency emergency) async {
+    await showNotificationCenterSheet(
+      context: context,
+      ref: ref,
+      onNotificationTap: (notification) async {
+        if (!mounted) return;
+        final referenceId = notification.referenceId;
+        if (notification.type == 'nuevo_mensaje' &&
+            referenceId?.isNotEmpty == true) {
+          context.push(AppRoutes.driverChat, extra: referenceId);
+          return;
+        }
+        if (referenceId?.isNotEmpty == true) {
+          context.go(AppRoutes.emergencyStatus, extra: referenceId);
+        } else if (emergency.asignacionId?.isNotEmpty == true) {
+          context.push(AppRoutes.driverChat, extra: emergency.id);
+        }
+      },
+    );
+  }
 
   void _showDriverRatingDialog(Emergency emergency) {
     if (_ratingDialogShown) return;
@@ -231,11 +255,20 @@ class _StatusBodyState extends ConsumerState<_StatusBody> {
     if (isCompleted) {
       _showDriverRatingDialog(emergency);
     }
+    final horizontal = AppResponsive.horizontalPadding(context);
+    final topInset = MediaQuery.of(context).padding.top;
 
     return Scaffold(
-      backgroundColor: AppColors.surface,
+      backgroundColor: AppColors.background,
       body: Stack(
         children: [
+          const Positioned.fill(
+            child: DecoratedBox(
+              decoration: BoxDecoration(
+                gradient: AppColors.pageBackgroundGradient,
+              ),
+            ),
+          ),
           // Glass AppBar
           Positioned(
             top: 0,
@@ -246,8 +279,7 @@ class _StatusBodyState extends ConsumerState<_StatusBody> {
                 filter: ImageFilter.blur(sigmaX: 20, sigmaY: 20),
                 child: Container(
                   height: 64 + MediaQuery.of(context).padding.top,
-                  padding:
-                      EdgeInsets.only(top: MediaQuery.of(context).padding.top),
+                  padding: EdgeInsets.only(top: topInset),
                   decoration: BoxDecoration(
                     color: Colors.white.withValues(alpha: 0.8),
                     boxShadow: [
@@ -259,7 +291,7 @@ class _StatusBodyState extends ConsumerState<_StatusBody> {
                     ],
                   ),
                   child: Padding(
-                    padding: const EdgeInsets.symmetric(horizontal: 24),
+                    padding: EdgeInsets.symmetric(horizontal: horizontal),
                     child: Row(
                       children: [
                         // Back button
@@ -282,19 +314,14 @@ class _StatusBodyState extends ConsumerState<_StatusBody> {
                           style: TextStyle(
                             fontSize: 18,
                             fontWeight: FontWeight.w700,
-                            letterSpacing: -0.3,
+                            letterSpacing: 0,
                             color: AppColors.onSurface,
                           ),
                         ),
                         const Spacer(),
                         // Profile avatar → /profile
                         ChatNotificationBell(
-                          onTap: emergency.asignacionId?.isNotEmpty == true
-                              ? () => context.push(
-                                    AppRoutes.driverChat,
-                                    extra: emergency.id,
-                                  )
-                              : null,
+                          onTap: () => _openNotifications(emergency),
                           iconColor: AppColors.secondary,
                         ),
                         const SizedBox(width: 8),
@@ -322,12 +349,14 @@ class _StatusBodyState extends ConsumerState<_StatusBody> {
 
           // Content
           Positioned.fill(
-            top: 64 + MediaQuery.of(context).padding.top,
+            top: 64 + topInset,
             bottom: 80 + MediaQuery.of(context).padding.bottom,
             child: SingleChildScrollView(
-              padding: const EdgeInsets.fromLTRB(24, 24, 24, 24),
-              child: Column(
-                children: [
+              padding: EdgeInsets.fromLTRB(horizontal, 24, horizontal, 24),
+              child: AppResponsiveContent(
+                child: AppStaggeredColumn(
+                  crossAxisAlignment: CrossAxisAlignment.stretch,
+                  children: [
                   // ETA Hero
                   _ETAHero(
                     emergency: emergency,
@@ -370,7 +399,8 @@ class _StatusBodyState extends ConsumerState<_StatusBody> {
 
                   // Timeline
                   _TimelineStepper(emergency: emergency),
-                ],
+                  ],
+                ),
               ),
             ),
           ),
@@ -534,11 +564,11 @@ class _ETAHero extends StatelessWidget {
         const Gap(4),
         Text(
           etaText,
-          style: const TextStyle(
-            fontSize: 48,
+          style: TextStyle(
+            fontSize: AppResponsive.isCompact(context) ? 40 : 48,
             fontWeight: FontWeight.w800,
             color: AppColors.onSurface,
-            letterSpacing: -2,
+            letterSpacing: 0,
           ),
         ),
         Text(
@@ -634,7 +664,12 @@ class _LiveMap extends StatelessWidget {
                     : 13.0;
 
     return Container(
-      height: 256,
+      height: AppResponsive.mapHeight(
+        context,
+        compact: 220,
+        regular: 256,
+        tablet: 300,
+      ),
       decoration: BoxDecoration(
         borderRadius: BorderRadius.circular(24),
         border: Border.all(color: AppColors.surfaceVariant),
@@ -997,8 +1032,11 @@ class _TechnicianCard extends StatelessWidget {
                         ),
                         Row(
                           children: [
-                            const Icon(Icons.star,
-                                size: 14, color: Color(0xFFFACC15)),
+                            const Icon(
+                              Icons.star,
+                              size: 14,
+                              color: AppColors.warning,
+                            ),
                             const Gap(4),
                             Text(
                               ratingText,

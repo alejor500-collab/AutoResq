@@ -51,7 +51,7 @@ class PendingApprovalScreen extends ConsumerWidget {
                   fontSize: 28,
                   fontWeight: FontWeight.w800,
                   color: isRejected ? AppColors.error : AppColors.onSurface,
-                  letterSpacing: -0.5,
+                  letterSpacing: 0,
                 ),
               ),
               const SizedBox(height: 16),

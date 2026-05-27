@@ -1,7 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../../../core/constants/app_colors.dart';
-import '../providers/chat_provider.dart';
 import '../../../../shared/providers/notification_provider.dart';
 
 class ChatNotificationBell extends ConsumerWidget {
@@ -15,15 +14,14 @@ class ChatNotificationBell extends ConsumerWidget {
     this.onTap,
     this.iconColor = AppColors.secondary,
     this.backgroundColor = Colors.transparent,
-    this.tooltip = 'Mensajes',
+    this.tooltip = 'Notificaciones',
   });
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    final unreadMessages = ref.watch(unreadChatCountProvider).valueOrNull ?? 0;
     final unreadNotifications = ref.watch(unreadNotificationsCountProvider);
-    final unread = unreadMessages + unreadNotifications;
-    final badgeText = unread > 99 ? '99+' : unread.toString();
+    final badgeText =
+        unreadNotifications > 99 ? '99+' : unreadNotifications.toString();
 
     return SizedBox(
       width: 40,
@@ -40,12 +38,12 @@ class ChatNotificationBell extends ConsumerWidget {
                 onPressed: onTap,
                 splashRadius: 22,
                 icon: Icon(
-                  unread > 0
+                  unreadNotifications > 0
                       ? Icons.notifications_active_rounded
                       : Icons.notifications_none_rounded,
                   color: onTap == null
                       ? iconColor.withValues(alpha: 0.42)
-                      : unread > 0
+                      : unreadNotifications > 0
                           ? AppColors.primary
                           : iconColor,
                   size: 23,
@@ -53,7 +51,7 @@ class ChatNotificationBell extends ConsumerWidget {
               ),
             ),
           ),
-          if (unread > 0)
+          if (unreadNotifications > 0)
             Positioned(
               right: 3,
               top: 3,

@@ -11,6 +11,12 @@
         android:label="autoresq"
         android:name="${applicationName}"
         android:icon="@mipmap/ic_launcher">
+        <meta-data
+            android:name="com.onesignal.NotificationIcon"
+            android:resource="@drawable/ic_stat_autoresq" />
+        <meta-data
+            android:name="com.onesignal.NotificationAccentColor"
+            android:value="FFBB020F" />
         <activity
             android:name=".MainActivity"
             android:exported="true"

@@ -192,7 +192,7 @@ class _ValidationAppBar extends StatelessWidget {
           fontSize: 17,
           fontWeight: FontWeight.w700,
           color: AppColors.textPrimary,
-          letterSpacing: -0.2,
+          letterSpacing: 0,
         ),
       ),
       actions: [
@@ -477,7 +477,7 @@ class _TechCard extends StatelessWidget {
                   child: AppButton(
                     label: 'Rechazar',
                     onPressed: onReject,
-                    variant: AppButtonVariant.outline,
+                    variant: AppButtonVariant.danger,
                     height: 42,
                   ),
                 ),
@@ -486,6 +486,7 @@ class _TechCard extends StatelessWidget {
                   child: AppButton(
                     label: 'Aprobar',
                     onPressed: onApprove,
+                    variant: AppButtonVariant.success,
                     height: 42,
                   ),
                 ),
@@ -602,7 +603,7 @@ class _CredentialRow extends StatelessWidget {
                     return Container(
                       width: double.infinity,
                       height: 300,
-                      color: const Color(0xFF1A1A1A),
+                      color: AppColors.inverseSurface,
                       child: const Center(
                         child: CircularProgressIndicator(
                           color: Colors.white,
@@ -614,7 +615,7 @@ class _CredentialRow extends StatelessWidget {
                   errorBuilder: (ctx, _, __) => Container(
                     width: double.infinity,
                     height: 240,
-                    color: const Color(0xFF1A1A1A),
+                    color: AppColors.inverseSurface,
                     child: Column(
                       mainAxisAlignment: MainAxisAlignment.center,
                       children: [
@@ -827,7 +828,7 @@ class _ApproveSheet extends StatelessWidget {
 
   const _ApproveSheet({required this.nombre});
 
-  static const _green = Color(0xFF2E7D32);
+  static const _green = AppColors.success;
 
   @override
   Widget build(BuildContext context) {
@@ -905,6 +906,7 @@ class _ApproveSheet extends StatelessWidget {
                 child: AppButton(
                   label: 'Aprobar',
                   onPressed: () => Navigator.pop(context, true),
+                  variant: AppButtonVariant.success,
                   height: 44,
                 ),
               ),

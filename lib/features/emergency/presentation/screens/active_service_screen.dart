@@ -7,12 +7,16 @@ import 'package:gap/gap.dart';
 import 'package:url_launcher/url_launcher.dart';
 import '../../../../core/constants/app_colors.dart';
 import '../../../../core/constants/app_constants.dart';
+import '../../../../core/constants/payment_methods.dart';
 import '../../../../core/router/app_router.dart';
 import '../../../../core/utils/helpers.dart';
 import '../../../../shared/providers/auth_provider.dart';
+import '../../../../shared/utils/app_responsive.dart';
 import '../../../../shared/widgets/app_button.dart';
 import '../../../../shared/widgets/app_drawer.dart';
+import '../../../../shared/widgets/app_motion.dart';
 import '../../../../shared/widgets/in_app_message_notice.dart';
+import '../../../../shared/widgets/notification_center_sheet.dart';
 import '../../../../shared/widgets/user_avatar.dart';
 import '../../../chat/presentation/providers/chat_provider.dart';
 import '../../../chat/presentation/widgets/chat_notification_bell.dart';
@@ -131,6 +135,32 @@ class _ActiveServiceBodyState extends ConsumerState<_ActiveServiceBody> {
     context.push(
       AppRoutes.technicianChat,
       extra: widget.emergency.id,
+    );
+  }
+
+  Future<void> _openNotifications() async {
+    await showNotificationCenterSheet(
+      context: context,
+      ref: ref,
+      onNotificationTap: (notification) async {
+        if (!mounted) return;
+        final referenceId = notification.referenceId;
+        switch (notification.type) {
+          case 'nuevo_mensaje':
+            if (referenceId?.isNotEmpty == true) {
+              context.push(AppRoutes.technicianChat, extra: referenceId);
+            }
+            return;
+          case 'nueva_solicitud':
+          case 'solicitud_cancelada':
+            context.go(AppRoutes.technicianHome, extra: 1);
+            return;
+          default:
+            if (referenceId?.isNotEmpty == true) {
+              context.go(AppRoutes.activeService, extra: referenceId);
+            }
+        }
+      },
     );
   }
 
@@ -325,16 +355,18 @@ class _ActiveServiceBodyState extends ConsumerState<_ActiveServiceBody> {
     final lat = emergency.lat ?? AppConstants.defaultLat;
     final lng = emergency.lng ?? AppConstants.defaultLng;
     final isEnRoute = substate == AppConstants.assignEnRoute;
+    final horizontal = AppResponsive.horizontalPadding(context);
+    final isShort = AppResponsive.isShort(context);
 
     return Scaffold(
       key: _scaffoldKey,
-      backgroundColor: Colors.white,
+      backgroundColor: AppColors.background,
       drawer: const AppDrawer(),
       body: Column(
         children: [
           // ─── Mapa ────────────────────────────────────────────────────
           Expanded(
-            flex: isEnRoute ? 3 : 2,
+            flex: isShort ? 2 : (isEnRoute ? 3 : 2),
             child: Stack(
               children: [
                 Positioned.fill(
@@ -347,8 +379,10 @@ class _ActiveServiceBodyState extends ConsumerState<_ActiveServiceBody> {
                 ),
                 SafeArea(
                   child: Padding(
-                    padding: const EdgeInsets.symmetric(
-                        horizontal: 12, vertical: 12),
+                    padding: EdgeInsets.symmetric(
+                      horizontal: horizontal,
+                      vertical: 12,
+                    ),
                     child: Row(
                       children: [
                         // Botón atrás
@@ -376,15 +410,15 @@ class _ActiveServiceBodyState extends ConsumerState<_ActiveServiceBody> {
                         _StatusFloatingChip(
                           label: isEnRoute ? 'EN RUTA' : 'ATENDIENDO',
                           color: isEnRoute
-                              ? const Color(0xFF1E88E5)
-                              : const Color(0xFFF59E0B),
+                              ? AppColors.primary
+                              : AppColors.warning,
                           icon: isEnRoute
                               ? Icons.navigation_rounded
                               : Icons.build_rounded,
                         ),
                         const Spacer(),
                         ChatNotificationBell(
-                          onTap: _openChat,
+                          onTap: _openNotifications,
                           iconColor: AppColors.secondary,
                           backgroundColor: Colors.white.withValues(alpha: 0.88),
                         ),
@@ -417,32 +451,35 @@ class _ActiveServiceBodyState extends ConsumerState<_ActiveServiceBody> {
 
           // ─── Tarjeta inferior ─────────────────────────────────────────
           Expanded(
-            flex: isEnRoute ? 2 : 3,
+            flex: isShort ? 3 : (isEnRoute ? 2 : 3),
             child: Container(
               width: double.infinity,
               decoration: const BoxDecoration(
-                color: Colors.white,
+                color: AppColors.surfaceContainerLowest,
                 borderRadius:
-                    BorderRadius.vertical(top: Radius.circular(24)),
+                    BorderRadius.vertical(top: Radius.circular(32)),
                 boxShadow: [
                   BoxShadow(
-                    color: Colors.black12,
-                    blurRadius: 20,
-                    offset: Offset(0, -4),
+                    color: AppColors.shadow,
+                    blurRadius: 24,
+                    offset: Offset(0, -8),
                   ),
                 ],
               ),
-              child: isEnRoute
-                  ? _EnRoutePanel(
-                      emergency: emergency,
-                      onHeLlegado: _onHeLlegado,
-                      onCancel: _cancelByTechnician,
-                    )
-                  : _AttendingPanel(
-                      emergency: emergency,
-                      elapsed: _formatElapsed(),
-                      onCancel: _cancelByTechnician,
-                    ),
+              child: AppFadeSlideIn(
+                offsetY: 10,
+                child: isEnRoute
+                    ? _EnRoutePanel(
+                        emergency: emergency,
+                        onHeLlegado: _onHeLlegado,
+                        onCancel: _cancelByTechnician,
+                      )
+                    : _AttendingPanel(
+                        emergency: emergency,
+                        elapsed: _formatElapsed(),
+                        onCancel: _cancelByTechnician,
+                      ),
+              ),
             ),
           ),
         ],
@@ -466,8 +503,9 @@ class _EnRoutePanel extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final horizontal = AppResponsive.horizontalPadding(context);
     return SingleChildScrollView(
-      padding: const EdgeInsets.fromLTRB(24, 20, 24, 24),
+      padding: EdgeInsets.fromLTRB(horizontal, 20, horizontal, 24),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
@@ -479,7 +517,7 @@ class _EnRoutePanel extends StatelessWidget {
                 fontSize: 28,
                 fontWeight: FontWeight.w900,
                 color: AppColors.onSurface,
-                letterSpacing: -0.5,
+                letterSpacing: 0,
               ),
             ),
             const Gap(2),
@@ -540,6 +578,11 @@ class _EnRoutePanel extends StatelessWidget {
             ],
           ),
           const Gap(16),
+          _ServiceInfoLine(
+            icon: PaymentMethods.icon(emergency.paymentMethod),
+            text: 'Pago: ${PaymentMethods.label(emergency.paymentMethod)}',
+          ),
+          const Gap(16),
 
           // Llamar + Chat
           Row(
@@ -574,8 +617,9 @@ class _EnRoutePanel extends StatelessWidget {
 
           // He llegado
           AppButton(
-            label: '📍 He llegado',
+            label: 'He llegado',
             onPressed: onHeLlegado,
+            variant: AppButtonVariant.success,
           ),
           const Gap(10),
           AppButton(
@@ -591,6 +635,45 @@ class _EnRoutePanel extends StatelessWidget {
 
 // ─── Panel ATENDIENDO ─────────────────────────────────────────────────────────
 
+class _ServiceInfoLine extends StatelessWidget {
+  final IconData icon;
+  final String text;
+
+  const _ServiceInfoLine({
+    required this.icon,
+    required this.text,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+      decoration: BoxDecoration(
+        color: AppColors.primary.withValues(alpha: 0.06),
+        borderRadius: BorderRadius.circular(14),
+        border: Border.all(color: AppColors.primary.withValues(alpha: 0.12)),
+      ),
+      child: Row(
+        children: [
+          Icon(icon, size: 18, color: AppColors.primary),
+          const Gap(10),
+          Expanded(
+            child: Text(
+              text,
+              style: const TextStyle(
+                fontSize: 13,
+                fontWeight: FontWeight.w800,
+                color: AppColors.onSurface,
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
 class _AttendingPanel extends StatelessWidget {
   final Emergency emergency;
   final String elapsed;
@@ -604,8 +687,9 @@ class _AttendingPanel extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final horizontal = AppResponsive.horizontalPadding(context);
     return SingleChildScrollView(
-      padding: const EdgeInsets.fromLTRB(24, 20, 24, 24),
+      padding: EdgeInsets.fromLTRB(horizontal, 20, horizontal, 24),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
@@ -625,6 +709,11 @@ class _AttendingPanel extends StatelessWidget {
               color: AppColors.textSecondary,
             ),
           ),
+          const Gap(10),
+          _ServiceInfoLine(
+            icon: PaymentMethods.icon(emergency.paymentMethod),
+            text: 'Pago: ${PaymentMethods.label(emergency.paymentMethod)}',
+          ),
           const Gap(22),
 
           // Contador
@@ -632,11 +721,11 @@ class _AttendingPanel extends StatelessWidget {
             child: Container(
               padding: const EdgeInsets.symmetric(horizontal: 32, vertical: 18),
               decoration: BoxDecoration(
-                color: const Color(0xFFF59E0B).withValues(alpha: 0.10),
+                color: AppColors.warning.withValues(alpha: 0.10),
                 borderRadius:
                     BorderRadius.circular(AppConstants.borderRadiusCard),
                 border: Border.all(
-                  color: const Color(0xFFF59E0B).withValues(alpha: 0.35),
+                  color: AppColors.warning.withValues(alpha: 0.35),
                 ),
               ),
               child: Text(
@@ -644,7 +733,7 @@ class _AttendingPanel extends StatelessWidget {
                 style: const TextStyle(
                   fontSize: 40,
                   fontWeight: FontWeight.w900,
-                  color: Color(0xFFF59E0B),
+                  color: AppColors.warning,
                   letterSpacing: 3,
                 ),
               ),
@@ -667,7 +756,8 @@ class _AttendingPanel extends StatelessWidget {
 
           // Finalizar
           AppButton(
-            label: '✅ Finalizar Servicio',
+            label: 'Finalizar servicio',
+            variant: AppButtonVariant.success,
             onPressed: () => context.pushReplacement(
               AppRoutes.serviceClosure,
               extra: {

@@ -324,7 +324,7 @@ class _KpiGrid extends StatelessWidget {
         label: 'Tecnicos aprobados',
         value: '${stats['approved_technicians'] ?? 0}',
         helper: '${stats['available_technicians'] ?? 0} disponibles',
-        color: AppColors.warning,
+        color: AppColors.success,
         icon: Icons.build_circle_rounded,
       ),
       _KpiItem(
@@ -340,14 +340,14 @@ class _KpiGrid extends StatelessWidget {
         label: 'Pendientes',
         value: '${stats['pending_validations'] ?? 0}',
         helper: '${stats['rejected_technicians'] ?? 0} rechazados',
-        color: AppColors.error,
+        color: AppColors.warning,
         icon: Icons.pending_actions_rounded,
       ),
       _KpiItem(
         label: 'Emergencias activas',
         value: '${stats['active_emergencies'] ?? 0}',
         helper: '${stats['completion_rate'] ?? 0}% completadas',
-        color: AppColors.primary,
+        color: AppColors.emergency,
         icon: Icons.monitor_heart_rounded,
       ),
     ];

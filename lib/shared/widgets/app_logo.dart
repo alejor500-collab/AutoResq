@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import '../../core/constants/app_colors.dart';
 
 class AppLogo extends StatelessWidget {
   final double height;
@@ -35,16 +36,16 @@ class AppLogo extends StatelessWidget {
               children: const [
                 Icon(
                   Icons.car_repair_rounded,
-                  color: Color(0xFFE50914),
+                  color: AppColors.emergency,
                   size: 34,
                 ),
                 SizedBox(width: 8),
                 Text(
                   'AutoResQ',
                   style: TextStyle(
-                    color: Color(0xFF061426),
+                    color: AppColors.textPrimary,
                     fontWeight: FontWeight.w900,
-                    letterSpacing: -1,
+                    letterSpacing: 0,
                   ),
                 ),
               ],

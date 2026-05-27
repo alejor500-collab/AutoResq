@@ -30,6 +30,8 @@ CREATE TABLE IF NOT EXISTS public.usuarios (
                      CHECK (rol IN ('conductor', 'tecnico', 'administrador')),
     activo       boolean NOT NULL DEFAULT true,
     avatar_url   text,
+    preferred_payment_method text NOT NULL DEFAULT 'cash'
+                     CHECK (preferred_payment_method IN ('cash', 'transfer')),
     creado_en    timestamp with time zone DEFAULT now(),
     actualizado_en timestamp with time zone DEFAULT now()
 );
@@ -105,26 +107,32 @@ CREATE TABLE IF NOT EXISTS public.emergencias (
         CHECK (
             ai_emergency_type IS NULL
             OR ai_emergency_type IN (
-                'battery', 'tire', 'fuel', 'engine', 'overheating',
-                'accident', 'lockout', 'electrical', 'brakes',
-                'unknown', 'not_emergency'
+                'Mecánica rápida',
+                'Sistema eléctrico y batería',
+                'Llantas y vulcanización',
+                'Grúa / remolque',
+                'Combustible',
+                'Cerrajería vehicular',
+                'Auxilio general'
             )
         ),
     ai_priority text
         CHECK (
             ai_priority IS NULL
-            OR ai_priority IN ('low', 'medium', 'high', 'critical')
+            OR ai_priority IN ('baja', 'media', 'alta')
         ),
     ai_user_message text,
     ai_safety_recommendation text,
     ai_technician_summary text,
-    ai_detected_risks text[] NOT NULL DEFAULT ARRAY['none']::text[],
+    ai_detected_risks text[] NOT NULL DEFAULT ARRAY[]::text[],
     ai_requires_immediate_attention boolean,
     ai_confidence numeric(4,3)
         CHECK (ai_confidence IS NULL OR (ai_confidence >= 0 AND ai_confidence <= 1)),
     ai_analysis_status text NOT NULL DEFAULT 'pending'
         CHECK (ai_analysis_status IN ('pending', 'completed', 'failed')),
     ai_analyzed_at timestamp with time zone,
+    payment_method text NOT NULL DEFAULT 'cash'
+        CHECK (payment_method IN ('cash', 'transfer')),
     estado           varchar(50) NOT NULL DEFAULT 'pendiente'
                          CHECK (estado IN ('pendiente', 'en_proceso', 'atendida', 'finalizada', 'cancelada')),
     fecha            timestamp with time zone DEFAULT now()

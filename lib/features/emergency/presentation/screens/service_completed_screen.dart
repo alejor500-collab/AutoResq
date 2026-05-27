@@ -50,11 +50,11 @@ class ServiceCompletedScreen extends StatelessWidget {
                       width: 80,
                       height: 80,
                       decoration: BoxDecoration(
-                        color: const Color(0xFF22C55E).withValues(alpha: 0.12),
+                        color: AppColors.successContainer,
                         shape: BoxShape.circle,
                         boxShadow: [
                           BoxShadow(
-                            color: const Color(0xFF22C55E).withValues(alpha: 0.20),
+                            color: AppColors.success.withValues(alpha: 0.20),
                             blurRadius: 20,
                             offset: const Offset(0, 4),
                           ),
@@ -63,7 +63,7 @@ class ServiceCompletedScreen extends StatelessWidget {
                       child: const Icon(
                         Icons.check_circle,
                         size: 80,
-                        color: Color(0xFF22C55E),
+                        color: AppColors.success,
                       ),
                     ),
                     const Gap(20),
@@ -76,7 +76,7 @@ class ServiceCompletedScreen extends StatelessWidget {
                         fontSize: 30,
                         fontWeight: FontWeight.w800,
                         color: AppColors.onSurface,
-                        letterSpacing: -0.5,
+                        letterSpacing: 0,
                       ),
                     ),
                     const Gap(6),
@@ -224,7 +224,7 @@ class ServiceCompletedScreen extends StatelessWidget {
                                             fontSize: 28,
                                             fontWeight: FontWeight.w800,
                                             color: AppColors.primary,
-                                            letterSpacing: -0.5,
+                                            letterSpacing: 0,
                                           ),
                                         ),
                                         const Gap(4),

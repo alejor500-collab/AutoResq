@@ -20,6 +20,7 @@ class UserModel extends AppUser {
     super.verificationStatus,
     super.rejectionReason,
     super.accountDisabledReason,
+    super.preferredPaymentMethod,
   });
 
   factory UserModel.fromJson(Map<String, dynamic> json) {
@@ -44,6 +45,8 @@ class UserModel extends AppUser {
       verificationStatus: json['verification_status'] as String?,
       rejectionReason: json['rejection_reason'] as String?,
       accountDisabledReason: json['account_disabled_reason'] as String?,
+      preferredPaymentMethod:
+          json['preferred_payment_method'] as String? ?? 'cash',
     );
   }
 
@@ -67,6 +70,7 @@ class UserModel extends AppUser {
       'verification_status': verificationStatus,
       'rejection_reason': rejectionReason,
       'account_disabled_reason': accountDisabledReason,
+      'preferred_payment_method': preferredPaymentMethod,
     };
   }
 
@@ -90,6 +94,7 @@ class UserModel extends AppUser {
       verificationStatus: entity.verificationStatus,
       rejectionReason: entity.rejectionReason,
       accountDisabledReason: entity.accountDisabledReason,
+      preferredPaymentMethod: entity.preferredPaymentMethod,
     );
   }
 }
