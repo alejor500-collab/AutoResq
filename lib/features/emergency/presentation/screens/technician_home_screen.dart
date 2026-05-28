@@ -30,6 +30,7 @@ import '../../../map/presentation/providers/map_provider.dart';
 import '../../../map/presentation/widgets/map_widget.dart';
 import 'incoming_request_sheet.dart';
 import '../providers/emergency_provider.dart';
+import '../widgets/emergency_evidence_photos.dart';
 import '../widgets/technician_offer_amount_sheet.dart';
 import '../../domain/entities/emergency_entity.dart';
 
@@ -832,6 +833,9 @@ class _TechnicianHomeScreenState extends ConsumerState<TechnicianHomeScreen> {
   }
 
   void _showIncomingRequest(Emergency emergency) {
+    final currentUser = ref.read(authNotifierProvider).value ??
+        ref.read(authStateProvider).valueOrNull;
+    if (currentUser?.id == emergency.usuarioId) return;
     showModalBottomSheet<void>(
       context: context,
       isScrollControlled: true,
@@ -1468,20 +1472,26 @@ class _ActiveServiceNotice extends StatelessWidget {
               ),
             ),
             const Gap(10),
-            FilledButton(
-              onPressed: onOpen,
-              style: FilledButton.styleFrom(
-                backgroundColor: Colors.white,
-                foregroundColor: AppColors.primary,
-                padding: const EdgeInsets.symmetric(
-                  horizontal: 14,
-                  vertical: 12,
+            ConstrainedBox(
+              constraints: const BoxConstraints(maxWidth: 76),
+              child: FilledButton(
+                onPressed: onOpen,
+                style: FilledButton.styleFrom(
+                  backgroundColor: Colors.white,
+                  foregroundColor: AppColors.primary,
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 14,
+                    vertical: 12,
+                  ),
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(14),
+                  ),
                 ),
-                shape: RoundedRectangleBorder(
-                  borderRadius: BorderRadius.circular(14),
+                child: const FittedBox(
+                  fit: BoxFit.scaleDown,
+                  child: Text('Ver'),
                 ),
               ),
-              child: const Text('Ver'),
             ),
           ],
         ),
@@ -2154,44 +2164,51 @@ class _EmergencyRequestCard extends StatelessWidget {
                     ),
                   ),
                   const Gap(8),
-                  Column(
-                    crossAxisAlignment: CrossAxisAlignment.end,
-                    children: [
-                      Text(
-                        amountText,
-                        style: TextStyle(
-                          fontSize: 14,
-                          fontWeight: FontWeight.w900,
-                          color:
-                              hasOffer ? AppColors.warning : AppColors.primary,
-                        ),
-                      ),
-                      if (hasOffer) ...[
-                        const Gap(6),
-                        Container(
-                          padding: const EdgeInsets.symmetric(
-                            horizontal: 10,
-                            vertical: 5,
-                          ),
-                          decoration: BoxDecoration(
-                            color: AppColors.warningContainer,
-                            borderRadius: BorderRadius.circular(999),
-                            border: Border.all(
-                              color:
-                                  AppColors.warning.withValues(alpha: 0.28),
-                            ),
-                          ),
-                          child: const Text(
-                            'Oferta enviada',
-                            style: TextStyle(
-                              fontSize: 11,
-                              fontWeight: FontWeight.w800,
-                              color: AppColors.warning,
-                            ),
+                  ConstrainedBox(
+                    constraints: const BoxConstraints(maxWidth: 118),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.end,
+                      children: [
+                        Text(
+                          amountText,
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                          style: TextStyle(
+                            fontSize: 14,
+                            fontWeight: FontWeight.w900,
+                            color:
+                                hasOffer ? AppColors.warning : AppColors.primary,
                           ),
                         ),
+                        if (hasOffer) ...[
+                          const Gap(6),
+                          Container(
+                            padding: const EdgeInsets.symmetric(
+                              horizontal: 10,
+                              vertical: 5,
+                            ),
+                            decoration: BoxDecoration(
+                              color: AppColors.warningContainer,
+                              borderRadius: BorderRadius.circular(999),
+                              border: Border.all(
+                                color:
+                                    AppColors.warning.withValues(alpha: 0.28),
+                              ),
+                            ),
+                            child: const Text(
+                              'Oferta enviada',
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis,
+                              style: TextStyle(
+                                fontSize: 11,
+                                fontWeight: FontWeight.w800,
+                                color: AppColors.warning,
+                              ),
+                            ),
+                          ),
+                        ],
                       ],
-                    ],
+                    ),
                   ),
                 ],
               ),
@@ -2213,6 +2230,14 @@ class _EmergencyRequestCard extends StatelessWidget {
                 icon: PaymentMethods.icon(emergency.paymentMethod),
                 text: 'Pago: ${PaymentMethods.label(emergency.paymentMethod)}',
               ),
+              if (emergency.evidencePhotoUrls.isNotEmpty) ...[
+                const Gap(10),
+                EmergencyEvidencePhotos(
+                  photoUrls: emergency.evidencePhotoUrls,
+                  title: 'Evidencia visual',
+                  compact: true,
+                ),
+              ],
               const Gap(8),
               Row(
                 crossAxisAlignment: CrossAxisAlignment.start,
@@ -2283,7 +2308,10 @@ class _EmergencyRequestCard extends StatelessWidget {
                   Expanded(
                     child: OutlinedButton(
                       onPressed: onTap,
-                      child: const Text('Ver detalle'),
+                      child: const FittedBox(
+                        fit: BoxFit.scaleDown,
+                        child: Text('Ver detalle'),
+                      ),
                     ),
                   ),
                   const Gap(10),
@@ -2297,6 +2325,8 @@ class _EmergencyRequestCard extends StatelessWidget {
                       ),
                       child: Text(
                         hasOffer ? 'Oferta enviada' : 'Ofertar',
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
                       ),
                     ),
                   ),

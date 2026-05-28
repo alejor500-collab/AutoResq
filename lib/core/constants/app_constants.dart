@@ -73,6 +73,7 @@ abstract class AppConstants {
 
   // ─── Supabase Storage ──────────────────────────────────────────────────────
   static const String bucketAvatars = 'avatars';
+  static const String bucketEmergencyPhotos = 'emergency-photos';
 
   // ─── UI — "The Kinetic Calm" Design System ─────────────────────────────────
   static const double borderRadiusCard = 16.0;      // rounded-lg

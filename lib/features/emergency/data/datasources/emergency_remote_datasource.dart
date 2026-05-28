@@ -1,5 +1,6 @@
 import 'dart:async';
 import 'dart:math' as math;
+import 'dart:typed_data';
 
 import 'package:supabase_flutter/supabase_flutter.dart';
 import '../../../../core/constants/app_constants.dart';
@@ -9,6 +10,18 @@ import '../../../../core/errors/exceptions.dart';
 import '../models/emergency_ai_analysis_model.dart';
 import '../models/emergency_model.dart';
 import '../models/emergency_pricing_model.dart';
+
+class EmergencyPhotoUpload {
+  final Uint8List bytes;
+  final String fileName;
+  final String contentType;
+
+  const EmergencyPhotoUpload({
+    required this.bytes,
+    required this.fileName,
+    required this.contentType,
+  });
+}
 
 abstract class EmergencyRemoteDataSource {
   Future<EmergencyModel> createEmergency({
@@ -23,6 +36,13 @@ abstract class EmergencyRemoteDataSource {
     String aiAnalysisStatus = 'pending',
     EmergencyPriceQuote? priceQuote,
     String paymentMethod = 'cash',
+    List<EmergencyPhotoUpload> evidencePhotos = const [],
+    List<String> evidencePhotoUrls = const [],
+  });
+  Future<List<String>> uploadEmergencyEvidencePhotos({
+    required String ownerId,
+    required List<EmergencyPhotoUpload> photos,
+    String? emergencyId,
   });
   Future<void> createTechnicianOffer(
     String emergencyId, {
@@ -38,6 +58,7 @@ abstract class EmergencyRemoteDataSource {
     double? lat,
     double? lng,
     String? direccion,
+    List<String> evidenceImageUrls = const [],
   });
   Future<EmergencyModel> getEmergency(String id);
   Future<EmergencyModel?> getActiveDriverEmergency(String userId);
@@ -73,9 +94,9 @@ class EmergencyRemoteDataSourceImpl implements EmergencyRemoteDataSource {
   EmergencyRemoteDataSourceImpl(this._client);
 
   static const _selectWithJoins =
-      '*, ubicaciones(*), asignaciones(*, tecnicos(id, usuario_id, especialidad, calificacion_promedio, usuarios!usuario_id(id, nombre, telefono))), usuarios!usuario_id(id, nombre, telefono), emergency_price_snapshots(*)';
+      '*, ubicaciones(*), asignaciones(*, tecnicos(id, usuario_id, especialidad, calificacion_promedio, usuarios!usuario_id(id, nombre, telefono))), usuarios!usuario_id(id, nombre, telefono), emergency_price_snapshots(*), technician_offers(id, tecnico_id, estado, monto_ofertado)';
   static const _selectWithoutPriceSnapshots =
-      '*, ubicaciones(*), asignaciones(*, tecnicos(id, usuario_id, especialidad, calificacion_promedio, usuarios!usuario_id(id, nombre, telefono))), usuarios!usuario_id(id, nombre, telefono)';
+      '*, ubicaciones(*), asignaciones(*, tecnicos(id, usuario_id, especialidad, calificacion_promedio, usuarios!usuario_id(id, nombre, telefono))), usuarios!usuario_id(id, nombre, telefono), technician_offers(id, tecnico_id, estado, monto_ofertado)';
 
   @override
   Future<EmergencyModel> createEmergency({
@@ -90,6 +111,8 @@ class EmergencyRemoteDataSourceImpl implements EmergencyRemoteDataSource {
     String aiAnalysisStatus = 'pending',
     EmergencyPriceQuote? priceQuote,
     String paymentMethod = 'cash',
+    List<EmergencyPhotoUpload> evidencePhotos = const [],
+    List<String> evidencePhotoUrls = const [],
   }) async {
     try {
       final resolvedTipoProblemaId =
@@ -150,7 +173,42 @@ class EmergencyRemoteDataSourceImpl implements EmergencyRemoteDataSource {
         }
       }
 
-      // 4. Insert historial
+      // 4. Upload evidence photos and attach public URLs to the emergency.
+      final existingEvidenceUrls = evidencePhotoUrls
+          .map((url) => url.trim())
+          .where((url) => url.isNotEmpty)
+          .toList(growable: false);
+      final uploadedEvidenceUrls = <String>[];
+      if (existingEvidenceUrls.isEmpty && evidencePhotos.isNotEmpty) {
+        try {
+          uploadedEvidenceUrls.addAll(
+            await uploadEmergencyEvidencePhotos(
+              ownerId: usuarioId,
+              emergencyId: emergencyData['id']?.toString(),
+              photos: evidencePhotos,
+            ),
+          );
+        } catch (_) {
+          // La solicitud principal no debe quedar bloqueada por Storage.
+        }
+      }
+      final urls = existingEvidenceUrls.isNotEmpty
+          ? existingEvidenceUrls
+          : uploadedEvidenceUrls;
+      if (urls.isNotEmpty) {
+        try {
+          await _client
+              .from(AppConstants.tableEmergencias)
+              .update({'evidence_photo_urls': urls}).eq(
+            'id',
+            emergencyData['id'],
+          );
+        } on PostgrestException catch (e) {
+          if (!_looksLikeMissingEvidencePhotoColumn(e)) rethrow;
+        }
+      }
+
+      // 5. Insert historial
       await _client.from(AppConstants.tableHistorial).insert({
         'emergencia_id': emergencyData['id'],
         'actor_id': usuarioId,
@@ -162,11 +220,59 @@ class EmergencyRemoteDataSourceImpl implements EmergencyRemoteDataSource {
         _notifyTechniciansAboutEmergency(emergencyData['id']?.toString()),
       );
 
-      // 5. Fetch with joins
+      // 6. Fetch with joins
       return await getEmergency(emergencyData['id']);
     } on PostgrestException catch (e) {
       throw ServerException(message: e.message);
     }
+  }
+
+  @override
+  Future<List<String>> uploadEmergencyEvidencePhotos({
+    required String ownerId,
+    required List<EmergencyPhotoUpload> photos,
+    String? emergencyId,
+  }) async {
+    if (ownerId.trim().isEmpty || photos.isEmpty) return const [];
+    final urls = <String>[];
+    final folder = emergencyId?.trim().isNotEmpty == true
+        ? emergencyId!.trim()
+        : 'pending/$ownerId/${DateTime.now().millisecondsSinceEpoch}';
+    for (var index = 0; index < photos.length; index++) {
+      final photo = photos[index];
+      final ext = _extensionForPhoto(photo.fileName, photo.contentType);
+      final path =
+          '$folder/${DateTime.now().millisecondsSinceEpoch}_$index.$ext';
+      await _client.storage
+          .from(AppConstants.bucketEmergencyPhotos)
+          .uploadBinary(
+            path,
+            photo.bytes,
+            fileOptions: FileOptions(
+              upsert: true,
+              contentType: photo.contentType,
+            ),
+          );
+      urls.add(
+        _client.storage
+            .from(AppConstants.bucketEmergencyPhotos)
+            .getPublicUrl(path),
+      );
+    }
+    return urls;
+  }
+
+  String _extensionForPhoto(String fileName, String contentType) {
+    final lowerName = fileName.toLowerCase();
+    final ext = lowerName.contains('.') ? lowerName.split('.').last : '';
+    if (['jpg', 'jpeg', 'png', 'webp'].contains(ext)) {
+      return ext == 'jpeg' ? 'jpg' : ext;
+    }
+    return switch (contentType) {
+      'image/png' => 'png',
+      'image/webp' => 'webp',
+      _ => 'jpg',
+    };
   }
 
   Future<void> _notifyTechniciansAboutEmergency(String? emergencyId) async {
@@ -202,6 +308,7 @@ class EmergencyRemoteDataSourceImpl implements EmergencyRemoteDataSource {
     double? lat,
     double? lng,
     String? direccion,
+    List<String> evidenceImageUrls = const [],
   }) async {
     try {
       final response = await _client.functions.invoke(
@@ -212,6 +319,8 @@ class EmergencyRemoteDataSourceImpl implements EmergencyRemoteDataSource {
           if (lng != null) 'lng': lng,
           if (direccion != null && direccion.trim().isNotEmpty)
             'location': direccion,
+          if (evidenceImageUrls.isNotEmpty)
+            'image_urls': evidenceImageUrls.take(2).toList(),
         },
       );
 
@@ -437,23 +546,29 @@ class EmergencyRemoteDataSourceImpl implements EmergencyRemoteDataSource {
     String? specialty,
   ) async {
     final emergencies = await getPendingEmergencies();
+    final viewerUserId = _client.auth.currentUser?.id;
+    final visibleToViewer =
+        viewerUserId == null || viewerUserId.isEmpty
+            ? emergencies
+            : emergencies
+                .where((emergency) => emergency.usuarioId != viewerUserId)
+                .toList(growable: false);
     final normalized = TechnicianSpecialties.normalizeCode(specialty);
     final filtered = normalized == null || normalized.isEmpty
-        ? emergencies
+        ? visibleToViewer
         : () {
-            final matching = emergencies.where((emergency) {
+            final matching = visibleToViewer.where((emergency) {
               final type = emergency.aiEmergencyType ?? emergency.clasificacionIa;
               return TechnicianSpecialties.matchesEmergencyType(
                 specialtyCode: normalized,
                 emergencyType: type,
               );
             }).toList();
-            return matching.isEmpty ? emergencies : matching;
+            return matching.isEmpty ? visibleToViewer : matching;
           }();
 
     if (filtered.isEmpty) return filtered;
 
-    final viewerUserId = _client.auth.currentUser?.id;
     if (viewerUserId == null || viewerUserId.isEmpty) return filtered;
 
     try {
@@ -473,6 +588,7 @@ class EmergencyRemoteDataSourceImpl implements EmergencyRemoteDataSource {
         currentTechnicianRating:
             (technician?['calificacion_promedio'] as num?)?.toDouble() ?? 0,
       );
+      if (radiusFiltered.isEmpty) return const [];
 
       final rows = await _client
           .from(AppConstants.tableTechnicianOffers)
@@ -518,6 +634,7 @@ class EmergencyRemoteDataSourceImpl implements EmergencyRemoteDataSource {
     final current = currentFromRoster ??
         _TechnicianMatchLocation(
           id: currentTechnicianId,
+          userId: null,
           specialty: null,
           lat: currentTechnicianLat,
           lng: currentTechnicianLng,
@@ -528,6 +645,7 @@ class EmergencyRemoteDataSourceImpl implements EmergencyRemoteDataSource {
     for (final emergency in emergencies) {
       final emergencyType = emergency.aiEmergencyType ?? emergency.clasificacionIa;
       final compatibleTechnicians = technicians.values.where((technician) {
+        if (technician.userId == emergency.usuarioId) return false;
         return TechnicianSpecialties.matchesEmergencyType(
           specialtyCode: technician.specialty,
           emergencyType: emergencyType,
@@ -607,7 +725,7 @@ class EmergencyRemoteDataSourceImpl implements EmergencyRemoteDataSource {
     final rows = await _client
         .from(AppConstants.tableTecnicos)
         .select(
-          'id, especialidad, ubicacion_lat, ubicacion_lng, calificacion_promedio',
+          'id, usuario_id, especialidad, ubicacion_lat, ubicacion_lng, calificacion_promedio',
         )
         .eq('estado_verificacion', 'aprobado')
         .eq('disponible', true);
@@ -619,6 +737,7 @@ class EmergencyRemoteDataSourceImpl implements EmergencyRemoteDataSource {
       if (id == null || id.isEmpty) continue;
       technicians[id] = _TechnicianMatchLocation(
         id: id,
+        userId: data['usuario_id']?.toString(),
         specialty: data['especialidad']?.toString(),
         lat: (data['ubicacion_lat'] as num?)?.toDouble(),
         lng: (data['ubicacion_lng'] as num?)?.toDouble(),
@@ -690,6 +809,13 @@ class EmergencyRemoteDataSourceImpl implements EmergencyRemoteDataSource {
     return text.contains('payment_method') && text.contains('column');
   }
 
+  bool _looksLikeMissingEvidencePhotoColumn(PostgrestException error) {
+    final text =
+        '${error.message} ${error.details ?? ''} ${error.hint ?? ''}'
+            .toLowerCase();
+    return text.contains('evidence_photo_urls') && text.contains('column');
+  }
+
   int? _tipoProblemaIdForAiType(String? type) {
     return switch (type) {
       'Sistema eléctrico y batería' => 3,
@@ -735,6 +861,14 @@ class EmergencyRemoteDataSourceImpl implements EmergencyRemoteDataSource {
             .toList();
       }
       throw ServerException(message: e.message);
+    }
+  }
+
+  void _assertNotOwnEmergency(EmergencyModel emergency, String userId) {
+    if (emergency.usuarioId == userId) {
+      throw const ServerException(
+        message: 'No puedes responder tu propia solicitud de emergencia.',
+      );
     }
   }
 
@@ -789,6 +923,7 @@ class EmergencyRemoteDataSourceImpl implements EmergencyRemoteDataSource {
       }
 
       final currentEmergency = await getEmergency(emergencyId);
+      _assertNotOwnEmergency(currentEmergency, technicianUserId);
       if (currentEmergency.estado != AppConstants.statusPending) {
         throw const ServerException(
           message: 'Esta solicitud ya no esta disponible.',
@@ -818,6 +953,11 @@ class EmergencyRemoteDataSourceImpl implements EmergencyRemoteDataSource {
     double? offeredAmount,
   }) async {
     try {
+      final currentUserId = _client.auth.currentUser?.id;
+      if (currentUserId != null && currentUserId.isNotEmpty) {
+        final currentEmergency = await getEmergency(emergencyId);
+        _assertNotOwnEmergency(currentEmergency, currentUserId);
+      }
       await _client.rpc(
         'create_technician_offer',
         params: {
@@ -932,6 +1072,7 @@ class EmergencyRemoteDataSourceImpl implements EmergencyRemoteDataSource {
 
 class _TechnicianMatchLocation {
   final String id;
+  final String? userId;
   final String? specialty;
   final double? lat;
   final double? lng;
@@ -939,6 +1080,7 @@ class _TechnicianMatchLocation {
 
   const _TechnicianMatchLocation({
     required this.id,
+    required this.userId,
     required this.specialty,
     required this.lat,
     required this.lng,
@@ -951,6 +1093,7 @@ class _TechnicianMatchLocation {
   }) {
     return _TechnicianMatchLocation(
       id: id,
+      userId: userId,
       specialty: specialty,
       lat: lat ?? this.lat,
       lng: lng ?? this.lng,

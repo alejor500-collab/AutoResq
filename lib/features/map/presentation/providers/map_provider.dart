@@ -70,12 +70,33 @@ class MapNotifier extends StateNotifier<MapState> {
         return;
       }
 
-      final position = await Geolocator.getCurrentPosition(
-        desiredAccuracy: LocationAccuracy.high,
-      );
+      Position? position;
+      String? warningMessage;
+      try {
+        position = await Geolocator.getCurrentPosition(
+          desiredAccuracy: LocationAccuracy.high,
+        );
+      } catch (_) {
+        position = await Geolocator.getLastKnownPosition();
+        if (position != null) {
+          warningMessage =
+              'Mostrando tu ultima ubicacion conocida. Puedes ajustarla manualmente';
+        }
+      }
+
+      if (position == null) {
+        state = state.copyWith(
+          isLoading: false,
+          error:
+              'No se pudo obtener tu ubicacion. Puedes seleccionarla manualmente',
+        );
+        return;
+      }
 
       final address = await _dioClient.reverseGeocode(
-          position.latitude, position.longitude);
+        position.latitude,
+        position.longitude,
+      );
 
       state = state.copyWith(
         isLoading: false,
@@ -84,16 +105,11 @@ class MapNotifier extends StateNotifier<MapState> {
           lng: position.longitude,
           address: address,
         ),
+        error: warningMessage,
       );
     } catch (e) {
-      // Fallback to Ecuador center
       state = state.copyWith(
         isLoading: false,
-        currentLocation: const LocationEntity(
-          lat: AppConstants.defaultLat,
-          lng: AppConstants.defaultLng,
-          address: 'Ecuador',
-        ),
         error:
             'No se pudo obtener tu ubicacion. Puedes seleccionarla manualmente',
       );

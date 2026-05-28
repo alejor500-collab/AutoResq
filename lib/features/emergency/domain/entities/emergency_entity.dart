@@ -61,6 +61,7 @@ class Emergency extends Equatable {
       estado; // pendiente | en_proceso | atendida | finalizada | cancelada
   final DateTime fecha;
   final String paymentMethod;
+  final List<String> evidencePhotoUrls;
 
   // Joined data (not in emergencias table directly)
   final String? driverName;
@@ -80,6 +81,7 @@ class Emergency extends Equatable {
   final DateTime? asignacionFecha;
   final DateTime? asignacionLlegadaFecha;
   final Map<String, dynamic>? priceSnapshot;
+  final double? acceptedOfferAmount;
   final String? myOfferStatus;
   final double? myOfferedAmount;
 
@@ -103,6 +105,7 @@ class Emergency extends Equatable {
     required this.estado,
     required this.fecha,
     this.paymentMethod = 'cash',
+    this.evidencePhotoUrls = const [],
     this.driverName,
     this.driverPhone,
     this.lat,
@@ -119,6 +122,7 @@ class Emergency extends Equatable {
     this.asignacionFecha,
     this.asignacionLlegadaFecha,
     this.priceSnapshot,
+    this.acceptedOfferAmount,
     this.myOfferStatus,
     this.myOfferedAmount,
   });
@@ -132,6 +136,8 @@ class Emergency extends Equatable {
       (priceSnapshot?['estimated_total'] as num?)?.toDouble();
   String? get pricingStatus => priceSnapshot?['pricing_status'] as String?;
   bool get hasMyOffer => myOfferStatus?.trim().isNotEmpty == true;
+  double? get agreedAmount =>
+      acceptedOfferAmount ?? myOfferedAmount ?? protectedTotal ?? estimatedTotal;
 
   Emergency copyWith({
     String? id,
@@ -153,6 +159,7 @@ class Emergency extends Equatable {
     String? estado,
     DateTime? fecha,
     String? paymentMethod,
+    List<String>? evidencePhotoUrls,
     String? driverName,
     String? driverPhone,
     double? lat,
@@ -169,6 +176,7 @@ class Emergency extends Equatable {
     DateTime? asignacionFecha,
     DateTime? asignacionLlegadaFecha,
     Map<String, dynamic>? priceSnapshot,
+    double? acceptedOfferAmount,
     String? myOfferStatus,
     double? myOfferedAmount,
   }) {
@@ -194,6 +202,7 @@ class Emergency extends Equatable {
       estado: estado ?? this.estado,
       fecha: fecha ?? this.fecha,
       paymentMethod: paymentMethod ?? this.paymentMethod,
+      evidencePhotoUrls: evidencePhotoUrls ?? this.evidencePhotoUrls,
       driverName: driverName ?? this.driverName,
       driverPhone: driverPhone ?? this.driverPhone,
       lat: lat ?? this.lat,
@@ -211,6 +220,7 @@ class Emergency extends Equatable {
       asignacionLlegadaFecha:
           asignacionLlegadaFecha ?? this.asignacionLlegadaFecha,
       priceSnapshot: priceSnapshot ?? this.priceSnapshot,
+      acceptedOfferAmount: acceptedOfferAmount ?? this.acceptedOfferAmount,
       myOfferStatus: myOfferStatus ?? this.myOfferStatus,
       myOfferedAmount: myOfferedAmount ?? this.myOfferedAmount,
     );
@@ -237,6 +247,7 @@ class Emergency extends Equatable {
         estado,
         fecha,
         paymentMethod,
+        evidencePhotoUrls,
         driverName,
         driverPhone,
         lat,
@@ -253,6 +264,7 @@ class Emergency extends Equatable {
         asignacionFecha,
         asignacionLlegadaFecha,
         priceSnapshot,
+        acceptedOfferAmount,
         myOfferStatus,
         myOfferedAmount,
       ];

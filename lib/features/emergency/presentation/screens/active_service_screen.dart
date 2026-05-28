@@ -43,6 +43,17 @@ Future<void> _callPhone(BuildContext context, String? phone) async {
   }
 }
 
+double? _snapshotDouble(Emergency emergency, String key) {
+  return (emergency.priceSnapshot?[key] as num?)?.toDouble();
+}
+
+bool _isTowEmergency(Emergency emergency) {
+  return emergency.priceSnapshot?['pricing_type'] == 'distance_based' ||
+      emergency.priceSnapshot?['service_code'] == 'tow_service' ||
+      emergency.aiEmergencyType == 'tow_service' ||
+      emergency.clasificacionIa == 'Grúa / remolque';
+}
+
 // ─── Substate local para esta pantalla ───────────────────────────────────────
 final _activeSubstateProvider = StateProvider.autoDispose<String>(
   (ref) => AppConstants.assignEnRoute,
@@ -354,6 +365,21 @@ class _ActiveServiceBodyState extends ConsumerState<_ActiveServiceBody> {
     final user = ref.watch(authNotifierProvider).valueOrNull;
     final lat = emergency.lat ?? AppConstants.defaultLat;
     final lng = emergency.lng ?? AppConstants.defaultLng;
+    final towDestinationLat = _snapshotDouble(emergency, 'destination_lat');
+    final towDestinationLng = _snapshotDouble(emergency, 'destination_lng');
+    final markers = [
+      emergencyMarker(lat, lng),
+      if (_isTowEmergency(emergency) &&
+          towDestinationLat != null &&
+          towDestinationLng != null)
+        MapMarker(
+          lat: towDestinationLat,
+          lng: towDestinationLng,
+          color: AppColors.emergency,
+          icon: Icons.flag_rounded,
+          label: 'Destino',
+        ),
+    ];
     final isEnRoute = substate == AppConstants.assignEnRoute;
     final horizontal = AppResponsive.horizontalPadding(context);
     final isShort = AppResponsive.isShort(context);
@@ -374,7 +400,7 @@ class _ActiveServiceBodyState extends ConsumerState<_ActiveServiceBody> {
                     lat: lat,
                     lng: lng,
                     zoom: 15,
-                    markers: [emergencyMarker(lat, lng)],
+                    markers: markers,
                   ),
                 ),
                 SafeArea(
@@ -582,6 +608,14 @@ class _EnRoutePanel extends StatelessWidget {
             icon: PaymentMethods.icon(emergency.paymentMethod),
             text: 'Pago: ${PaymentMethods.label(emergency.paymentMethod)}',
           ),
+          if (emergency.agreedAmount != null) ...[
+            const Gap(10),
+            _ServiceInfoLine(
+              icon: Icons.local_offer_outlined,
+              text:
+                  'Precio acordado: ${AppHelpers.formatCurrency(emergency.agreedAmount!)}',
+            ),
+          ],
           const Gap(16),
 
           // Llamar + Chat
@@ -714,6 +748,14 @@ class _AttendingPanel extends StatelessWidget {
             icon: PaymentMethods.icon(emergency.paymentMethod),
             text: 'Pago: ${PaymentMethods.label(emergency.paymentMethod)}',
           ),
+          if (emergency.agreedAmount != null) ...[
+            const Gap(10),
+            _ServiceInfoLine(
+              icon: Icons.local_offer_outlined,
+              text:
+                  'Precio acordado: ${AppHelpers.formatCurrency(emergency.agreedAmount!)}',
+            ),
+          ],
           const Gap(22),
 
           // Contador
@@ -768,9 +810,7 @@ class _AttendingPanel extends StatelessWidget {
                 'driverName': emergency.driverName ?? 'Conductor',
                 'clasificacionIa': emergency.clasificacionIa,
                 'duration': elapsed,
-                'amount': emergency.protectedTotal != null
-                    ? emergency.protectedTotal!.toStringAsFixed(2)
-                    : emergency.estimatedTotal?.toStringAsFixed(2),
+                'amount': emergency.agreedAmount?.toStringAsFixed(2),
               },
             ),
           ),

@@ -107,9 +107,7 @@ class _AppTextFieldState extends State<AppTextField>
       case _FieldState.invalid:
         return AppColors.error.withValues(alpha: 0.05);
       case _FieldState.idle:
-        return _hasFocus
-            ? AppColors.surfaceContainerLowest
-            : AppColors.surfaceContainerLow;
+        return AppColors.surfaceContainerLowest;
     }
   }
 
@@ -125,7 +123,10 @@ class _AppTextFieldState extends State<AppTextField>
     }
     return OutlineInputBorder(
       borderRadius: BorderRadius.circular(24),
-      borderSide: BorderSide.none,
+      borderSide: BorderSide(
+        color: AppColors.outlineVariant.withValues(alpha: 0.85),
+        width: 1.2,
+      ),
     );
   }
 
@@ -152,17 +153,23 @@ class _AppTextFieldState extends State<AppTextField>
             padding: const EdgeInsets.only(left: 4, bottom: 8),
             child: Row(
               children: [
-                Text(
-                  widget.label,
-                  style: TextStyle(
-                    fontSize: 12,
-                    fontWeight: FontWeight.w700,
-                    letterSpacing: 0.1,
-                    color: _fieldState == _FieldState.valid
-                        ? AppColors.success
-                        : _hasFocus
-                            ? AppColors.primary
-                            : AppColors.secondary,
+                Expanded(
+                  child: Text(
+                    widget.label,
+                    maxLines: 2,
+                    overflow: TextOverflow.ellipsis,
+                    style: TextStyle(
+                      fontSize: 12,
+                      fontWeight: FontWeight.w800,
+                      letterSpacing: 0.1,
+                      color: _fieldState == _FieldState.invalid
+                          ? AppColors.error
+                          : _fieldState == _FieldState.valid
+                              ? AppColors.success
+                              : _hasFocus
+                                  ? AppColors.primary
+                                  : AppColors.onSurfaceVariant,
+                    ),
                   ),
                 ),
                 if (_fieldState == _FieldState.valid) ...[
@@ -233,11 +240,27 @@ class _AppTextFieldState extends State<AppTextField>
               decoration: InputDecoration(
                 hintText: widget.hint,
                 hintStyle: TextStyle(
-                  color: AppColors.secondary.withValues(alpha: 0.5),
+                  color: AppColors.onSurfaceVariant.withValues(alpha: 0.72),
                   fontSize: 15,
                   fontWeight: FontWeight.w400,
                 ),
-                prefixIcon: widget.prefixIcon,
+                prefixIcon: widget.prefixIcon == null
+                    ? null
+                    : IconTheme(
+                        data: IconThemeData(
+                          color: _fieldState == _FieldState.invalid
+                              ? AppColors.error
+                              : _hasFocus
+                                  ? AppColors.primary
+                                  : AppColors.onSurfaceVariant,
+                          size: 20,
+                        ),
+                        child: widget.prefixIcon!,
+                      ),
+                prefixIconConstraints: const BoxConstraints(
+                  minWidth: 48,
+                  minHeight: 48,
+                ),
                 suffixIcon: widget.obscureText
                     ? IconButton(
                         icon: Icon(
@@ -275,6 +298,13 @@ class _AppTextFieldState extends State<AppTextField>
                 focusedErrorBorder: OutlineInputBorder(
                   borderRadius: BorderRadius.circular(24),
                   borderSide: const BorderSide(color: AppColors.error, width: 1.5),
+                ),
+                errorMaxLines: 3,
+                errorStyle: const TextStyle(
+                  color: AppColors.error,
+                  fontSize: 12,
+                  fontWeight: FontWeight.w700,
+                  height: 1.35,
                 ),
               ),
             ),

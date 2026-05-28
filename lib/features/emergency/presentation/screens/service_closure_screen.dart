@@ -137,9 +137,10 @@ class _ServiceClosureScreenState extends ConsumerState<ServiceClosureScreen> {
                                   radius: 24,
                                 ),
                                 const Gap(12),
-                                Column(
-                                  crossAxisAlignment: CrossAxisAlignment.start,
-                                  children: [
+                                Expanded(
+                                  child: Column(
+                                    crossAxisAlignment: CrossAxisAlignment.start,
+                                    children: [
                                     const Text(
                                       'Cliente',
                                       style: TextStyle(
@@ -150,15 +151,18 @@ class _ServiceClosureScreenState extends ConsumerState<ServiceClosureScreen> {
                                       ),
                                     ),
                                     const Gap(2),
-                                    Text(
-                                      driverName,
-                                      style: const TextStyle(
-                                        fontSize: 18,
-                                        fontWeight: FontWeight.w700,
-                                        color: AppColors.onSurface,
+                                      Text(
+                                        driverName,
+                                        maxLines: 1,
+                                        overflow: TextOverflow.ellipsis,
+                                        style: const TextStyle(
+                                          fontSize: 18,
+                                          fontWeight: FontWeight.w700,
+                                          color: AppColors.onSurface,
+                                        ),
                                       ),
-                                    ),
-                                  ],
+                                    ],
+                                  ),
                                 ),
                               ],
                             ),
@@ -189,6 +193,8 @@ class _ServiceClosureScreenState extends ConsumerState<ServiceClosureScreen> {
                                       const Gap(4),
                                       Text(
                                         vehicleInfo ?? '—',
+                                        maxLines: 2,
+                                        overflow: TextOverflow.ellipsis,
                                         style: const TextStyle(
                                           fontSize: 15,
                                           fontWeight: FontWeight.w600,
@@ -219,12 +225,16 @@ class _ServiceClosureScreenState extends ConsumerState<ServiceClosureScreen> {
                                               size: 16,
                                               color: AppColors.onSurface),
                                           const Gap(4),
-                                          Text(
-                                            duration ?? '—',
-                                            style: const TextStyle(
-                                              fontSize: 15,
-                                              fontWeight: FontWeight.w600,
-                                              color: AppColors.onSurface,
+                                          Expanded(
+                                            child: Text(
+                                              duration ?? '—',
+                                              maxLines: 1,
+                                              overflow: TextOverflow.ellipsis,
+                                              style: const TextStyle(
+                                                fontSize: 15,
+                                                fontWeight: FontWeight.w600,
+                                                color: AppColors.onSurface,
+                                              ),
                                             ),
                                           ),
                                         ],
@@ -242,17 +252,23 @@ class _ServiceClosureScreenState extends ConsumerState<ServiceClosureScreen> {
                               padding: const EdgeInsets.fromLTRB(16, 14, 16, 0),
                               child: Row(
                                 children: [
-                                  const Text(
-                                    'Tipo de falla:',
-                                    style: TextStyle(
-                                      fontSize: 11,
-                                      fontWeight: FontWeight.w500,
-                                      color: AppColors.textSecondary,
-                                      letterSpacing: 0.3,
+                                  const Flexible(
+                                    child: Text(
+                                      'Tipo de falla:',
+                                      maxLines: 1,
+                                      overflow: TextOverflow.ellipsis,
+                                      style: TextStyle(
+                                        fontSize: 11,
+                                        fontWeight: FontWeight.w500,
+                                        color: AppColors.textSecondary,
+                                        letterSpacing: 0.3,
+                                      ),
                                     ),
                                   ),
                                   const Gap(8),
-                                  StatusChip(status: clasificacionIa),
+                                  Flexible(
+                                    child: StatusChip(status: clasificacionIa),
+                                  ),
                                 ],
                               ),
                             ),

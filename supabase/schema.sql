@@ -131,6 +131,7 @@ CREATE TABLE IF NOT EXISTS public.emergencias (
     ai_analysis_status text NOT NULL DEFAULT 'pending'
         CHECK (ai_analysis_status IN ('pending', 'completed', 'failed')),
     ai_analyzed_at timestamp with time zone,
+    evidence_photo_urls text[] NOT NULL DEFAULT ARRAY[]::text[],
     payment_method text NOT NULL DEFAULT 'cash'
         CHECK (payment_method IN ('cash', 'transfer')),
     estado           varchar(50) NOT NULL DEFAULT 'pendiente'
@@ -505,6 +506,10 @@ CREATE POLICY "asignaciones_insert_tecnico" ON public.asignaciones
         EXISTS (
             SELECT 1 FROM public.tecnicos t
             WHERE t.id = tecnico_id AND t.usuario_id = auth.uid()
+        )
+        AND EXISTS (
+            SELECT 1 FROM public.emergencias e
+            WHERE e.id = emergencia_id AND e.usuario_id <> auth.uid()
         )
     );
 

@@ -271,7 +271,7 @@ class _DriverHomeScreenState extends ConsumerState<DriverHomeScreen> {
     final lat = mapState.currentLocation?.lat ?? AppConstants.defaultLat;
     final lng = mapState.currentLocation?.lng ?? AppConstants.defaultLng;
     final address =
-        mapState.error ?? mapState.currentLocation?.address ?? 'Ecuador';
+        mapState.currentLocation?.address ?? mapState.error ?? 'Ubicación no disponible';
     final horizontal = AppResponsive.horizontalPadding(context);
     final topInset = MediaQuery.of(context).padding.top;
 

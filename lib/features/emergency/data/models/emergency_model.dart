@@ -21,6 +21,7 @@ class EmergencyModel extends Emergency {
     required super.estado,
     required super.fecha,
     super.paymentMethod,
+    super.evidencePhotoUrls,
     super.driverName,
     super.driverPhone,
     super.lat,
@@ -37,6 +38,7 @@ class EmergencyModel extends Emergency {
     super.asignacionFecha,
     super.asignacionLlegadaFecha,
     super.priceSnapshot,
+    super.acceptedOfferAmount,
     super.myOfferStatus,
     super.myOfferedAmount,
   });
@@ -106,6 +108,11 @@ class EmergencyModel extends Emergency {
       }
     }
 
+    final acceptedOfferAmount = _acceptedOfferAmount(
+      json['technician_offers'],
+      tecnicoId: tecnicoId,
+    );
+
     return EmergencyModel(
       id: json['id'] as String,
       usuarioId: json['usuario_id'] as String,
@@ -130,6 +137,7 @@ class EmergencyModel extends Emergency {
       estado: json['estado'] as String? ?? 'pendiente',
       fecha: DateTime.parse(json['fecha'] as String),
       paymentMethod: json['payment_method'] as String? ?? 'cash',
+      evidencePhotoUrls: _parseStringList(json['evidence_photo_urls']),
       driverName: _firstMap(json['usuarios'])['nombre'] as String?,
       driverPhone: _firstMap(json['usuarios'])['telefono'] as String?,
       lat: lat,
@@ -146,6 +154,7 @@ class EmergencyModel extends Emergency {
       asignacionFecha: asignacionFecha,
       asignacionLlegadaFecha: asignacionLlegadaFecha,
       priceSnapshot: priceSnapshot,
+      acceptedOfferAmount: acceptedOfferAmount,
       myOfferStatus: json['my_offer_status'] as String?,
       myOfferedAmount: (json['my_offered_amount'] as num?)?.toDouble(),
     );
@@ -172,6 +181,7 @@ class EmergencyModel extends Emergency {
     String? estado,
     DateTime? fecha,
     String? paymentMethod,
+    List<String>? evidencePhotoUrls,
     String? driverName,
     String? driverPhone,
     double? lat,
@@ -188,6 +198,7 @@ class EmergencyModel extends Emergency {
     DateTime? asignacionFecha,
     DateTime? asignacionLlegadaFecha,
     Map<String, dynamic>? priceSnapshot,
+    double? acceptedOfferAmount,
     String? myOfferStatus,
     double? myOfferedAmount,
   }) {
@@ -213,6 +224,7 @@ class EmergencyModel extends Emergency {
       estado: estado ?? this.estado,
       fecha: fecha ?? this.fecha,
       paymentMethod: paymentMethod ?? this.paymentMethod,
+      evidencePhotoUrls: evidencePhotoUrls ?? this.evidencePhotoUrls,
       driverName: driverName ?? this.driverName,
       driverPhone: driverPhone ?? this.driverPhone,
       lat: lat ?? this.lat,
@@ -230,6 +242,7 @@ class EmergencyModel extends Emergency {
       asignacionLlegadaFecha:
           asignacionLlegadaFecha ?? this.asignacionLlegadaFecha,
       priceSnapshot: priceSnapshot ?? this.priceSnapshot,
+      acceptedOfferAmount: acceptedOfferAmount ?? this.acceptedOfferAmount,
       myOfferStatus: myOfferStatus ?? this.myOfferStatus,
       myOfferedAmount: myOfferedAmount ?? this.myOfferedAmount,
     );
@@ -258,7 +271,20 @@ class EmergencyModel extends Emergency {
         'ai_analyzed_at': aiAnalyzedAt!.toIso8601String(),
       'estado': estado,
       'payment_method': paymentMethod,
+      if (evidencePhotoUrls.isNotEmpty)
+        'evidence_photo_urls': evidencePhotoUrls,
     };
+  }
+
+  static List<String> _parseStringList(dynamic value) {
+    if (value is List) {
+      return value
+          .whereType<String>()
+          .map((item) => item.trim())
+          .where((item) => item.isNotEmpty)
+          .toList(growable: false);
+    }
+    return const [];
   }
 
   static Map<String, dynamic> _firstMap(dynamic value) {
@@ -295,6 +321,24 @@ class EmergencyModel extends Emergency {
     });
 
     return rows.first;
+  }
+
+  static double? _acceptedOfferAmount(
+    dynamic value, {
+    required String? tecnicoId,
+  }) {
+    if (value == null) return null;
+    final rows = value is List ? value : [value];
+    for (final row in rows.whereType<Map>()) {
+      final data = Map<String, dynamic>.from(row);
+      final status = data['estado']?.toString();
+      final offerTechnicianId = data['tecnico_id']?.toString();
+      if (status == 'aceptada' &&
+          (tecnicoId == null || offerTechnicianId == tecnicoId)) {
+        return (data['monto_ofertado'] as num?)?.toDouble();
+      }
+    }
+    return null;
   }
 
   static int _assignmentRank(String? status) {

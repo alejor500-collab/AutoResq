@@ -1,4 +1,5 @@
 ﻿import 'dart:ui';
+import 'dart:typed_data';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_map/flutter_map.dart';
@@ -10,6 +11,7 @@ import '../../../../core/constants/app_colors.dart';
 import '../../../../core/constants/app_constants.dart';
 import '../../../../core/constants/emergency_match_policy.dart';
 import '../../../../core/constants/payment_methods.dart';
+import '../../../../core/network/dio_client.dart';
 import '../../../../core/router/app_router.dart';
 import '../../../../core/utils/helpers.dart';
 import '../../../../shared/providers/auth_provider.dart';
@@ -34,75 +36,17 @@ class CreateEmergencyScreen extends ConsumerStatefulWidget {
 
 class _CreateEmergencyScreenState extends ConsumerState<CreateEmergencyScreen> {
   final _descCtrl = TextEditingController();
-  static const Set<String> _vehicleContextKeywords = {
-    'auto',
-    'carro',
-    'coche',
-    'vehiculo',
-    'vehículo',
-    'camioneta',
-    'camión',
-    'camion',
-    'moto',
-    'motor',
-    'llanta',
-    'llantas',
-    'bateria',
-    'batería',
-    'gasolina',
-    'combustible',
-    'grua',
-    'grúa',
-    'remolque',
-    'llave',
-    'puerta',
-    'freno',
-    'frenos',
-    'radiador',
-  };
-  static const Set<String> _problemKeywords = {
-    'pinchada',
-    'pinchado',
-    'daño',
-    'danio',
-    'falla',
-    'averia',
-    'avería',
-    'enciende',
-    'encender',
-    'apago',
-    'apagó',
-    'apagado',
-    'boto',
-    'botó',
-    'humo',
-    'ruido',
-    'vibracion',
-    'vibración',
-    'calienta',
-    'calentando',
-    'descargada',
-    'descargado',
-    'trabado',
-    'trabada',
-    'cerrado',
-    'cerrada',
-    'abierta',
-    'abierto',
-    'frena',
-    'frenar',
-    'fuga',
-    'fugando',
-    'sin',
-    'quedo',
-    'quedó',
-  };
+  static const int _minDescriptionLength = 8;
+  static const int _maxDescriptionLength = 1800;
   int _currentStep = 0;
   EmergencyAiAnalysisModel? _aiResult;
   EmergencyPriceQuote? _pricingQuote;
   LocationEntity? _destinationLocation;
+  final List<XFile> _attachments = [];
+  List<String> _evidencePhotoUrls = const [];
   bool _aiAnalysisAttempted = false;
   bool _isPricingLoading = false;
+  bool _isUploadingEvidence = false;
   String _paymentMethod = PaymentMethods.cash;
 
   @override
@@ -124,42 +68,33 @@ class _CreateEmergencyScreenState extends ConsumerState<CreateEmergencyScreen> {
   }
 
   String? _validateEmergencyDescription(String rawValue) {
-    final value = rawValue.trim();
-    if (value.isEmpty) {
-      return 'Describe primero el problema.';
+    final normalized = _normalizedEmergencyDescription(rawValue);
+    if (normalized.isEmpty) {
+      return 'Cuéntanos qué está pasando con tu vehículo para poder pedir ayuda.';
     }
-
-    final normalized = value
-        .toLowerCase()
-        .replaceAll(RegExp(r'[^\w\sáéíóúüñ]'), ' ')
-        .replaceAll(RegExp(r'\s+'), ' ')
-        .trim();
-    final words = normalized.split(' ').where((word) => word.isNotEmpty).toList();
-
-    if (value.length < 12 || words.length < 3) {
-      return 'Escribe una descripción más clara del problema vehicular.';
+    if (normalized.length < _minDescriptionLength) {
+      return 'Agrega un poco más de detalle. Por ejemplo: “se apagó en la vía”, “necesito grúa” o “no enciende”.';
     }
-
-    final uniqueWords = words.toSet().length;
-    if (uniqueWords <= 1) {
-      return 'La descripción no parece válida. Intenta explicar qué le ocurre al vehículo.';
+    if (normalized.length > _maxDescriptionLength) {
+      return 'La descripción es muy larga. Resume lo más importante en menos de $_maxDescriptionLength caracteres.';
     }
-
-    final hasRepeatedNoise = RegExp(r'(.)\1{4,}').hasMatch(normalized);
-    if (hasRepeatedNoise) {
-      return 'La descripción parece incoherente. Escribe el problema con palabras normales.';
+    final meaningfulChars = normalized.replaceAll(
+      RegExp(r'[^A-Za-z0-9ÁÉÍÓÚÜÑáéíóúüñ]'),
+      '',
+    );
+    if (meaningfulChars.length < _minDescriptionLength) {
+      return 'Escribe el problema con palabras. La IA puede interpretar tu descripción aunque sea breve.';
     }
-
-    final hasVehicleContext =
-        words.any((word) => _vehicleContextKeywords.contains(word));
-    final hasProblemContext =
-        words.any((word) => _problemKeywords.contains(word));
-
-    if (!hasVehicleContext || !hasProblemContext) {
-      return 'Describe un problema real del vehículo, por ejemplo que no enciende, que la llanta está pinchada o que te quedaste sin batería.';
+    if (RegExp(r'(.)\1{7,}', unicode: true).hasMatch(meaningfulChars)) {
+      return 'Parece que hay caracteres repetidos. Escribe una frase corta sobre lo que ocurre.';
     }
-
     return null;
+  }
+
+  String _normalizedEmergencyDescription(String rawValue) {
+    return rawValue
+        .trim()
+        .replaceAll(RegExp(r'\s+'), ' ');
   }
 
   Future<void> _showInvalidDescriptionDialog(String message) async {
@@ -170,7 +105,7 @@ class _CreateEmergencyScreenState extends ConsumerState<CreateEmergencyScreen> {
           shape: RoundedRectangleBorder(
             borderRadius: BorderRadius.circular(24),
           ),
-          title: const Text('Descripción no válida'),
+          title: const Text('Completa la descripción'),
           content: Text(message),
           actions: [
             FilledButton(
@@ -184,18 +119,22 @@ class _CreateEmergencyScreenState extends ConsumerState<CreateEmergencyScreen> {
   }
 
   Future<void> _analyzeAI() async {
-    final validationMessage = _validateEmergencyDescription(_descCtrl.text);
+    final description = _normalizedEmergencyDescription(_descCtrl.text);
+    final validationMessage = _validateEmergencyDescription(description);
     if (validationMessage != null) {
       await _showInvalidDescriptionDialog(validationMessage);
       return;
     }
+    final evidenceUrls = await _ensureEvidenceUploaded();
+    if (!mounted || evidenceUrls == null) return;
     final mapState = ref.read(mapNotifierProvider);
     final result =
         await ref.read(emergencyNotifierProvider.notifier).analyzeWithAI(
-              _descCtrl.text.trim(),
+              description,
               lat: mapState.currentLocation?.lat,
               lng: mapState.currentLocation?.lng,
               address: mapState.currentLocation?.address,
+              evidencePhotoUrls: evidenceUrls,
             );
     if (!mounted) return;
     setState(() {
@@ -212,7 +151,7 @@ class _CreateEmergencyScreenState extends ConsumerState<CreateEmergencyScreen> {
     final lng = mapState.currentLocation?.lng ?? AppConstants.defaultLng;
     final serviceCode = EmergencyPricingService.serviceCodeFromAnalysis(
       aiType: _aiResult?.emergencyType,
-      description: _descCtrl.text.trim(),
+      description: _normalizedEmergencyDescription(_descCtrl.text),
       confidence: _aiResult?.confidence ?? 0,
     );
 
@@ -260,7 +199,8 @@ class _CreateEmergencyScreenState extends ConsumerState<CreateEmergencyScreen> {
   }
 
   Future<void> _createEmergency() async {
-    final validationMessage = _validateEmergencyDescription(_descCtrl.text);
+    final description = _normalizedEmergencyDescription(_descCtrl.text);
+    final validationMessage = _validateEmergencyDescription(description);
     if (validationMessage != null) {
       await _showInvalidDescriptionDialog(validationMessage);
       return;
@@ -314,6 +254,8 @@ class _CreateEmergencyScreenState extends ConsumerState<CreateEmergencyScreen> {
     final lat = mapState.currentLocation?.lat ?? AppConstants.defaultLat;
     final lng = mapState.currentLocation?.lng ?? AppConstants.defaultLng;
     final address = mapState.currentLocation?.address;
+    final evidenceUrls = await _ensureEvidenceUploaded();
+    if (!mounted || evidenceUrls == null) return;
 
     AiAnalysis? aiAnalysis;
     if (_aiResult != null) {
@@ -330,7 +272,7 @@ class _CreateEmergencyScreenState extends ConsumerState<CreateEmergencyScreen> {
 
     final emergency =
         await ref.read(emergencyNotifierProvider.notifier).createEmergency(
-              description: _descCtrl.text.trim(),
+              description: description,
               lat: lat,
               lng: lng,
               address: address,
@@ -338,6 +280,8 @@ class _CreateEmergencyScreenState extends ConsumerState<CreateEmergencyScreen> {
               skipAiAnalysis: _aiAnalysisAttempted && aiAnalysis == null,
               priceQuote: quote,
               paymentMethod: _paymentMethod,
+              evidencePhotos: _attachments,
+              evidencePhotoUrls: evidenceUrls,
             );
 
     if (!mounted) return;
@@ -351,6 +295,41 @@ class _CreateEmergencyScreenState extends ConsumerState<CreateEmergencyScreen> {
         error ?? 'No se pudo crear la emergencia. Intenta nuevamente.',
         isError: true,
       );
+    }
+  }
+
+  Future<List<String>?> _ensureEvidenceUploaded() async {
+    if (_attachments.isEmpty) return const [];
+    if (_evidencePhotoUrls.length == _attachments.length) {
+      return _evidencePhotoUrls;
+    }
+
+    setState(() => _isUploadingEvidence = true);
+    try {
+      final urls = await ref
+          .read(emergencyNotifierProvider.notifier)
+          .uploadEvidencePhotos(_attachments);
+      if (!mounted) return null;
+      if (urls.length != _attachments.length) {
+        AppHelpers.showSnackBar(
+          context,
+          'No se pudieron subir todas las fotos. Intenta nuevamente o elimina las fotos para continuar.',
+          isError: true,
+        );
+        return null;
+      }
+      setState(() => _evidencePhotoUrls = urls);
+      return urls;
+    } catch (_) {
+      if (!mounted) return null;
+      AppHelpers.showSnackBar(
+        context,
+        'No se pudieron subir las fotos. Revisa tu conexion e intenta nuevamente.',
+        isError: true,
+      );
+      return null;
+    } finally {
+      if (mounted) setState(() => _isUploadingEvidence = false);
     }
   }
 
@@ -553,11 +532,25 @@ class _CreateEmergencyScreenState extends ConsumerState<CreateEmergencyScreen> {
                       1 => _DescriptionStep(
                           controller: _descCtrl,
                           isAnalyzing: emergencyState.isAnalyzingAI,
+                          attachments: _attachments,
+                          onAttachmentsChanged: (photos) {
+                            setState(() {
+                              _attachments
+                                ..clear()
+                                ..addAll(photos);
+                              _evidencePhotoUrls = const [];
+                              if (_currentStep < 2) {
+                                _aiResult = null;
+                                _aiAnalysisAttempted = false;
+                              }
+                            });
+                          },
                         ),
                       2 => _DiagnosticStep(
                           result: _aiResult,
                           pricingQuote: _pricingQuote,
                           isPricingLoading: _isPricingLoading,
+                          origin: mapState.currentLocation,
                           destination: _destinationLocation,
                           onSelectDestination: _selectTowDestination,
                           paymentMethod: _paymentMethod,
@@ -637,7 +630,7 @@ class _CreateEmergencyScreenState extends ConsumerState<CreateEmergencyScreen> {
       case 0:
         return 'Confirma donde necesitas la asistencia tecnica.';
       case 1:
-        return 'Describe el problema con tu vehiculo.';
+        return 'Escribe con tus palabras. La IA lo interpretará para el técnico.';
       case 2:
         return 'Resultado del análisis inteligente.';
       default:
@@ -655,18 +648,24 @@ class _CreateEmergencyScreenState extends ConsumerState<CreateEmergencyScreen> {
         );
       case 1:
         return _GradientActionButton(
-          label: emergencyState.isAnalyzingAI
+          label: _isUploadingEvidence
+              ? 'Subiendo fotos...'
+              : emergencyState.isAnalyzingAI
               ? 'Analizando...'
               : 'Analizar con IA',
           icon: Icons.psychology,
-          isLoading: emergencyState.isAnalyzingAI,
-          onPressed: emergencyState.isAnalyzingAI ? null : _analyzeAI,
+          isLoading: emergencyState.isAnalyzingAI || _isUploadingEvidence,
+          onPressed: emergencyState.isAnalyzingAI || _isUploadingEvidence
+              ? null
+              : _analyzeAI,
         );
       case 2:
         final needsDestination =
             _pricingQuote?.pricingStatus == 'pending_destination';
         return _GradientActionButton(
-          label: _isPricingLoading
+          label: _isUploadingEvidence
+              ? 'Subiendo fotos...'
+              : _isPricingLoading
               ? 'Calculando tarifa...'
               : emergencyState.isLoading
                   ? 'Enviando...'
@@ -675,8 +674,11 @@ class _CreateEmergencyScreenState extends ConsumerState<CreateEmergencyScreen> {
                       : 'Publicar solicitud',
           icon: needsDestination ? Icons.map_outlined : Icons.arrow_forward,
           isEmergency: !needsDestination,
-          isLoading: emergencyState.isLoading || _isPricingLoading,
-          onPressed: emergencyState.isLoading || _isPricingLoading
+          isLoading:
+              emergencyState.isLoading || _isPricingLoading || _isUploadingEvidence,
+          onPressed: emergencyState.isLoading ||
+                  _isPricingLoading ||
+                  _isUploadingEvidence
               ? null
               : needsDestination
                   ? _selectTowDestination
@@ -733,6 +735,19 @@ class _LocationStep extends StatelessWidget {
   Widget build(BuildContext context) {
     final lat = mapState.currentLocation?.lat ?? AppConstants.defaultLat;
     final lng = mapState.currentLocation?.lng ?? AppConstants.defaultLng;
+    final hasPreciseLocation = mapState.currentLocation != null;
+    final displayAddress = mapState.isLoading
+        ? 'Obteniendo ubicacion...'
+        : mapState.currentLocation?.address ??
+            mapState.error ??
+            'Ubicacion por confirmar';
+    final coordinatesLabel = hasPreciseLocation
+        ? 'Coordenadas exactas: ${DioClient.formatCoordinates(lat, lng)}'
+        : 'Selecciona o confirma tu ubicacion exacta en el mapa';
+    final helperLabel = mapState.error != null && hasPreciseLocation
+        ? mapState.error
+        : coordinatesLabel;
+    final hasLocationWarning = mapState.error != null;
 
     return Container(
       decoration: BoxDecoration(
@@ -824,29 +839,48 @@ class _LocationStep extends StatelessWidget {
                 Positioned(
                   bottom: 16,
                   left: 16,
-                  child: Container(
-                    padding:
-                        const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                  right: 16,
+                  child: Align(
+                    alignment: Alignment.centerLeft,
+                    child: Container(
+                      constraints: const BoxConstraints(maxWidth: 260),
+                      padding:
+                          const EdgeInsets.symmetric(horizontal: 12, vertical: 7),
                     decoration: BoxDecoration(
-                      color: AppColors.primary,
+                      color: hasPreciseLocation
+                          ? AppColors.primary
+                          : AppColors.warning,
                       borderRadius: BorderRadius.circular(9999),
                     ),
-                    child: const Row(
+                    child: Row(
                       mainAxisSize: MainAxisSize.min,
                       children: [
-                        Icon(Icons.my_location, color: Colors.white, size: 12),
-                        Gap(6),
-                        Text(
-                          'DETECCION EN VIVO',
+                        Icon(
+                          hasPreciseLocation
+                              ? Icons.my_location
+                              : Icons.location_searching_rounded,
+                          color: Colors.white,
+                          size: 13,
+                        ),
+                        const Gap(6),
+                        Flexible(
+                          child: Text(
+                            hasPreciseLocation
+                                ? 'UBICACION DETECTADA'
+                                : 'CONFIRMA TU UBICACION',
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
                           style: TextStyle(
                             color: Colors.white,
                             fontSize: 10,
                             fontWeight: FontWeight.w800,
-                            letterSpacing: 1.5,
+                            letterSpacing: 1.0,
+                          ),
                           ),
                         ),
                       ],
                     ),
+                  ),
                   ),
                 ),
               ],
@@ -868,21 +902,12 @@ class _LocationStep extends StatelessWidget {
                   ),
                 ),
                 const Gap(6),
-                Wrap(
-                  spacing: 8,
-                  runSpacing: 4,
-                  crossAxisAlignment: WrapCrossAlignment.center,
+                Row(
+                  crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    ConstrainedBox(
-                      constraints: BoxConstraints(
-                        maxWidth: MediaQuery.sizeOf(context).width - 128,
-                      ),
+                    Expanded(
                       child: Text(
-                        mapState.isLoading
-                            ? 'Obteniendo ubicacion...'
-                            : mapState.error ??
-                                mapState.currentLocation?.address ??
-                                'Ecuador',
+                        displayAddress,
                         maxLines: 2,
                         overflow: TextOverflow.ellipsis,
                         style: const TextStyle(
@@ -892,6 +917,7 @@ class _LocationStep extends StatelessWidget {
                         ),
                       ),
                     ),
+                    const Gap(8),
                     TextButton(
                       onPressed: onEdit,
                       child: const Text(
@@ -905,11 +931,15 @@ class _LocationStep extends StatelessWidget {
                     ),
                   ],
                 ),
-                const Text(
-                  'Cobertura nacional en Ecuador',
+                Text(
+                  helperLabel,
                   style: TextStyle(
                     fontSize: 13,
-                    color: AppColors.secondary,
+                    fontWeight:
+                        hasLocationWarning ? FontWeight.w700 : FontWeight.w500,
+                    height: 1.35,
+                    color:
+                        hasLocationWarning ? AppColors.error : AppColors.secondary,
                   ),
                 ),
               ],
@@ -926,10 +956,14 @@ class _LocationStep extends StatelessWidget {
 class _DescriptionStep extends StatefulWidget {
   final TextEditingController controller;
   final bool isAnalyzing;
+  final List<XFile> attachments;
+  final ValueChanged<List<XFile>> onAttachmentsChanged;
 
   const _DescriptionStep({
     required this.controller,
     required this.isAnalyzing,
+    required this.attachments,
+    required this.onAttachmentsChanged,
   });
 
   @override
@@ -938,17 +972,25 @@ class _DescriptionStep extends StatefulWidget {
 
 class _DescriptionStepState extends State<_DescriptionStep> {
   final _picker = ImagePicker();
-  final List<XFile> _attachments = [];
 
   Future<void> _pickImage(ImageSource source) async {
     try {
       final image = await _picker.pickImage(
         source: source,
-        imageQuality: 80,
-        maxWidth: 1280,
+        imageQuality: 72,
+        maxWidth: 1024,
+        maxHeight: 1024,
       );
       if (image == null || !mounted) return;
-      setState(() => _attachments.add(image));
+      if (widget.attachments.length >= 3) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('Puedes adjuntar hasta 3 fotos por solicitud'),
+          ),
+        );
+        return;
+      }
+      widget.onAttachmentsChanged([...widget.attachments, image]);
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
           content: Text(
@@ -970,6 +1012,11 @@ class _DescriptionStepState extends State<_DescriptionStep> {
         ),
       );
     }
+  }
+
+  void _removeImage(int index) {
+    final updated = [...widget.attachments]..removeAt(index);
+    widget.onAttachmentsChanged(updated);
   }
 
   @override
@@ -1032,12 +1079,22 @@ class _DescriptionStepState extends State<_DescriptionStep> {
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               const Text(
-                'DESCRIBE TU PROBLEMA',
+                'CUÉNTANOS QUÉ PASÓ',
                 style: TextStyle(
-                  fontSize: 10,
-                  fontWeight: FontWeight.w700,
-                  letterSpacing: 1,
-                  color: AppColors.secondary,
+                  fontSize: 11,
+                  fontWeight: FontWeight.w900,
+                  letterSpacing: 0.8,
+                  color: AppColors.onSurfaceVariant,
+                ),
+              ),
+              const Gap(6),
+              const Text(
+                'Puedes escribir libremente: síntomas, ruido, ubicación, si necesitas grúa o cualquier detalle útil. No tienes que elegir palabras exactas.',
+                style: TextStyle(
+                  fontSize: 13,
+                  height: 1.4,
+                  fontWeight: FontWeight.w600,
+                  color: AppColors.textSecondary,
                 ),
               ),
               const Gap(12),
@@ -1045,6 +1102,7 @@ class _DescriptionStepState extends State<_DescriptionStep> {
                 controller: widget.controller,
                 minLines: 5,
                 maxLines: 6,
+                maxLength: _CreateEmergencyScreenState._maxDescriptionLength,
                 textAlignVertical: TextAlignVertical.top,
                 style: const TextStyle(
                   fontSize: 16,
@@ -1053,31 +1111,30 @@ class _DescriptionStepState extends State<_DescriptionStep> {
                 ),
                 decoration: InputDecoration(
                   hintText:
-                      'Ej: Mi auto no enciende y hace un ruido metalico al girar la llave...',
+                      'Ej: Se apagó en la vía y no vuelve a encender. Estoy a un lado de la carretera.',
                   hintStyle: const TextStyle(
-                    color: AppColors.secondaryContainer,
-                    fontSize: 16,
-                    height: 1.35,
+                    color: AppColors.textSecondary,
+                    fontSize: 15,
+                    height: 1.4,
+                    fontWeight: FontWeight.w500,
                   ),
                   filled: true,
-                  fillColor: AppColors.surfaceContainerLow,
+                  fillColor: AppColors.surfaceContainerLowest,
                   border: OutlineInputBorder(
-                    borderRadius: BorderRadius.circular(14),
+                    borderRadius: BorderRadius.circular(18),
                     borderSide: BorderSide(
-                      color: AppColors.onSurface.withValues(alpha: 0.08),
+                      color: AppColors.outlineVariant,
                     ),
                   ),
                   enabledBorder: OutlineInputBorder(
-                    borderRadius: BorderRadius.circular(14),
-                    borderSide: BorderSide(
-                      color: AppColors.onSurface.withValues(alpha: 0.08),
-                    ),
+                    borderRadius: BorderRadius.circular(18),
+                    borderSide: const BorderSide(color: AppColors.outlineVariant),
                   ),
                   focusedBorder: OutlineInputBorder(
-                    borderRadius: BorderRadius.circular(14),
+                    borderRadius: BorderRadius.circular(18),
                     borderSide: const BorderSide(
                       color: AppColors.primary,
-                      width: 1.4,
+                      width: 2,
                     ),
                   ),
                   contentPadding:
@@ -1102,44 +1159,149 @@ class _DescriptionStepState extends State<_DescriptionStep> {
                   ),
                 ],
               ),
-              if (_attachments.isNotEmpty) ...[
+              if (widget.attachments.isNotEmpty) ...[
                 const Gap(12),
-                Container(
-                  width: double.infinity,
-                  padding:
-                      const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
-                  decoration: BoxDecoration(
-                    color: AppColors.primary.withValues(alpha: 0.08),
-                    borderRadius: BorderRadius.circular(12),
-                    border: Border.all(
-                      color: AppColors.primary.withValues(alpha: 0.14),
-                    ),
-                  ),
-                  child: Row(
-                    children: [
-                      const Icon(
-                        Icons.check_circle_outline,
-                        size: 18,
-                        color: AppColors.primary,
-                      ),
-                      const Gap(8),
-                      Expanded(
-                        child: Text(
-                          '${_attachments.length} foto${_attachments.length == 1 ? '' : 's'} agregada${_attachments.length == 1 ? '' : 's'}',
-                          maxLines: 1,
-                          overflow: TextOverflow.ellipsis,
-                          style: const TextStyle(
-                            fontSize: 13,
-                            fontWeight: FontWeight.w600,
-                            color: AppColors.primary,
-                          ),
-                        ),
-                      ),
-                    ],
-                  ),
+                _SelectedPhotoStrip(
+                  photos: widget.attachments,
+                  onRemove: _removeImage,
                 ),
               ],
             ],
+          ),
+        ),
+      ],
+    );
+  }
+}
+
+class _SelectedPhotoStrip extends StatelessWidget {
+  final List<XFile> photos;
+  final ValueChanged<int> onRemove;
+
+  const _SelectedPhotoStrip({
+    required this.photos,
+    required this.onRemove,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.all(12),
+      decoration: BoxDecoration(
+        color: AppColors.primary.withValues(alpha: 0.08),
+        borderRadius: BorderRadius.circular(14),
+        border: Border.all(
+          color: AppColors.primary.withValues(alpha: 0.14),
+        ),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              const Icon(
+                Icons.check_circle_outline,
+                size: 18,
+                color: AppColors.primary,
+              ),
+              const Gap(8),
+              Expanded(
+                child: Text(
+                  '${photos.length} foto${photos.length == 1 ? '' : 's'} agregada${photos.length == 1 ? '' : 's'} para el analisis y el tecnico',
+                  maxLines: 2,
+                  overflow: TextOverflow.ellipsis,
+                  style: const TextStyle(
+                    fontSize: 13,
+                    fontWeight: FontWeight.w700,
+                    color: AppColors.primary,
+                    height: 1.25,
+                  ),
+                ),
+              ),
+            ],
+          ),
+          const Gap(10),
+          SizedBox(
+            height: 72,
+            child: ListView.separated(
+              scrollDirection: Axis.horizontal,
+              itemCount: photos.length,
+              separatorBuilder: (_, __) => const Gap(8),
+              itemBuilder: (context, index) {
+                return _SelectedPhotoThumb(
+                  photo: photos[index],
+                  onRemove: () => onRemove(index),
+                );
+              },
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _SelectedPhotoThumb extends StatelessWidget {
+  final XFile photo;
+  final VoidCallback onRemove;
+
+  const _SelectedPhotoThumb({
+    required this.photo,
+    required this.onRemove,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return Stack(
+      clipBehavior: Clip.none,
+      children: [
+        ClipRRect(
+          borderRadius: BorderRadius.circular(12),
+          child: FutureBuilder<Uint8List>(
+            future: photo.readAsBytes(),
+            builder: (context, snapshot) {
+              if (!snapshot.hasData) {
+                return Container(
+                  width: 72,
+                  height: 72,
+                  color: AppColors.surfaceContainerHigh,
+                  child: const Center(
+                    child: SizedBox(
+                      width: 18,
+                      height: 18,
+                      child: CircularProgressIndicator(strokeWidth: 2),
+                    ),
+                  ),
+                );
+              }
+              return Image.memory(
+                snapshot.data!,
+                width: 72,
+                height: 72,
+                fit: BoxFit.cover,
+              );
+            },
+          ),
+        ),
+        Positioned(
+          top: -8,
+          right: -8,
+          child: Material(
+            color: AppColors.error,
+            shape: const CircleBorder(),
+            child: InkWell(
+              customBorder: const CircleBorder(),
+              onTap: onRemove,
+              child: const Padding(
+                padding: EdgeInsets.all(4),
+                child: Icon(
+                  Icons.close_rounded,
+                  size: 14,
+                  color: Colors.white,
+                ),
+              ),
+            ),
           ),
         ),
       ],
@@ -1194,6 +1356,7 @@ class _DiagnosticStep extends StatelessWidget {
   final EmergencyAiAnalysisModel? result;
   final EmergencyPriceQuote? pricingQuote;
   final bool isPricingLoading;
+  final LocationEntity? origin;
   final LocationEntity? destination;
   final VoidCallback onSelectDestination;
   final String paymentMethod;
@@ -1203,6 +1366,7 @@ class _DiagnosticStep extends StatelessWidget {
     required this.result,
     required this.pricingQuote,
     required this.isPricingLoading,
+    required this.origin,
     required this.destination,
     required this.onSelectDestination,
     required this.paymentMethod,
@@ -1415,6 +1579,15 @@ class _DiagnosticStep extends StatelessWidget {
             destination: destination,
             onSelectDestination: onSelectDestination,
           ),
+          if (pricingQuote?.pricingType == 'distance_based' ||
+              EmergencyMatchPolicy.isTowCategory(categoria)) ...[
+            const Gap(14),
+            _TowRoutePreview(
+              origin: origin,
+              destination: destination,
+              onSelectDestination: onSelectDestination,
+            ),
+          ],
           const Gap(14),
           _PaymentMethodCard(
             selected: paymentMethod,
@@ -1691,6 +1864,172 @@ class _PaymentOption extends StatelessWidget {
           ],
         ),
       ),
+    );
+  }
+}
+
+class _TowRoutePreview extends StatelessWidget {
+  final LocationEntity? origin;
+  final LocationEntity? destination;
+  final VoidCallback onSelectDestination;
+
+  const _TowRoutePreview({
+    required this.origin,
+    required this.destination,
+    required this.onSelectDestination,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final originPoint = LatLng(
+      origin?.lat ?? AppConstants.defaultLat,
+      origin?.lng ?? AppConstants.defaultLng,
+    );
+    final destinationPoint = destination == null
+        ? null
+        : LatLng(destination!.lat, destination!.lng);
+    final points = [
+      originPoint,
+      if (destinationPoint != null) destinationPoint,
+    ];
+
+    return Container(
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(color: AppColors.emergency.withValues(alpha: 0.18)),
+      ),
+      clipBehavior: Clip.antiAlias,
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          SizedBox(
+            height: AppResponsive.mapHeight(
+              context,
+              compact: 170,
+              regular: 210,
+              tablet: 250,
+            ),
+            child: FlutterMap(
+              key: ValueKey(
+                'tow-preview-${originPoint.latitude},${originPoint.longitude}-${destinationPoint?.latitude},${destinationPoint?.longitude}',
+              ),
+              options: MapOptions(
+                initialCenter: destinationPoint == null
+                    ? originPoint
+                    : LatLng(
+                        (originPoint.latitude + destinationPoint.latitude) / 2,
+                        (originPoint.longitude + destinationPoint.longitude) / 2,
+                      ),
+                initialZoom: destinationPoint == null ? 14 : 12,
+                initialCameraFit: points.length >= 2
+                    ? CameraFit.bounds(
+                        bounds: LatLngBounds.fromPoints(points),
+                        padding: const EdgeInsets.all(44),
+                      )
+                    : null,
+                interactionOptions: const InteractionOptions(
+                  flags: InteractiveFlag.pinchZoom | InteractiveFlag.drag,
+                ),
+              ),
+              children: [
+                TileLayer(
+                  urlTemplate: AppConstants.osmTileUrl,
+                  userAgentPackageName: 'com.autoresq.app',
+                ),
+                if (destinationPoint != null)
+                  PolylineLayer(
+                    polylines: [
+                      Polyline(
+                        points: points,
+                        color: AppColors.emergency.withValues(alpha: 0.62),
+                        strokeWidth: 3,
+                      ),
+                    ],
+                  ),
+                MarkerLayer(
+                  markers: [
+                    Marker(
+                      point: originPoint,
+                      width: 40,
+                      height: 40,
+                      child: _MapBubbleMarker(
+                        color: AppColors.primary,
+                        icon: Icons.my_location_rounded,
+                      ),
+                    ),
+                    if (destinationPoint != null)
+                      Marker(
+                        point: destinationPoint,
+                        width: 40,
+                        height: 40,
+                        child: _MapBubbleMarker(
+                          color: AppColors.emergency,
+                          icon: Icons.flag_rounded,
+                        ),
+                      ),
+                  ],
+                ),
+              ],
+            ),
+          ),
+          Padding(
+            padding: const EdgeInsets.all(14),
+            child: Row(
+              children: [
+                Expanded(
+                  child: Text(
+                    destination?.address ??
+                        'Selecciona el destino de traslado para ver la ruta de grúa.',
+                    maxLines: 2,
+                    overflow: TextOverflow.ellipsis,
+                    style: const TextStyle(
+                      fontSize: 12,
+                      fontWeight: FontWeight.w700,
+                      color: AppColors.onSurface,
+                      height: 1.3,
+                    ),
+                  ),
+                ),
+                const Gap(10),
+                OutlinedButton(
+                  onPressed: onSelectDestination,
+                  child: Text(destination == null ? 'Destino' : 'Cambiar'),
+                ),
+              ],
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _MapBubbleMarker extends StatelessWidget {
+  final Color color;
+  final IconData icon;
+
+  const _MapBubbleMarker({
+    required this.color,
+    required this.icon,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      decoration: BoxDecoration(
+        color: color,
+        shape: BoxShape.circle,
+        border: Border.all(color: Colors.white, width: 3),
+        boxShadow: [
+          BoxShadow(
+            color: color.withValues(alpha: 0.35),
+            blurRadius: 12,
+            spreadRadius: 2,
+          ),
+        ],
+      ),
+      child: Icon(icon, color: Colors.white, size: 18),
     );
   }
 }

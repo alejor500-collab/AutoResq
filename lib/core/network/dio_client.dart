@@ -33,6 +33,10 @@ class DioClient {
 
   Dio get dio => _dio;
 
+  static String formatCoordinates(double lat, double lng) {
+    return 'Lat ${lat.toStringAsFixed(5)}, Lng ${lng.toStringAsFixed(5)}';
+  }
+
   Future<String> reverseGeocode(double lat, double lng) async {
     try {
       final response = await _dio.get(
@@ -50,9 +54,13 @@ class DioClient {
         ),
       );
       final data = response.data as Map<String, dynamic>;
-      return data['display_name'] as String? ?? 'Ubicacion desconocida';
+      final displayName = (data['display_name'] as String?)?.trim();
+      if (displayName != null && displayName.isNotEmpty) {
+        return displayName;
+      }
+      return formatCoordinates(lat, lng);
     } catch (_) {
-      return 'Ecuador';
+      return formatCoordinates(lat, lng);
     }
   }
 

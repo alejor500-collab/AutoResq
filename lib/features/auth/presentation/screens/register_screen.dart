@@ -389,20 +389,24 @@ class _RegisterScreenState extends ConsumerState<RegisterScreen> {
                       ),
                       const SizedBox(height: 16),
                       // Cedula photo picker
-                      GestureDetector(
-                        onTap: _pickCedula,
-                        child: Container(
+                      Material(
+                        color: Colors.transparent,
+                        borderRadius: BorderRadius.circular(18),
+                        child: InkWell(
+                          onTap: _pickCedula,
+                          borderRadius: BorderRadius.circular(18),
+                          child: Ink(
                           width: double.infinity,
                           padding: const EdgeInsets.all(20),
                           decoration: BoxDecoration(
                             color: _cedulaBytes != null
-                                ? AppColors.primary.withValues(alpha: 0.08)
-                                : AppColors.surfaceContainerLow,
-                            borderRadius: BorderRadius.circular(16),
+                                ? AppColors.primaryFixed
+                                : AppColors.surfaceContainerLowest,
+                            borderRadius: BorderRadius.circular(18),
                             border: Border.all(
                               color: _cedulaBytes != null
                                   ? AppColors.primary.withValues(alpha: 0.3)
-                                  : AppColors.surfaceContainerHigh,
+                                  : AppColors.outlineVariant,
                               width: 1.5,
                             ),
                           ),
@@ -437,9 +441,11 @@ class _RegisterScreenState extends ConsumerState<RegisterScreen> {
                                       _cedulaBytes != null
                                           ? 'Cédula capturada'
                                           : 'Foto de cédula *',
+                                      maxLines: 1,
+                                      overflow: TextOverflow.ellipsis,
                                       style: TextStyle(
                                         fontSize: 14,
-                                        fontWeight: FontWeight.w700,
+                                        fontWeight: FontWeight.w800,
                                         color: _cedulaBytes != null
                                             ? AppColors.primary
                                             : AppColors.onSurface,
@@ -450,9 +456,12 @@ class _RegisterScreenState extends ConsumerState<RegisterScreen> {
                                       _cedulaBytes != null
                                           ? 'Toca para cambiar'
                                           : 'Requerida para verificación técnica',
+                                      maxLines: 2,
+                                      overflow: TextOverflow.ellipsis,
                                       style: const TextStyle(
                                           fontSize: 12,
-                                          color: AppColors.secondary),
+                                          height: 1.35,
+                                          color: AppColors.textSecondary),
                                     ),
                                   ],
                                 ),
@@ -464,6 +473,7 @@ class _RegisterScreenState extends ConsumerState<RegisterScreen> {
                               ),
                             ],
                           ),
+                        ),
                         ),
                       ),
                       const SizedBox(height: 16),

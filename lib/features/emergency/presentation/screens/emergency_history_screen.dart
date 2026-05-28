@@ -171,7 +171,10 @@ class _HistoryCardState extends State<_HistoryCard> {
                           ),
                         ),
                         const Gap(4),
-                        Row(
+                        Wrap(
+                          spacing: 8,
+                          runSpacing: 6,
+                          crossAxisAlignment: WrapCrossAlignment.center,
                           children: [
                             Text(
                               AppHelpers.formatDate(e.fecha),
@@ -180,7 +183,6 @@ class _HistoryCardState extends State<_HistoryCard> {
                                 color: AppColors.textSecondary,
                               ),
                             ),
-                            const Gap(8),
                             StatusChip(status: e.estado),
                           ],
                         ),
@@ -223,6 +225,14 @@ class _HistoryCardState extends State<_HistoryCard> {
                     label: 'Fecha',
                     value: AppHelpers.formatDateTime(e.fecha),
                   ),
+                  if (e.agreedAmount != null) ...[
+                    const Gap(8),
+                    _InfoRow(
+                      icon: Icons.local_offer_outlined,
+                      label: 'Precio acordado',
+                      value: AppHelpers.formatCurrency(e.agreedAmount!),
+                    ),
+                  ],
                   if (e.clasificacionIa != null) ...[
                     const Gap(10),
                     Container(
@@ -274,16 +284,22 @@ class _InfoRow extends StatelessWidget {
       children: [
         Icon(icon, size: 14, color: AppColors.textSecondary),
         const Gap(6),
-        Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Text(label,
-                style: const TextStyle(
-                    fontSize: 10, color: AppColors.textSecondary)),
-            Text(value,
-                style: const TextStyle(
-                    fontSize: 13, color: AppColors.textPrimary)),
-          ],
+        Expanded(
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(label,
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: const TextStyle(
+                      fontSize: 10, color: AppColors.textSecondary)),
+              Text(value,
+                  maxLines: 3,
+                  overflow: TextOverflow.ellipsis,
+                  style: const TextStyle(
+                      fontSize: 13, color: AppColors.textPrimary)),
+            ],
+          ),
         ),
       ],
     );

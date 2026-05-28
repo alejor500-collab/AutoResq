@@ -13,6 +13,7 @@ import '../../../../shared/widgets/app_button.dart';
 import '../../../../shared/widgets/star_rating.dart';
 import '../../../../shared/widgets/user_avatar.dart';
 import '../providers/emergency_provider.dart';
+import '../widgets/emergency_evidence_photos.dart';
 import '../widgets/technician_offer_amount_sheet.dart';
 import '../../domain/entities/emergency_entity.dart';
 
@@ -27,8 +28,9 @@ class IncomingRequestSheet extends ConsumerStatefulWidget {
 }
 
 class _IncomingRequestSheetState extends ConsumerState<IncomingRequestSheet> {
+  static const int _initialSeconds = 180;
   Timer? _timer;
-  int _seconds = 30;
+  int _seconds = _initialSeconds;
   double _driverRating = 0;
   int _driverServices = 0;
 
@@ -134,10 +136,14 @@ class _IncomingRequestSheetState extends ConsumerState<IncomingRequestSheet> {
     final emergencyState = ref.watch(emergencyNotifierProvider);
     final emergency = widget.emergency;
     final hasOffer = emergency.hasMyOffer;
+    final currentUser = ref.watch(authNotifierProvider).value ??
+        ref.watch(authStateProvider).valueOrNull;
+    final isOwnRequest = currentUser?.id == emergency.usuarioId;
+    final isSmallScreen = MediaQuery.sizeOf(context).height < 700;
 
     return DraggableScrollableSheet(
-      initialChildSize: 0.75,
-      minChildSize: 0.5,
+      initialChildSize: isSmallScreen ? 0.88 : 0.78,
+      minChildSize: isSmallScreen ? 0.72 : 0.5,
       maxChildSize: 0.95,
       builder: (context, scrollController) {
         return Container(
@@ -165,7 +171,12 @@ class _IncomingRequestSheetState extends ConsumerState<IncomingRequestSheet> {
               Expanded(
                 child: SingleChildScrollView(
                   controller: scrollController,
-                  padding: const EdgeInsets.fromLTRB(24, 8, 24, 24),
+                  padding: EdgeInsets.fromLTRB(
+                    isSmallScreen ? 16 : 24,
+                    8,
+                    isSmallScreen ? 16 : 24,
+                    24 + MediaQuery.paddingOf(context).bottom,
+                  ),
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
@@ -174,16 +185,21 @@ class _IncomingRequestSheetState extends ConsumerState<IncomingRequestSheet> {
                         mainAxisAlignment: MainAxisAlignment.spaceBetween,
                         crossAxisAlignment: CrossAxisAlignment.center,
                         children: [
-                          const Text(
-                            'NUEVA SOLICITUD',
-                            style: TextStyle(
-                              fontSize: 16,
-                              fontWeight: FontWeight.w900,
-                              color: AppColors.primary,
-                              letterSpacing: 0.5,
+                          const Expanded(
+                            child: Text(
+                              'NUEVA SOLICITUD',
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis,
+                              style: TextStyle(
+                                fontSize: 16,
+                                fontWeight: FontWeight.w900,
+                                color: AppColors.primary,
+                                letterSpacing: 0.5,
+                              ),
                             ),
                           ),
-                          _TimerChip(seconds: _seconds),
+                          const Gap(10),
+                          _CountdownChip(seconds: _seconds),
                         ],
                       ),
                       const Gap(12),
@@ -308,11 +324,15 @@ class _IncomingRequestSheetState extends ConsumerState<IncomingRequestSheet> {
                                             size: 14,
                                           ),
                                           const Gap(5),
-                                          Text(
-                                            '${AppHelpers.formatRating(_driverRating)} ($_driverServices servicios)',
-                                            style: const TextStyle(
-                                              fontSize: 12,
-                                              color: AppColors.textSecondary,
+                                          Flexible(
+                                            child: Text(
+                                              '${AppHelpers.formatRating(_driverRating)} ($_driverServices servicios)',
+                                              maxLines: 1,
+                                              overflow: TextOverflow.ellipsis,
+                                              style: const TextStyle(
+                                                fontSize: 12,
+                                                color: AppColors.textSecondary,
+                                              ),
                                             ),
                                           ),
                                         ],
@@ -348,6 +368,13 @@ class _IncomingRequestSheetState extends ConsumerState<IncomingRequestSheet> {
                         ],
                       ),
                       const Gap(16),
+                      EmergencyEvidencePhotos(
+                        photoUrls: emergency.evidencePhotoUrls,
+                        title: 'Fotos enviadas por el conductor',
+                        featured: true,
+                      ),
+                      if (emergency.evidencePhotoUrls.isNotEmpty)
+                        const Gap(14),
                       _ProtectedPriceCard(emergency: emergency),
                       if (hasOffer) ...[
                         const Gap(12),
@@ -391,8 +418,12 @@ class _IncomingRequestSheetState extends ConsumerState<IncomingRequestSheet> {
                       // ─── Botón de oferta ──────────────────────────────
                       AppButton(
                         label:
-                            hasOffer ? 'Actualizar oferta' : 'Enviar oferta',
-                        onPressed: emergencyState.isLoading
+                            isOwnRequest
+                                ? 'Solicitud propia'
+                                : hasOffer
+                                    ? 'Actualizar oferta'
+                                    : 'Enviar oferta',
+                        onPressed: emergencyState.isLoading || isOwnRequest
                             ? null
                             : () async {
                                 final offeredAmount =
@@ -492,27 +523,55 @@ class _ProtectedPriceCard extends StatelessWidget {
             ),
           ),
           const Gap(6),
-          Row(
-            children: [
-              Expanded(
+          LayoutBuilder(
+            builder: (context, constraints) {
+              final isTight = constraints.maxWidth < 300;
+              final service = Text(
+                serviceName,
+                maxLines: isTight ? 2 : 1,
+                overflow: TextOverflow.ellipsis,
+                style: const TextStyle(
+                  fontSize: 15,
+                  fontWeight: FontWeight.w800,
+                  color: AppColors.onSurface,
+                ),
+              );
+              final amountWidget = FittedBox(
+                fit: BoxFit.scaleDown,
+                alignment: Alignment.centerRight,
                 child: Text(
-                  serviceName,
+                  amountText,
                   style: const TextStyle(
-                    fontSize: 15,
-                    fontWeight: FontWeight.w800,
-                    color: AppColors.onSurface,
+                    fontSize: 18,
+                    fontWeight: FontWeight.w900,
+                    color: AppColors.primary,
                   ),
                 ),
-              ),
-              Text(
-                amountText,
-                style: const TextStyle(
-                  fontSize: 18,
-                  fontWeight: FontWeight.w900,
-                  color: AppColors.primary,
-                ),
-              ),
-            ],
+              );
+              if (isTight) {
+                return Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    service,
+                    const Gap(4),
+                    Align(
+                      alignment: Alignment.centerRight,
+                      child: amountWidget,
+                    ),
+                  ],
+                );
+              }
+              return Row(
+                children: [
+                  Expanded(child: service),
+                  const Gap(10),
+                  ConstrainedBox(
+                    constraints: const BoxConstraints(maxWidth: 132),
+                    child: amountWidget,
+                  ),
+                ],
+              );
+            },
           ),
           const Gap(6),
           const Text(
@@ -583,12 +642,17 @@ class _AiMetaChip extends StatelessWidget {
         children: [
           Icon(icon, size: 12, color: AppColors.tertiary),
           const Gap(4),
-          Text(
-            label,
-            style: const TextStyle(
-              fontSize: 11,
-              fontWeight: FontWeight.w700,
-              color: AppColors.tertiary,
+          ConstrainedBox(
+            constraints: const BoxConstraints(maxWidth: 190),
+            child: Text(
+              label,
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+              style: const TextStyle(
+                fontSize: 11,
+                fontWeight: FontWeight.w700,
+                color: AppColors.tertiary,
+              ),
             ),
           ),
         ],
@@ -599,6 +663,7 @@ class _AiMetaChip extends StatelessWidget {
 
 // ─── Chip temporizador regresivo ──────────────────────────────────────────────
 
+// ignore: unused_element
 class _TimerChip extends StatelessWidget {
   final int seconds;
 
@@ -626,6 +691,49 @@ class _TimerChip extends StatelessWidget {
 }
 
 // ─── Chip clasificación IA ────────────────────────────────────────────────────
+
+class _CountdownChip extends StatelessWidget {
+  final int seconds;
+
+  const _CountdownChip({required this.seconds});
+
+  @override
+  Widget build(BuildContext context) {
+    final safeSeconds = seconds < 0 ? 0 : seconds;
+    final minutes = safeSeconds ~/ 60;
+    final remainingSeconds = safeSeconds % 60;
+    final label =
+        '${minutes.toString().padLeft(2, '0')}:${remainingSeconds.toString().padLeft(2, '0')}';
+
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+      decoration: BoxDecoration(
+        color: AppColors.warning.withValues(alpha: 0.15),
+        borderRadius: BorderRadius.circular(20),
+        border: Border.all(color: AppColors.warning.withValues(alpha: 0.4)),
+      ),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          const Icon(
+            Icons.timer_outlined,
+            size: 14,
+            color: AppColors.warning,
+          ),
+          const Gap(5),
+          Text(
+            label,
+            style: const TextStyle(
+              fontSize: 13,
+              fontWeight: FontWeight.w900,
+              color: AppColors.warning,
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
 
 class _AiClassificationChip extends StatelessWidget {
   final String tipo;
@@ -668,12 +776,17 @@ class _AiClassificationChip extends StatelessWidget {
         children: [
           Icon(_icon, size: 14, color: _color),
           const Gap(6),
-          Text(
-            tipo,
-            style: TextStyle(
-              fontSize: 12,
-              fontWeight: FontWeight.w700,
-              color: _color,
+          ConstrainedBox(
+            constraints: const BoxConstraints(maxWidth: 220),
+            child: Text(
+              tipo,
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+              style: TextStyle(
+                fontSize: 12,
+                fontWeight: FontWeight.w700,
+                color: _color,
+              ),
             ),
           ),
         ],

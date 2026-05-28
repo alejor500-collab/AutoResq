@@ -89,10 +89,11 @@ class _TechnicianOfferAmountSheetState
           top: false,
           child: Padding(
             padding: const EdgeInsets.fromLTRB(20, 16, 20, 20),
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
+            child: SingleChildScrollView(
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
                 Center(
                   child: Container(
                     width: 42,
@@ -213,7 +214,8 @@ class _TechnicianOfferAmountSheetState
                     ),
                   ],
                 ),
-              ],
+                ],
+              ),
             ),
           ),
         ),

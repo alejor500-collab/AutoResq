@@ -370,8 +370,10 @@ class _EditProfileScreenState extends ConsumerState<EditProfileScreen> {
                   child: Text(
                     'Tu especialidad es visible para los conductores que solicitan asistencia.',
                     style: TextStyle(
-                      fontSize: 12,
+                      fontSize: 12.5,
                       color: AppColors.textSecondary,
+                      height: 1.4,
+                      fontWeight: FontWeight.w600,
                     ),
                   ),
                 ),

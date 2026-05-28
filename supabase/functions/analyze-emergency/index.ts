@@ -9,6 +9,7 @@ const GITHUB_API_VERSION = '2026-03-10';
 const GITHUB_DEFAULT_MODEL = 'openai/gpt-4.1-mini';
 const OPENAI_RESPONSES_URL = 'https://api.openai.com/v1/responses';
 const OPENAI_DEFAULT_MODEL = 'gpt-5.4-mini';
+const MIN_DESCRIPTION_LENGTH = 8;
 const MAX_DESCRIPTION_LENGTH = 1800;
 const MAX_OUTPUT_TOKENS = 300;
 
@@ -33,6 +34,7 @@ type AnalyzeEmergencyBody = {
   vehicle_type?: string;
   plate?: string;
   brand_model?: string;
+  image_urls?: string[];
 };
 
 type EmergencyAnalysis = {
@@ -84,7 +86,16 @@ Deno.serve(async (req: Request) => {
 
   const description = body.description?.trim();
   if (!description) {
-    return jsonResponse({ error: 'Missing required field: description' }, 400);
+    return jsonResponse(
+      { error: 'Describe brevemente que ocurre con el vehiculo.' },
+      400,
+    );
+  }
+  if (description.length < MIN_DESCRIPTION_LENGTH) {
+    return jsonResponse(
+      { error: 'Agrega un poco mas de detalle sobre el problema.' },
+      400,
+    );
   }
 
   const safeDescription = description.slice(0, MAX_DESCRIPTION_LENGTH);
@@ -101,6 +112,18 @@ Deno.serve(async (req: Request) => {
       if (githubResult) {
         return jsonResponse(githubResult, 200);
       }
+      if (hasEvidenceImages(body)) {
+        const githubTextOnlyResult = await runGitHubModelsAnalysis({
+          apiKey: githubApiKey,
+          model: githubModel,
+          githubOrg,
+          body: withoutEvidenceImages(body),
+          description: safeDescription,
+        });
+        if (githubTextOnlyResult) {
+          return jsonResponse(githubTextOnlyResult, 200);
+        }
+      }
     }
 
     if (openAiContingencyApiKey) {
@@ -115,6 +138,17 @@ Deno.serve(async (req: Request) => {
       });
       if (openAiResult) {
         return jsonResponse(openAiResult, 200);
+      }
+      if (hasEvidenceImages(body)) {
+        const openAiTextOnlyResult = await runOpenAiContingencyAnalysis({
+          apiKey: openAiContingencyApiKey,
+          model: openAiContingencyModel,
+          body: withoutEvidenceImages(body),
+          description: safeDescription,
+        });
+        if (openAiTextOnlyResult) {
+          return jsonResponse(openAiTextOnlyResult, 200);
+        }
       }
     }
 
@@ -159,7 +193,7 @@ async function runGitHubModelsAnalysis({
         },
         {
           role: 'user',
-          content: buildUserInput(description, body),
+          content: buildChatUserContent(description, body),
         },
       ],
       response_format: {
@@ -222,6 +256,7 @@ async function runOpenAiContingencyAnalysis({
               type: 'input_text',
               text: buildUserInput(description, body),
             },
+            ...buildOpenAiImageInput(body),
           ],
         },
       ],
@@ -253,7 +288,9 @@ async function runOpenAiContingencyAnalysis({
 function buildSystemPrompt(): string {
   return [
     'Eres el asistente de diagnóstico vehicular para emergencias de AutoResQ.',
-    'Analiza solo la información proporcionada por el conductor.',
+    'Analiza solo la información proporcionada por el conductor, aunque venga en lenguaje informal, breve, incompleto o con errores de escritura.',
+    'No rechaces descripciones libres: interpreta síntomas, necesidades o contexto y clasifica prudentemente.',
+    'Si se adjuntan fotos, úsalas solo como apoyo visual y no inventes datos que no sean visibles o reportados.',
     'No inventes síntomas, causas, piezas dañadas, contexto, kilometraje ni antecedentes.',
     'No des diagnósticos definitivos; entrega solo una orientación inicial prudente.',
     'Tu respuesta debe ser exclusivamente JSON válido, sin markdown, sin texto extra, sin explicaciones y sin bloques de código.',
@@ -280,6 +317,9 @@ function buildUserInput(
     body.vehicle_type ? `Tipo de vehiculo: ${body.vehicle_type}` : null,
     body.plate ? `Placa: ${body.plate}` : null,
     body.brand_model ? `Marca/modelo: ${body.brand_model}` : null,
+    body.image_urls?.length
+      ? `Fotos adjuntas: ${Math.min(body.image_urls.length, 2)} imagen(es) de evidencia.`
+      : null,
   ].filter(Boolean);
 
   return `${context.join('\n')}\n\nDevuelve exactamente un objeto JSON con esta forma:
@@ -291,6 +331,57 @@ function buildUserInput(
   "requiere_grua": true | false,
   "recomendacion": ""
 }`;
+}
+
+function buildChatUserContent(
+  description: string,
+  body: AnalyzeEmergencyBody,
+):
+  | string
+  | Array<
+    | { type: 'text'; text: string }
+    | { type: 'image_url'; image_url: { url: string } }
+  > {
+  const text = buildUserInput(description, body);
+  const imageUrls = sanitizeImageUrls(body.image_urls);
+  if (imageUrls.length === 0) return text;
+  return [
+    { type: 'text', text },
+    ...imageUrls.map((url) => ({
+      type: 'image_url' as const,
+      image_url: { url },
+    })),
+  ];
+}
+
+function buildOpenAiImageInput(
+  body: AnalyzeEmergencyBody,
+): Array<{ type: 'input_image'; image_url: string }> {
+  return sanitizeImageUrls(body.image_urls).map((url) => ({
+    type: 'input_image',
+    image_url: url,
+  }));
+}
+
+function sanitizeImageUrls(value: unknown): string[] {
+  if (!Array.isArray(value)) return [];
+  return value
+    .filter((url): url is string => typeof url === 'string')
+    .map((url) => url.trim())
+    .filter((url) =>
+      url.startsWith('data:image/') || url.startsWith('https://')
+    )
+    .slice(0, 2);
+}
+
+function hasEvidenceImages(body: AnalyzeEmergencyBody): boolean {
+  return sanitizeImageUrls(body.image_urls).length > 0;
+}
+
+function withoutEvidenceImages(body: AnalyzeEmergencyBody): AnalyzeEmergencyBody {
+  const copy = { ...body };
+  delete copy.image_urls;
+  return copy;
 }
 
 function safeParseAnalysis(

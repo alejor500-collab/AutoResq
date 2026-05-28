@@ -62,6 +62,17 @@ Future<void> _callPhone(BuildContext context, String? phone) async {
   }
 }
 
+double? _snapshotDouble(Emergency emergency, String key) {
+  return (emergency.priceSnapshot?[key] as num?)?.toDouble();
+}
+
+bool _isTowEmergency(Emergency emergency) {
+  return emergency.priceSnapshot?['pricing_type'] == 'distance_based' ||
+      emergency.priceSnapshot?['service_code'] == 'tow_service' ||
+      emergency.aiEmergencyType == 'tow_service' ||
+      emergency.clasificacionIa == 'Grúa / remolque';
+}
+
 class _StatusBody extends ConsumerStatefulWidget {
   final Emergency emergency;
 
@@ -235,6 +246,13 @@ class _StatusBodyState extends ConsumerState<_StatusBody> {
             : const AsyncValue<List<TechnicianOffer>>.data([]);
     final lat = emergency.lat ?? AppConstants.defaultLat;
     final lng = emergency.lng ?? AppConstants.defaultLng;
+    final offers = offersAsync.valueOrNull ?? const <TechnicianOffer>[];
+    final towDestinationLat = _snapshotDouble(emergency, 'destination_lat');
+    final towDestinationLng = _snapshotDouble(emergency, 'destination_lng');
+    final hasTowDestination =
+        _isTowEmergency(emergency) &&
+        towDestinationLat != null &&
+        towDestinationLng != null;
     final technicianLocation = emergency.tecnicoId == null
         ? const AsyncValue<TechnicianLiveLocation?>.data(null)
         : ref.watch(technicianLiveLocationProvider(emergency.tecnicoId!));
@@ -251,6 +269,18 @@ class _StatusBodyState extends ConsumerState<_StatusBody> {
               ),
             ),
           );
+    final towRouteEstimate = hasTowDestination
+        ? ref.watch(
+            technicianRouteEstimateProvider(
+              (
+                originLat: lat,
+                originLng: lng,
+                destinationLat: towDestinationLat,
+                destinationLng: towDestinationLng,
+              ),
+            ),
+          )
+        : null;
     final isCompleted = emergency.estado == AppConstants.statusCompleted ||
         emergency.asignacionEstado == AppConstants.assignFinished;
     if (isCompleted) {
@@ -373,7 +403,13 @@ class _StatusBodyState extends ConsumerState<_StatusBody> {
                     lng: lng,
                     address: emergency.direccion,
                     technicianLocation: tech,
+                    nearbyOffers: offers,
+                    towDestination: hasTowDestination
+                        ? LatLng(towDestinationLat, towDestinationLng)
+                        : null,
                     route: routeEstimate?.valueOrNull,
+                    towRoute: towRouteEstimate?.valueOrNull,
+                    isTow: _isTowEmergency(emergency),
                   ),
                   const Gap(24),
 
@@ -631,19 +667,31 @@ class _LiveMap extends StatelessWidget {
   final double lng;
   final String? address;
   final TechnicianLiveLocation? technicianLocation;
+  final List<TechnicianOffer> nearbyOffers;
+  final LatLng? towDestination;
   final RouteEstimate? route;
+  final RouteEstimate? towRoute;
+  final bool isTow;
 
   const _LiveMap({
     required this.lat,
     required this.lng,
     this.address,
     this.technicianLocation,
+    this.nearbyOffers = const [],
+    this.towDestination,
     this.route,
+    this.towRoute,
+    this.isTow = false,
   });
 
   @override
   Widget build(BuildContext context) {
     final tech = technicianLocation;
+    final destination = towDestination;
+    final offerMarkers = nearbyOffers
+        .where((offer) => offer.lat != null && offer.lng != null)
+        .toList(growable: false);
     final center = tech == null
         ? LatLng(lat, lng)
         : LatLng((lat + tech.lat) / 2, (lng + tech.lng) / 2);
@@ -651,10 +699,15 @@ class _LiveMap extends StatelessWidget {
         (tech == null
             ? <LatLng>[]
             : [LatLng(tech.lat, tech.lng), LatLng(lat, lng)]);
+    final towRoutePoints = towRoute?.points ??
+        (destination == null ? <LatLng>[] : [LatLng(lat, lng), destination]);
     final boundsPoints = [
       LatLng(lat, lng),
       if (tech != null) LatLng(tech.lat, tech.lng),
+      if (destination != null) destination,
+      ...offerMarkers.map((offer) => LatLng(offer.lat!, offer.lng!)),
       ...routePoints,
+      ...towRoutePoints,
     ];
     final initialZoom = tech == null
         ? 14.0
@@ -719,6 +772,16 @@ class _LiveMap extends StatelessWidget {
                     ),
                   ],
                 ),
+              if (towRoutePoints.length >= 2)
+                PolylineLayer(
+                  polylines: [
+                    Polyline(
+                      points: towRoutePoints,
+                      color: AppColors.emergency.withValues(alpha: 0.62),
+                      strokeWidth: 3,
+                    ),
+                  ],
+                ),
               MarkerLayer(
                 markers: [
                   Marker(
@@ -735,8 +798,34 @@ class _LiveMap extends StatelessWidget {
                         child:
                             Icon(Icons.circle, color: Colors.white, size: 12),
                       ),
+                      ),
                     ),
-                  ),
+                  if (destination != null)
+                    Marker(
+                      point: destination,
+                      width: 42,
+                      height: 42,
+                      child: Container(
+                        decoration: BoxDecoration(
+                          color: AppColors.emergency,
+                          shape: BoxShape.circle,
+                          border: Border.all(color: Colors.white, width: 3),
+                          boxShadow: [
+                            BoxShadow(
+                              color:
+                                  AppColors.emergency.withValues(alpha: 0.35),
+                              blurRadius: 14,
+                              spreadRadius: 2,
+                            ),
+                          ],
+                        ),
+                        child: const Icon(
+                          Icons.flag_rounded,
+                          color: Colors.white,
+                          size: 19,
+                        ),
+                      ),
+                    ),
                   if (tech != null)
                     Marker(
                       point: LatLng(tech.lat, tech.lng),
@@ -760,6 +849,34 @@ class _LiveMap extends StatelessWidget {
                           Icons.build_rounded,
                           color: Colors.white,
                           size: 18,
+                        ),
+                      ),
+                    ),
+                  if (tech == null)
+                    ...offerMarkers.map(
+                      (offer) => Marker(
+                        point: LatLng(offer.lat!, offer.lng!),
+                        width: 34,
+                        height: 34,
+                        child: Container(
+                          decoration: BoxDecoration(
+                            color: AppColors.technicianMarker,
+                            shape: BoxShape.circle,
+                            border: Border.all(color: Colors.white, width: 2),
+                            boxShadow: [
+                              BoxShadow(
+                                color: AppColors.technicianMarker
+                                    .withValues(alpha: 0.28),
+                                blurRadius: 10,
+                                spreadRadius: 1,
+                              ),
+                            ],
+                          ),
+                          child: const Icon(
+                            Icons.local_shipping_outlined,
+                            color: Colors.white,
+                            size: 16,
+                          ),
                         ),
                       ),
                     ),
@@ -880,7 +997,7 @@ class _LiveMap extends StatelessWidget {
             ),
           if (route != null)
             Positioned(
-              top: 16,
+              top: isTow && destination != null ? 56 : 16,
               left: 16,
               right: 16,
               child: Align(
@@ -902,6 +1019,41 @@ class _LiveMap extends StatelessWidget {
                     route!.isApproximate
                         ? 'Ruta estimada: ${route!.distanceLabel}'
                         : 'Ruta por carretera: ${route!.distanceLabel}',
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: const TextStyle(
+                      fontSize: 11,
+                      fontWeight: FontWeight.w700,
+                      color: AppColors.onSurface,
+                    ),
+                  ),
+                ),
+              ),
+            ),
+          if (isTow && destination != null)
+            Positioned(
+              top: 16,
+              left: 16,
+              right: 16,
+              child: Align(
+                alignment: Alignment.topLeft,
+                child: Container(
+                  padding:
+                      const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                  decoration: BoxDecoration(
+                    color: Colors.white.withValues(alpha: 0.95),
+                    borderRadius: BorderRadius.circular(8),
+                    boxShadow: [
+                      BoxShadow(
+                        color: Colors.black.withValues(alpha: 0.1),
+                        blurRadius: 8,
+                      ),
+                    ],
+                  ),
+                  child: Text(
+                    towRoute == null
+                        ? 'Destino de grúa seleccionado'
+                        : 'Traslado: ${towRoute!.distanceLabel}',
                     maxLines: 1,
                     overflow: TextOverflow.ellipsis,
                     style: const TextStyle(
@@ -1433,6 +1585,9 @@ class _TechnicianOfferTile extends StatelessWidget {
       emergencyType: emergencyType,
       distanceKm: offer.distanceKm,
     );
+    final amountLabel = offer.offeredAmount == null
+        ? 'Por acordar'
+        : AppHelpers.formatCurrency(offer.offeredAmount!);
 
     return Container(
       padding: const EdgeInsets.all(14),
@@ -1500,6 +1655,52 @@ class _TechnicianOfferTile extends StatelessWidget {
                 ),
               ),
             ],
+          ),
+          const Gap(12),
+          Container(
+            width: double.infinity,
+            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+            decoration: BoxDecoration(
+              color: AppColors.primary.withValues(alpha: 0.08),
+              borderRadius: BorderRadius.circular(14),
+              border: Border.all(color: AppColors.primary.withValues(alpha: 0.16)),
+            ),
+            child: Row(
+              children: [
+                const Icon(
+                  Icons.local_offer_rounded,
+                  color: AppColors.primary,
+                  size: 18,
+                ),
+                const Gap(8),
+                const Expanded(
+                  child: Text(
+                    'Precio ofertado',
+                    style: TextStyle(
+                      fontSize: 12,
+                      fontWeight: FontWeight.w800,
+                      color: AppColors.onSurface,
+                    ),
+                  ),
+                ),
+                ConstrainedBox(
+                  constraints: const BoxConstraints(maxWidth: 120),
+                  child: FittedBox(
+                    fit: BoxFit.scaleDown,
+                    alignment: Alignment.centerRight,
+                    child: Text(
+                      amountLabel,
+                      maxLines: 1,
+                      style: const TextStyle(
+                        fontSize: 16,
+                        fontWeight: FontWeight.w900,
+                        color: AppColors.primary,
+                      ),
+                    ),
+                  ),
+                ),
+              ],
+            ),
           ),
           const Gap(12),
           if (band != null) ...[

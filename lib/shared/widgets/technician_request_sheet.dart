@@ -253,6 +253,8 @@ class _TechnicianRequestSheetState
                 style: const TextStyle(
                   fontSize: 13,
                   color: AppColors.textSecondary,
+                  height: 1.4,
+                  fontWeight: FontWeight.w600,
                 ),
               ),
               const SizedBox(height: 24),
@@ -291,20 +293,25 @@ class _TechnicianRequestSheetState
                 ),
               ),
               const SizedBox(height: 16),
-              GestureDetector(
-                onTap: _isSubmitting ? null : _pickCedula,
-                child: Container(
+              Material(
+                color: Colors.transparent,
+                borderRadius: BorderRadius.circular(18),
+                child: InkWell(
+                  onTap: _isSubmitting ? null : _pickCedula,
+                  borderRadius: BorderRadius.circular(18),
+                  child: Ink(
                   width: double.infinity,
                   padding: const EdgeInsets.all(16),
                   decoration: BoxDecoration(
                     color: _cedulaBytes != null
-                        ? AppColors.primary.withValues(alpha: 0.06)
-                        : AppColors.surfaceContainerLow,
-                    borderRadius: BorderRadius.circular(16),
+                        ? AppColors.primaryFixed
+                        : AppColors.surfaceContainerLowest,
+                    borderRadius: BorderRadius.circular(18),
                     border: Border.all(
                       color: _cedulaBytes != null
                           ? AppColors.primary.withValues(alpha: 0.3)
-                          : AppColors.border,
+                          : AppColors.outlineVariant,
+                      width: 1.2,
                     ),
                   ),
                   child: Row(
@@ -334,13 +341,15 @@ class _TechnicianRequestSheetState
                         child: Column(
                           crossAxisAlignment: CrossAxisAlignment.start,
                           children: [
-                            Text(
-                              _cedulaBytes != null
-                                  ? 'Cedula capturada'
-                                  : 'Foto de cedula *',
-                              style: TextStyle(
-                                fontSize: 14,
-                                fontWeight: FontWeight.w600,
+                              Text(
+                                _cedulaBytes != null
+                                    ? 'Cedula capturada'
+                                    : 'Foto de cedula *',
+                                maxLines: 1,
+                                overflow: TextOverflow.ellipsis,
+                                style: TextStyle(
+                                  fontSize: 14,
+                                  fontWeight: FontWeight.w800,
                                 color: _cedulaBytes != null
                                     ? AppColors.primary
                                     : AppColors.textPrimary,
@@ -350,9 +359,12 @@ class _TechnicianRequestSheetState
                               _cedulaBytes != null
                                   ? 'Toca para cambiar'
                                   : 'Requerida para verificacion',
+                              maxLines: 2,
+                              overflow: TextOverflow.ellipsis,
                               style: const TextStyle(
                                 fontSize: 12,
                                 color: AppColors.textSecondary,
+                                height: 1.35,
                               ),
                             ),
                           ],
@@ -365,6 +377,7 @@ class _TechnicianRequestSheetState
                       ),
                     ],
                   ),
+                ),
                 ),
               ),
               const SizedBox(height: 24),
@@ -393,11 +406,14 @@ class _TechnicianRequestSheetState
                             color: Colors.white,
                           ),
                         )
-                      : const Text(
-                          'Enviar solicitud',
-                          style: TextStyle(
-                            fontSize: 15,
-                            fontWeight: FontWeight.w700,
+                      : const FittedBox(
+                          fit: BoxFit.scaleDown,
+                          child: Text(
+                            'Enviar solicitud',
+                            style: TextStyle(
+                              fontSize: 15,
+                              fontWeight: FontWeight.w800,
+                            ),
                           ),
                         ),
                 ),

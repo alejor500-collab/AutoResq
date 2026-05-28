@@ -1,7 +1,9 @@
 import 'dart:math' as math;
+import 'dart:typed_data';
 
 import 'package:dio/dio.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:image_picker/image_picker.dart';
 import 'package:latlong2/latlong.dart';
 import '../../../../core/constants/app_constants.dart';
 import '../../../../shared/providers/auth_provider.dart';
@@ -72,6 +74,8 @@ class TechnicianOffer {
   final String? specialty;
   final double rating;
   final int totalServices;
+  final double? lat;
+  final double? lng;
   final double? distanceKm;
   final int? etaMinutes;
   final double? offeredAmount;
@@ -88,6 +92,8 @@ class TechnicianOffer {
     this.specialty,
     required this.rating,
     required this.totalServices,
+    this.lat,
+    this.lng,
     this.distanceKm,
     this.etaMinutes,
     this.offeredAmount,
@@ -130,6 +136,10 @@ class TechnicianOffer {
       totalServices: (json['total_services'] as num?)?.toInt() ??
           (technician['total_servicios'] as num?)?.toInt() ??
           0,
+      lat: (json['technician_lat'] as num?)?.toDouble() ??
+          (technician['ubicacion_lat'] as num?)?.toDouble(),
+      lng: (json['technician_lng'] as num?)?.toDouble() ??
+          (technician['ubicacion_lng'] as num?)?.toDouble(),
       distanceKm: (json['distancia_km'] as num?)?.toDouble(),
       etaMinutes: (json['eta_minutos'] as num?)?.toInt(),
       offeredAmount: (json['monto_ofertado'] as num?)?.toDouble(),
@@ -173,6 +183,7 @@ class EmergencyNotifier extends StateNotifier<EmergencyState> {
     double? lat,
     double? lng,
     String? address,
+    List<String> evidencePhotoUrls = const [],
   }) async {
     state = state.copyWith(isAnalyzingAI: true, error: null);
     try {
@@ -181,15 +192,18 @@ class EmergencyNotifier extends StateNotifier<EmergencyState> {
         lat: lat,
         lng: lng,
         direccion: address,
+        evidenceImageUrls: evidencePhotoUrls,
       );
       state = state.copyWith(isAnalyzingAI: false, aiResult: result);
       return result;
     } catch (e) {
+      final fallback = EmergencyAiAnalysisModel.fallback(description);
       state = state.copyWith(
         isAnalyzingAI: false,
-        error: 'No se pudo analizar con IA.',
+        aiResult: fallback,
+        error: 'No se pudo analizar con IA. Usamos una clasificacion segura.',
       );
-      return null;
+      return fallback;
     }
   }
 
@@ -203,6 +217,8 @@ class EmergencyNotifier extends StateNotifier<EmergencyState> {
     bool skipAiAnalysis = false,
     EmergencyPriceQuote? priceQuote,
     String paymentMethod = 'cash',
+    List<XFile> evidencePhotos = const [],
+    List<String> evidencePhotoUrls = const [],
   }) async {
     final user = _currentUser;
     if (user == null) return null;
@@ -253,9 +269,11 @@ class EmergencyNotifier extends StateNotifier<EmergencyState> {
             lat: lat,
             lng: lng,
             direccion: address,
+            evidenceImageUrls: evidencePhotoUrls,
           );
           analysisStatus = 'completed';
         } catch (_) {
+          analysisModel = EmergencyAiAnalysisModel.fallback(description);
           analysisStatus = 'failed';
         }
       }
@@ -270,6 +288,8 @@ class EmergencyNotifier extends StateNotifier<EmergencyState> {
         aiAnalysisStatus: analysisStatus,
         priceQuote: priceQuote,
         paymentMethod: paymentMethod,
+        evidencePhotos: await _buildPhotoUploads(evidencePhotos),
+        evidencePhotoUrls: evidencePhotoUrls,
       );
       state = state.copyWith(
         isLoading: false,
@@ -283,6 +303,39 @@ class EmergencyNotifier extends StateNotifier<EmergencyState> {
   }
 
   // ─── Load Driver History ──────────────────────────────────────────────────
+  Future<List<EmergencyPhotoUpload>> _buildPhotoUploads(
+    List<XFile> photos,
+  ) async {
+    final uploads = <EmergencyPhotoUpload>[];
+    for (final photo in photos.take(3)) {
+      final bytes = await photo.readAsBytes();
+      uploads.add(
+        EmergencyPhotoUpload(
+          bytes: Uint8List.fromList(bytes),
+          fileName: photo.name.isNotEmpty ? photo.name : photo.path,
+          contentType: _contentTypeForFile(photo.name),
+        ),
+      );
+    }
+    return uploads;
+  }
+
+  String _contentTypeForFile(String fileName) {
+    final lower = fileName.toLowerCase();
+    if (lower.endsWith('.png')) return 'image/png';
+    if (lower.endsWith('.webp')) return 'image/webp';
+    return 'image/jpeg';
+  }
+
+  Future<List<String>> uploadEvidencePhotos(List<XFile> photos) async {
+    final user = _currentUser;
+    if (user == null || photos.isEmpty) return const [];
+    return _dataSource.uploadEmergencyEvidencePhotos(
+      ownerId: user.id,
+      photos: await _buildPhotoUploads(photos),
+    );
+  }
+
   Future<void> loadDriverEmergencies(String driverId) async {
     state = state.copyWith(isLoading: true, error: null, emergencies: []);
     try {
@@ -533,8 +586,13 @@ final technicianOffersProvider =
 // ─── Watch Pending Emergencies (Realtime) ─────────────────────────────────────
 final watchPendingProvider = StreamProvider<List<Emergency>>((ref) {
   final ds = ref.read(emergencyDataSourceProvider);
+  final user = ref.watch(authNotifierProvider).value ??
+      ref.watch(authStateProvider).valueOrNull;
   return ds.watchPendingEmergencies().map(
-        (rows) => rows.map((json) => EmergencyModel.fromJson(json)).toList(),
+        (rows) => rows
+            .map((json) => EmergencyModel.fromJson(json))
+            .where((emergency) => emergency.usuarioId != user?.id)
+            .toList(),
       );
 });
 
