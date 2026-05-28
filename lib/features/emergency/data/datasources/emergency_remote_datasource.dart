@@ -73,6 +73,11 @@ abstract class EmergencyRemoteDataSource {
   );
   Future<List<EmergencyModel>> getAllEmergencies();
   Future<void> updateStatus(String id, String estado);
+  Future<void> completeTechnicianService({
+    required String emergencyId,
+    String? assignmentId,
+    String? technicianId,
+  });
   Future<void> cancelTechnicianService(String emergencyId);
   Future<void> assignTechnician(String emergencyId, String technicianUserId);
   Future<bool> hasPendingRating({
@@ -299,6 +304,21 @@ class EmergencyRemoteDataSourceImpl implements EmergencyRemoteDataSource {
       );
     } catch (_) {
       // La aceptacion del tecnico no debe fallar si el canal push aun no esta desplegado.
+    }
+  }
+
+  Future<void> _notifyDriverAboutFinishedEmergency(String? emergencyId) async {
+    if (emergencyId == null || emergencyId.isEmpty) return;
+    try {
+      await _client.functions.invoke(
+        'notify-emergency-update',
+        body: {
+          'emergency_id': emergencyId,
+          'type': 'servicio_finalizado',
+        },
+      );
+    } catch (_) {
+      // El cierre del servicio no debe fallar si el canal push aun no esta desplegado.
     }
   }
 
@@ -878,6 +898,60 @@ class EmergencyRemoteDataSourceImpl implements EmergencyRemoteDataSource {
       await _client
           .from(AppConstants.tableEmergencias)
           .update({'estado': estado}).eq('id', id);
+    } on PostgrestException catch (e) {
+      throw ServerException(message: e.message);
+    }
+  }
+
+  @override
+  Future<void> completeTechnicianService({
+    required String emergencyId,
+    String? assignmentId,
+    String? technicianId,
+  }) async {
+    try {
+      final cleanAssignmentId = assignmentId?.trim();
+      if (cleanAssignmentId != null && cleanAssignmentId.isNotEmpty) {
+        await _client
+            .from(AppConstants.tableAsignaciones)
+            .update({'estado': AppConstants.assignFinished}).eq(
+          'id',
+          cleanAssignmentId,
+        );
+      } else {
+        await _client
+            .from(AppConstants.tableAsignaciones)
+            .update({'estado': AppConstants.assignFinished})
+            .eq('emergencia_id', emergencyId)
+            .inFilter('estado', [
+          AppConstants.assignAccepted,
+          AppConstants.assignEnRoute,
+          AppConstants.assignAttending,
+        ]);
+      }
+
+      await _client
+          .from(AppConstants.tableEmergencias)
+          .update({'estado': AppConstants.statusCompleted}).eq(
+        'id',
+        emergencyId,
+      );
+
+      final cleanTechnicianId = technicianId?.trim();
+      if (cleanTechnicianId != null && cleanTechnicianId.isNotEmpty) {
+        await _client
+            .from(AppConstants.tableTecnicos)
+            .update({'disponible': true}).eq('id', cleanTechnicianId);
+      } else {
+        final currentUserId = _client.auth.currentUser?.id;
+        if (currentUserId != null && currentUserId.isNotEmpty) {
+          await _client
+              .from(AppConstants.tableTecnicos)
+              .update({'disponible': true}).eq('usuario_id', currentUserId);
+        }
+      }
+
+      unawaited(_notifyDriverAboutFinishedEmergency(emergencyId));
     } on PostgrestException catch (e) {
       throw ServerException(message: e.message);
     }

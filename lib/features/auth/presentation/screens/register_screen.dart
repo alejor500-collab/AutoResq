@@ -94,10 +94,43 @@ class _RegisterScreenState extends ConsumerState<RegisterScreen> {
   }
 
   Future<void> _loginWithGoogle() async {
+    if (_selectedRole == 1) {
+      if (!TechnicianSpecialties.isValidCode(_selectedSpecialtyCode)) {
+        AppHelpers.showSnackBar(
+          context,
+          'Selecciona una especialidad tecnica',
+          isError: true,
+        );
+        return;
+      }
+      if (_cedulaBytes == null) {
+        AppHelpers.showSnackBar(
+          context,
+          'La foto de cedula es obligatoria para tecnicos',
+          isError: true,
+        );
+        return;
+      }
+    }
+
     final notifier = ref.read(authNotifierProvider.notifier);
-    final success = await notifier.loginWithGoogle();
+    final success = await notifier.loginWithGoogle(
+      role: _roleName,
+      specialty: _selectedRole == 1 ? _selectedSpecialtyCode : null,
+    );
     if (!mounted) return;
     if (success) {
+      if (_selectedRole == 1) {
+        final uploaded = await _uploadTechnicianCredential();
+        if (!mounted || !uploaded) return;
+        AppHelpers.showSnackBar(
+          context,
+          'Solicitud tecnica enviada. Puedes usar AutoResQ como conductor.',
+          isSuccess: true,
+        );
+        context.go(AppRoutes.driverHome);
+        return;
+      }
       _navigateByRole();
     } else {
       final error = ref.read(authNotifierProvider).error;
@@ -106,6 +139,63 @@ class _RegisterScreenState extends ConsumerState<RegisterScreen> {
         error?.toString() ?? 'Error al iniciar sesión con Google',
         isError: true,
       );
+    }
+  }
+
+  Future<bool> _uploadTechnicianCredential() async {
+    final user = ref.read(authNotifierProvider).value;
+    if (user == null || _cedulaBytes == null) {
+      AppHelpers.showSnackBar(
+        context,
+        'No se pudo subir el documento de identidad.',
+        isError: true,
+      );
+      return false;
+    }
+
+    try {
+      final supabase = ref.read(supabaseClientProvider);
+      final ext = _cedulaExt.isEmpty ? 'jpg' : _cedulaExt;
+      final mimeType = switch (ext) {
+        'png' => 'image/png',
+        'webp' => 'image/webp',
+        _ => 'image/jpeg',
+      };
+      final path =
+          '${user.id}/cedula_${DateTime.now().millisecondsSinceEpoch}.$ext';
+      await supabase.storage.from(AppConstants.bucketAvatars).uploadBinary(
+            path,
+            _cedulaBytes!,
+            fileOptions: FileOptions(upsert: true, contentType: mimeType),
+          );
+      final url = supabase.storage
+          .from(AppConstants.bucketAvatars)
+          .getPublicUrl(path);
+      final rows = await supabase
+          .from(AppConstants.tableTecnicos)
+          .update({'url_credencial': url})
+          .eq('usuario_id', user.id)
+          .select('url_credencial');
+      if (rows.isEmpty) {
+        if (mounted) {
+          AppHelpers.showSnackBar(
+            context,
+            'No se pudo subir el documento de identidad.',
+            isError: true,
+          );
+        }
+        return false;
+      }
+      return true;
+    } catch (_) {
+      if (mounted) {
+        AppHelpers.showSnackBar(
+          context,
+          'No se pudo subir el documento de identidad.',
+          isError: true,
+        );
+      }
+      return false;
     }
   }
 

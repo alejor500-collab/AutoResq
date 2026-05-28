@@ -8,7 +8,10 @@ import '../models/user_model.dart';
 
 abstract class AuthRemoteDataSource {
   Future<UserModel> login({required String email, required String password});
-  Future<UserModel> loginWithGoogle();
+  Future<UserModel> loginWithGoogle({
+    String? role,
+    String? specialty,
+  });
   Future<UserModel> register({
     required String email,
     required String password,
@@ -61,44 +64,158 @@ class AuthRemoteDataSourceImpl implements AuthRemoteDataSource {
     );
   }
 
-  /// Fetches the profile row. If it doesn't exist (e.g. first OAuth login and
-  /// the DB trigger hasn't run), it creates the row from auth user metadata
-  /// so the app never treats an authenticated user as unauthenticated.
-  Future<UserModel> _ensureProfile(User supabaseUser) async {
-    try {
-      return await _fetchProfile(supabaseUser.id);
-    } catch (_) {
-      final meta = supabaseUser.userMetadata ?? {};
-      final email = supabaseUser.email ?? '';
-      final name = (meta['full_name'] ?? meta['name'] ?? email.split('@').first)
-          .toString();
-      final avatarUrl = (meta['avatar_url'] ?? meta['picture']) as String?;
+  String? _metadataString(User supabaseUser, List<String> keys) {
+    final meta = supabaseUser.userMetadata ?? {};
+    for (final key in keys) {
+      final value = meta[key]?.toString().trim();
+      if (value != null && value.isNotEmpty) return value;
+    }
+    return null;
+  }
 
+  bool _isGoogleUser(User supabaseUser) {
+    final provider = supabaseUser.appMetadata['provider']?.toString();
+    if (provider == 'google') return true;
+    final providers = supabaseUser.appMetadata['providers'];
+    return providers is List && providers.contains('google');
+  }
+
+  Future<void> _syncGoogleProfileMetadata(
+    User supabaseUser, {
+    String? role,
+  }) async {
+    if (!_isGoogleUser(supabaseUser)) return;
+
+    final email = supabaseUser.email ?? '';
+    final emailName = email.contains('@') ? email.split('@').first : email;
+    final displayName = _metadataString(supabaseUser, const [
+      'nombre',
+      'full_name',
+      'name',
+    ]);
+    final avatarUrl = _metadataString(supabaseUser, const [
+      'avatar_url',
+      'picture',
+    ]);
+    final profileRole = role == AppConstants.roleTechnician
+        ? AppConstants.roleDriver
+        : role ?? AppConstants.roleDriver;
+
+    final existing = await _client
+        .from(AppConstants.tableProfiles)
+        .select('nombre, avatar_url')
+        .eq('id', supabaseUser.id)
+        .maybeSingle();
+
+    if (existing == null) {
       await _client.from(AppConstants.tableProfiles).upsert({
         'id': supabaseUser.id,
         'email': email,
-        'nombre': name,
+        'nombre': displayName ?? emailName,
+        'telefono': '',
+        'rol': profileRole,
+        'activo': true,
+        if (avatarUrl != null) 'avatar_url': avatarUrl,
+        'creado_en': DateTime.now().toIso8601String(),
+      }, onConflict: 'id');
+      return;
+    }
+
+    final currentName = existing['nombre']?.toString().trim() ?? '';
+    final currentAvatar = existing['avatar_url']?.toString().trim() ?? '';
+    final updates = <String, dynamic>{'email': email};
+    if (displayName != null &&
+        (currentName.isEmpty || currentName == emailName)) {
+      updates['nombre'] = displayName;
+    }
+    if (avatarUrl != null && currentAvatar.isEmpty) {
+      updates['avatar_url'] = avatarUrl;
+    }
+    if (updates.length > 1 || updates['email'] != null) {
+      await _client
+          .from(AppConstants.tableProfiles)
+          .update(updates)
+          .eq('id', supabaseUser.id);
+    }
+  }
+
+  Future<void> _ensureTechnicianApplication({
+    required String userId,
+    String? specialty,
+  }) async {
+    final normalizedSpecialty = _normalizeSpecialtyCode(specialty) ??
+        TechnicianSpecialties.generalAssistance;
+    final existing = await _client
+        .from(AppConstants.tableTecnicos)
+        .select('id, estado_verificacion')
+        .eq('usuario_id', userId)
+        .maybeSingle();
+
+    if (existing == null) {
+      await _client.from(AppConstants.tableTecnicos).insert({
+        'usuario_id': userId,
+        'especialidad': normalizedSpecialty,
+        'estado_verificacion': AppConstants.verificationPending,
+        'disponible': false,
+        'motivo_rechazo': null,
+      });
+      return;
+    }
+
+    final status = existing['estado_verificacion']?.toString();
+    if (status != AppConstants.verificationApproved) {
+      await _client.from(AppConstants.tableTecnicos).update({
+        'especialidad': normalizedSpecialty,
+        'estado_verificacion': AppConstants.verificationPending,
+        'disponible': false,
+        'motivo_rechazo': null,
+      }).eq('usuario_id', userId);
+
+      await _client
+          .from(AppConstants.tableProfiles)
+          .update({'rol': AppConstants.roleDriver}).eq('id', userId);
+    }
+  }
+
+  /// Fetches the profile row. If it doesn't exist (e.g. first OAuth login and
+  /// the DB trigger hasn't run), it creates the row from auth user metadata
+  /// so the app never treats an authenticated user as unauthenticated.
+  Future<UserModel> _ensureProfile(
+    User supabaseUser, {
+    String? role,
+    String? specialty,
+  }) async {
+    await _syncGoogleProfileMetadata(supabaseUser, role: role);
+    if (role == AppConstants.roleTechnician) {
+      await _ensureTechnicianApplication(
+        userId: supabaseUser.id,
+        specialty: specialty,
+      );
+    }
+    try {
+      return await _fetchProfile(supabaseUser.id);
+    } on PostgrestException {
+      final email = supabaseUser.email ?? '';
+      final avatarUrl = _metadataString(
+        supabaseUser,
+        const ['avatar_url', 'picture'],
+      );
+      await _client.from(AppConstants.tableProfiles).upsert({
+        'id': supabaseUser.id,
+        'email': email,
+        'nombre': _metadataString(supabaseUser, const [
+              'nombre',
+              'full_name',
+              'name',
+            ]) ??
+            (email.contains('@') ? email.split('@').first : email),
         'telefono': '',
         'rol': AppConstants.roleDriver,
         'activo': true,
         if (avatarUrl != null) 'avatar_url': avatarUrl,
         'creado_en': DateTime.now().toIso8601String(),
-      });
-
-      return UserModel(
-        id: supabaseUser.id,
-        email: email,
-        name: name,
-        phone: '',
-        role: AppConstants.roleDriver,
-        avatarUrl: avatarUrl,
-        rating: 0.0,
-        totalServices: 0,
-        isActive: true,
-        isAvailable: false,
-        isApproved: true,
-        createdAt: DateTime.now(),
-      );
+      }, onConflict: 'id');
+      return _fetchProfile(supabaseUser.id);
     }
   }
 
@@ -298,7 +415,10 @@ class AuthRemoteDataSourceImpl implements AuthRemoteDataSource {
   }
 
   @override
-  Future<UserModel> loginWithGoogle() async {
+  Future<UserModel> loginWithGoogle({
+    String? role,
+    String? specialty,
+  }) async {
     try {
       if (kIsWeb) {
         await _client.auth.signInWithOAuth(OAuthProvider.google);
@@ -307,7 +427,13 @@ class AuthRemoteDataSourceImpl implements AuthRemoteDataSource {
 
       // Android / iOS: Chrome Custom Tab → deep link → Supabase PKCE callback
       final existingUser = _client.auth.currentUser;
-      if (existingUser != null) return _ensureProfile(existingUser);
+      if (existingUser != null) {
+        return _ensureProfile(
+          existingUser,
+          role: role,
+          specialty: specialty,
+        );
+      }
 
       final completer = Completer<UserModel>();
       late final StreamSubscription<AuthState> subscription;
@@ -316,7 +442,13 @@ class AuthRemoteDataSourceImpl implements AuthRemoteDataSource {
         final user = event.session?.user;
         if (user == null || completer.isCompleted) return;
         try {
-          completer.complete(await _ensureProfile(user));
+          completer.complete(
+            await _ensureProfile(
+              user,
+              role: role,
+              specialty: specialty,
+            ),
+          );
         } catch (error, stackTrace) {
           completer.completeError(error, stackTrace);
         }

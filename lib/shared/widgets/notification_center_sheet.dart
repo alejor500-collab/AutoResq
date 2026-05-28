@@ -119,6 +119,7 @@ class _NotificationTile extends StatelessWidget {
       'solicitud_cancelada' || 'tecnico_cancelo' => AppColors.error,
       'nuevo_mensaje' => AppColors.primary,
       'nueva_solicitud' => AppColors.success,
+      'servicio_finalizado' => AppColors.success,
       'solicitud_aceptada' => AppColors.warning,
       _ => AppColors.secondary,
     };
@@ -126,6 +127,7 @@ class _NotificationTile extends StatelessWidget {
       'solicitud_cancelada' || 'tecnico_cancelo' => Icons.cancel_rounded,
       'nuevo_mensaje' => Icons.chat_bubble_rounded,
       'nueva_solicitud' => Icons.notifications_active_rounded,
+      'servicio_finalizado' => Icons.check_circle_rounded,
       'solicitud_aceptada' => Icons.check_circle_rounded,
       _ => Icons.notifications_rounded,
     };

@@ -639,15 +639,37 @@ SECURITY DEFINER
 SET search_path = public
 AS $$
 BEGIN
-    INSERT INTO public.usuarios (id, nombre, email, telefono, rol)
+    INSERT INTO public.usuarios (id, nombre, email, telefono, rol, avatar_url)
     VALUES (
         NEW.id,
-        COALESCE(NEW.raw_user_meta_data->>'nombre', split_part(NEW.email, '@', 1)),
+        COALESCE(
+            NULLIF(TRIM(NEW.raw_user_meta_data->>'nombre'), ''),
+            NULLIF(TRIM(NEW.raw_user_meta_data->>'full_name'), ''),
+            NULLIF(TRIM(NEW.raw_user_meta_data->>'name'), ''),
+            split_part(NEW.email, '@', 1)
+        ),
         NEW.email,
-        NEW.raw_user_meta_data->>'telefono',
-        COALESCE(NEW.raw_user_meta_data->>'rol', 'conductor')
+        COALESCE(NEW.raw_user_meta_data->>'telefono', ''),
+        CASE
+            WHEN NEW.raw_user_meta_data->>'rol' IN ('conductor', 'tecnico', 'administrador')
+                THEN NEW.raw_user_meta_data->>'rol'
+            ELSE 'conductor'
+        END,
+        COALESCE(
+            NULLIF(TRIM(NEW.raw_user_meta_data->>'avatar_url'), ''),
+            NULLIF(TRIM(NEW.raw_user_meta_data->>'picture'), '')
+        )
     )
-    ON CONFLICT (id) DO NOTHING;
+    ON CONFLICT (id) DO UPDATE SET
+        email = EXCLUDED.email,
+        nombre = CASE
+            WHEN public.usuarios.nombre IS NULL
+              OR TRIM(public.usuarios.nombre) = ''
+              OR public.usuarios.nombre = split_part(EXCLUDED.email, '@', 1)
+                THEN EXCLUDED.nombre
+            ELSE public.usuarios.nombre
+        END,
+        avatar_url = COALESCE(public.usuarios.avatar_url, EXCLUDED.avatar_url);
     RETURN NEW;
 END;
 $$;

@@ -8,7 +8,10 @@ abstract class AuthRepository {
     required String password,
   });
 
-  Future<Either<Failure, AppUser>> loginWithGoogle();
+  Future<Either<Failure, AppUser>> loginWithGoogle({
+    String? role,
+    String? specialty,
+  });
 
   Future<Either<Failure, AppUser>> register({
     required String email,

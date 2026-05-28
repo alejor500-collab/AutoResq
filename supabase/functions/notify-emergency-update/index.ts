@@ -57,7 +57,7 @@ Deno.serve(async (req: Request) => {
   if (!emergencyId) {
     return jsonResponse({ error: 'Missing required field: emergency_id' }, 400);
   }
-  if (type !== 'solicitud_aceptada') {
+  if (type !== 'solicitud_aceptada' && type !== 'servicio_finalizado') {
     return jsonResponse({ error: 'Unsupported notification type' }, 400);
   }
 
@@ -76,13 +76,17 @@ Deno.serve(async (req: Request) => {
     return jsonResponse({ error: 'Emergency not found' }, 404);
   }
 
+  const assignmentStates = type === 'servicio_finalizado'
+    ? ['finalizada']
+    : ['aceptada', 'en_ruta', 'atendiendo'];
+
   const { data: assignment, error: assignmentError } = await supabase
     .from('asignaciones')
     .select(
       'emergencia_id, estado, tecnicos!tecnico_id(usuario_id, usuarios!usuario_id(nombre))',
     )
     .eq('emergencia_id', emergencyId)
-    .in('estado', ['aceptada', 'en_ruta', 'atendiendo'])
+    .in('estado', assignmentStates)
     .order('fecha_asignacion', { ascending: false })
     .limit(1)
     .maybeSingle<AssignmentRow>();
@@ -94,14 +98,26 @@ Deno.serve(async (req: Request) => {
 
   const technicianName =
     assignment.tecnicos?.usuarios?.nombre?.trim() || 'Tu tecnico';
-  const message = `${technicianName} acepto tu solicitud y ya puede ver tu servicio.`;
+  const message = type === 'servicio_finalizado'
+    ? `${technicianName} marco el servicio como finalizado. Ya puedes calificar la atencion.`
+    : `${technicianName} acepto tu solicitud y ya puede ver tu servicio.`;
 
-  const { error: insertError } = await supabase.from('notificaciones').insert({
-    usuario_id: emergency.usuario_id,
-    tipo: 'solicitud_aceptada',
-    mensaje: message,
-    referencia_id: emergencyId,
-  });
+  const { data: existingNotification } = await supabase
+    .from('notificaciones')
+    .select('id')
+    .eq('usuario_id', emergency.usuario_id)
+    .eq('tipo', type)
+    .eq('referencia_id', emergencyId)
+    .maybeSingle<{ id: string }>();
+
+  const { error: insertError } = existingNotification
+    ? { error: null }
+    : await supabase.from('notificaciones').insert({
+        usuario_id: emergency.usuario_id,
+        tipo: type,
+        mensaje: message,
+        referencia_id: emergencyId,
+      });
 
   if (insertError) {
     console.error('[notify-emergency-update] notification insert error:', insertError);
@@ -110,7 +126,9 @@ Deno.serve(async (req: Request) => {
 
   const pushResult = await sendPushNotification({
     userIds: [emergency.usuario_id],
-    title: 'Tu solicitud fue aceptada',
+    title: type === 'servicio_finalizado'
+      ? 'Servicio finalizado'
+      : 'Tu solicitud fue aceptada',
     message,
     emergencyId,
     type,

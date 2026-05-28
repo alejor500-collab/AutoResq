@@ -2152,7 +2152,10 @@ class _FakeAuthRepository implements AuthRepository {
   }
 
   @override
-  Future<Either<Failure, AppUser>> loginWithGoogle() async {
+  Future<Either<Failure, AppUser>> loginWithGoogle({
+    String? role,
+    String? specialty,
+  }) async {
     return user != null
         ? right(user!)
         : left(const AuthFailure('Sin usuario de prueba'));
@@ -2392,6 +2395,13 @@ class _FakeEmergencyRemoteDataSource implements EmergencyRemoteDataSource {
 
   @override
   Future<void> cancelTechnicianService(String emergencyId) async {}
+
+  @override
+  Future<void> completeTechnicianService({
+    required String emergencyId,
+    String? assignmentId,
+    String? technicianId,
+  }) async {}
 
   @override
   Future<EmergencyModel> createEmergency({

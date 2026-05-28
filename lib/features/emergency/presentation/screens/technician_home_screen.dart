@@ -56,9 +56,11 @@ class _TechnicianHomeScreenState extends ConsumerState<TechnicianHomeScreen> {
   int _lastUnreadChatCount = 0;
   bool? _isAvailable;
   bool _activeWarningShown = false;
+  bool _isShowingIncomingRequest = false;
   String? _autoOpenedActiveServiceId;
   bool _pendingEmergencyFeedSeeded = false;
   final Set<String> _knownPendingEmergencyIds = <String>{};
+  final Set<String> _presentedPendingEmergencyIds = <String>{};
   List<Emergency> _bannerEmergencies = const [];
 
   @override
@@ -194,6 +196,8 @@ class _TechnicianHomeScreenState extends ConsumerState<TechnicianHomeScreen> {
             }
             return;
           case 'nueva_solicitud':
+            await _openPendingRequestFromNotification(referenceId);
+            return;
           case 'solicitud_cancelada':
             ref.invalidate(technicianPendingEmergenciesProvider);
             setState(() => _navIndex = 1);
@@ -205,6 +209,31 @@ class _TechnicianHomeScreenState extends ConsumerState<TechnicianHomeScreen> {
         }
       },
     );
+  }
+
+  Future<void> _openPendingRequestFromNotification(String? emergencyId) async {
+    ref.invalidate(technicianPendingEmergenciesProvider);
+    if (emergencyId == null || emergencyId.isEmpty) {
+      setState(() => _navIndex = 1);
+      return;
+    }
+
+    try {
+      final emergency =
+          await ref.read(emergencyDataSourceProvider).getEmergency(emergencyId);
+      if (!mounted) return;
+      final opened = await _showIncomingRequest(emergency);
+      if (opened) return;
+      setState(() => _navIndex = 1);
+    } catch (e) {
+      if (!mounted) return;
+      setState(() => _navIndex = 1);
+      AppHelpers.showSnackBar(
+        context,
+        'No se pudo abrir esta solicitud. Actualizamos la lista.',
+        isError: true,
+      );
+    }
   }
 
   void _showActiveServiceDialog(
@@ -627,7 +656,9 @@ class _TechnicianHomeScreenState extends ConsumerState<TechnicianHomeScreen> {
                   emergency: emergency,
                   canAccept: isAvailable,
                   isLoading: isLoading,
-                  onTap: () => _showIncomingRequest(emergency),
+                  onTap: () {
+                    unawaited(_showIncomingRequest(emergency));
+                  },
                   onAccept: () => _sendOfferFromList(emergency),
                 ),
               ),
@@ -832,16 +863,67 @@ class _TechnicianHomeScreenState extends ConsumerState<TechnicianHomeScreen> {
     );
   }
 
-  void _showIncomingRequest(Emergency emergency) {
+  Future<bool> _showIncomingRequest(
+    Emergency emergency, {
+    bool auto = false,
+  }) async {
     final currentUser = ref.read(authNotifierProvider).value ??
         ref.read(authStateProvider).valueOrNull;
-    if (currentUser?.id == emergency.usuarioId) return;
-    showModalBottomSheet<void>(
-      context: context,
-      isScrollControlled: true,
-      backgroundColor: Colors.transparent,
-      builder: (_) => IncomingRequestSheet(emergency: emergency),
-    );
+    if (currentUser?.id == emergency.usuarioId) return false;
+    if (auto && !_presentedPendingEmergencyIds.add(emergency.id)) {
+      return false;
+    }
+    if (_isShowingIncomingRequest) return false;
+
+    final active = ref.read(activeTechnicianEmergencyProvider).valueOrNull ??
+        ref.read(emergencyNotifierProvider).activeEmergency;
+    if (active != null) return false;
+
+    Emergency freshEmergency = emergency;
+    try {
+      freshEmergency =
+          await ref.read(emergencyDataSourceProvider).getEmergency(emergency.id);
+    } catch (_) {
+      // The pending feed already gave us a usable row; keep it as a fallback.
+    }
+    if (!mounted) return false;
+
+    final isPending = freshEmergency.estado == AppConstants.statusPending &&
+        !freshEmergency.hasTechnician;
+    if (!isPending) {
+      if (!auto) {
+        AppHelpers.showSnackBar(
+          context,
+          'Esta solicitud ya no esta disponible.',
+          isError: true,
+        );
+      }
+      return false;
+    }
+
+    _bannerDismissTimer?.cancel();
+    setState(() {
+      _isShowingIncomingRequest = true;
+      _bannerEmergencies = _bannerEmergencies
+          .where((item) => item.id != freshEmergency.id)
+          .toList(growable: false);
+    });
+
+    try {
+      await showModalBottomSheet<void>(
+        context: context,
+        isScrollControlled: true,
+        backgroundColor: Colors.transparent,
+        builder: (_) => IncomingRequestSheet(emergency: freshEmergency),
+      );
+    } finally {
+      if (mounted) {
+        setState(() => _isShowingIncomingRequest = false);
+      } else {
+        _isShowingIncomingRequest = false;
+      }
+    }
+    return true;
   }
 
   void _handlePendingEmergencyUpdate(
@@ -893,6 +975,7 @@ class _TechnicianHomeScreenState extends ConsumerState<TechnicianHomeScreen> {
         setState(() => _bannerEmergencies = const []);
       }
     });
+    unawaited(_tryAutoOpenIncomingRequest(emergencies));
   }
 
   void _openBannerEmergency() {
@@ -900,7 +983,17 @@ class _TechnicianHomeScreenState extends ConsumerState<TechnicianHomeScreen> {
     final first = _bannerEmergencies.first;
     _bannerDismissTimer?.cancel();
     setState(() => _bannerEmergencies = const []);
-    _showIncomingRequest(first);
+    unawaited(_showIncomingRequest(first));
+  }
+
+  Future<void> _tryAutoOpenIncomingRequest(List<Emergency> emergencies) async {
+    if (emergencies.isEmpty || _isShowingIncomingRequest) return;
+    final opened = await _showIncomingRequest(emergencies.first, auto: true);
+    if (!mounted || !opened) return;
+    final remaining = emergencies
+        .where((emergency) => emergency.id != emergencies.first.id)
+        .toList(growable: false);
+    setState(() => _bannerEmergencies = remaining);
   }
 
   void _openRequestsTabFromBanner() {

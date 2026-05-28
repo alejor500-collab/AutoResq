@@ -507,6 +507,27 @@ class EmergencyNotifier extends StateNotifier<EmergencyState> {
     }
   }
 
+  Future<bool> completeTechnicianService({
+    required String emergencyId,
+    String? assignmentId,
+    String? technicianId,
+  }) async {
+    state = state.copyWith(isLoading: true, error: null);
+    try {
+      await _dataSource.completeTechnicianService(
+        emergencyId: emergencyId,
+        assignmentId: assignmentId,
+        technicianId: technicianId,
+      );
+      final updated = await _dataSource.getEmergency(emergencyId);
+      state = state.copyWith(isLoading: false, activeEmergency: updated);
+      return true;
+    } catch (e) {
+      state = state.copyWith(isLoading: false, error: e.toString());
+      return false;
+    }
+  }
+
   Future<bool> cancelTechnicianService(String emergencyId) async {
     state = state.copyWith(isLoading: true, error: null);
     try {

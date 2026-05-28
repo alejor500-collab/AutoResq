@@ -5,9 +5,11 @@ import 'package:gap/gap.dart';
 import '../../../../core/constants/app_colors.dart';
 import '../../../../core/constants/app_constants.dart';
 import '../../../../core/router/app_router.dart';
+import '../../../../core/utils/helpers.dart';
 import '../../../../shared/widgets/app_button.dart';
 import '../../../../shared/widgets/status_chip.dart';
 import '../../../../shared/widgets/user_avatar.dart';
+import '../providers/emergency_provider.dart';
 
 // Route path: /technician/service-closure
 class ServiceClosureScreen extends ConsumerStatefulWidget {
@@ -19,6 +21,50 @@ class ServiceClosureScreen extends ConsumerStatefulWidget {
 }
 
 class _ServiceClosureScreenState extends ConsumerState<ServiceClosureScreen> {
+  bool _isCompleting = false;
+
+  Future<void> _confirmCompletionAndRate({
+    required String emergencyId,
+    String? asignacionId,
+    String? technicianId,
+    required Map<String, dynamic> ratingArgs,
+  }) async {
+    if (_isCompleting) return;
+    if (emergencyId.isEmpty) {
+      AppHelpers.showSnackBar(
+        context,
+        'No se encontro el servicio para cerrar.',
+        isError: true,
+      );
+      return;
+    }
+
+    setState(() => _isCompleting = true);
+    final ok = await ref
+        .read(emergencyNotifierProvider.notifier)
+        .completeTechnicianService(
+          emergencyId: emergencyId,
+          assignmentId: asignacionId,
+          technicianId: technicianId,
+        );
+    if (!mounted) return;
+    setState(() => _isCompleting = false);
+
+    if (!ok) {
+      AppHelpers.showSnackBar(
+        context,
+        ref.read(emergencyNotifierProvider).error ??
+            'No se pudo finalizar el servicio.',
+        isError: true,
+      );
+      return;
+    }
+
+    ref.invalidate(activeTechnicianEmergencyProvider);
+    ref.invalidate(technicianEmergencyHistoryProvider);
+    context.pushReplacement(AppRoutes.rateDriver, extra: ratingArgs);
+  }
+
   @override
   Widget build(BuildContext context) {
     final extra = (ModalRoute.of(context)?.settings.arguments ?? {})
@@ -351,21 +397,26 @@ class _ServiceClosureScreenState extends ConsumerState<ServiceClosureScreen> {
                 24,
               ),
               child: AppButton(
-                label: 'Confirmar y calificar cliente →',
-                onPressed: () => context.push(
-                  AppRoutes.rateDriver,
-                  extra: {
-                    'emergencyId': emergencyId,
-                    'asignacionId': asignacionId,
-                    'technicianId': technicianId,
-                    'driverId': driverId,
-                    'driverName': driverName,
-                    'vehicleInfo': vehicleInfo,
-                    'duration': duration,
-                    'clasificacionIa': clasificacionIa,
-                    'amount': amount,
-                  },
-                ),
+                label: 'Finalizar y calificar cliente',
+                isLoading: _isCompleting,
+                onPressed: _isCompleting
+                    ? null
+                    : () => _confirmCompletionAndRate(
+                          emergencyId: emergencyId,
+                          asignacionId: asignacionId,
+                          technicianId: technicianId,
+                          ratingArgs: {
+                            'emergencyId': emergencyId,
+                            'asignacionId': asignacionId,
+                            'technicianId': technicianId,
+                            'driverId': driverId,
+                            'driverName': driverName,
+                            'vehicleInfo': vehicleInfo,
+                            'duration': duration,
+                            'clasificacionIa': clasificacionIa,
+                            'amount': amount,
+                          },
+                        ),
               ),
             ),
           ],

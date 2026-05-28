@@ -155,35 +155,35 @@ Deno.serve(async (req: Request) => {
       .filter(Boolean) as string[],
   );
 
+  const pushRecipientIds = recipients
+    .map((technician) => technician.usuario_id)
+    .filter(Boolean) as string[];
   const newRecipients = recipients.filter(
     (technician) => technician.usuario_id && !existingIds.has(technician.usuario_id),
   );
-  if (newRecipients.length === 0) {
-    return jsonResponse({ ok: true, recipients: 0, push: 'already_notified' }, 200);
-  }
 
   const serviceName = serviceNameForType(emergencyType);
   const driverName = driver?.nombre?.trim() || 'Conductor';
   const address = location?.direccion?.trim() || 'Ubicacion del conductor';
   const message = `${serviceName}: ${driverName} necesita asistencia en ${address}.`;
 
-  const rows = newRecipients.map((technician) => ({
-    usuario_id: technician.usuario_id,
-    tipo: 'nueva_solicitud',
-    mensaje: message,
-    referencia_id: emergencyId,
-  }));
+  if (newRecipients.length > 0) {
+    const rows = newRecipients.map((technician) => ({
+      usuario_id: technician.usuario_id,
+      tipo: 'nueva_solicitud',
+      mensaje: message,
+      referencia_id: emergencyId,
+    }));
 
-  const { error: insertError } = await supabase.from('notificaciones').insert(rows);
-  if (insertError) {
-    console.error('[notify-new-emergency] notification insert error:', insertError);
-    return jsonResponse({ error: 'Notification insert failed' }, 500);
+    const { error: insertError } = await supabase.from('notificaciones').insert(rows);
+    if (insertError) {
+      console.error('[notify-new-emergency] notification insert error:', insertError);
+      return jsonResponse({ error: 'Notification insert failed' }, 500);
+    }
   }
 
   const pushResult = await sendPushNotification({
-    userIds: newRecipients
-      .map((technician) => technician.usuario_id)
-      .filter(Boolean) as string[],
+    userIds: pushRecipientIds,
     title: 'Nueva solicitud en AutoResQ',
     message,
     emergencyId,
@@ -192,7 +192,8 @@ Deno.serve(async (req: Request) => {
   return jsonResponse(
     {
       ok: true,
-      recipients: newRecipients.length,
+      recipients: pushRecipientIds.length,
+      inserted: newRecipients.length,
       push: pushResult,
     },
     200,

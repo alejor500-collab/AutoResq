@@ -440,6 +440,12 @@ class _IncomingRequestSheetState extends ConsumerState<IncomingRequestSheet> {
                                     );
                                 if (!context.mounted) return;
                                 if (ok) {
+                                  ref.invalidate(
+                                    technicianPendingEmergenciesProvider,
+                                  );
+                                  ref.invalidate(
+                                    technicianEmergencyHistoryProvider,
+                                  );
                                   context.pop();
                                   AppHelpers.showSnackBar(
                                     context,
