@@ -67,7 +67,7 @@ class _TechnicianOfferAmountSheetState
     final parsed = _parseAmount(_amountController.text);
     if (parsed == null || parsed <= 0) {
       setState(() {
-        _errorText = 'Ingresa una cuota inicial válida.';
+        _errorText = 'Ingresa un precio aproximado valido.';
       });
       return;
     }
@@ -115,7 +115,7 @@ class _TechnicianOfferAmountSheetState
                 ),
                 const Gap(6),
                 const Text(
-                  'Define una cuota inicial referencial. El valor final puede ajustarse según la revisión y repuestos necesarios.',
+                  'Indica un precio aproximado para iniciar la atencion. El valor final puede ajustarse despues de revisar el vehiculo y confirmar repuestos o trabajos adicionales.',
                   style: TextStyle(
                     fontSize: 13,
                     color: AppColors.textSecondary,
@@ -137,7 +137,7 @@ class _TechnicianOfferAmountSheetState
                     children: [
                       if (suggested != null)
                         Text(
-                          'Cuota referencial de la app: ${AppHelpers.formatCurrency(suggested)}',
+                          'Referencia de la app: ${AppHelpers.formatCurrency(suggested)}',
                           style: const TextStyle(
                             fontSize: 13,
                             fontWeight: FontWeight.w700,
@@ -147,7 +147,7 @@ class _TechnicianOfferAmountSheetState
                       if (currentOffer != null) ...[
                         if (suggested != null) const Gap(6),
                         Text(
-                          'Tu oferta actual: ${AppHelpers.formatCurrency(currentOffer)}',
+                          'Tu precio aproximado actual: ${AppHelpers.formatCurrency(currentOffer)}',
                           style: const TextStyle(
                             fontSize: 13,
                             fontWeight: FontWeight.w700,
@@ -160,7 +160,7 @@ class _TechnicianOfferAmountSheetState
                 ),
                 const Gap(16),
                 AppTextField(
-                  label: 'Tu cuota inicial',
+                  label: 'Precio aproximado',
                   hint: 'Ej. 8.00',
                   controller: _amountController,
                   keyboardType: const TextInputType.numberWithOptions(
@@ -208,7 +208,7 @@ class _TechnicianOfferAmountSheetState
                       child: AppButton(
                         label: widget.alreadyOffered
                             ? 'Actualizar'
-                            : 'Confirmar',
+                            : 'Enviar oferta',
                         onPressed: _submit,
                       ),
                     ),

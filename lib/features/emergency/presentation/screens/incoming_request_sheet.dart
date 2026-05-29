@@ -17,6 +17,8 @@ import '../widgets/emergency_evidence_photos.dart';
 import '../widgets/technician_offer_amount_sheet.dart';
 import '../../domain/entities/emergency_entity.dart';
 
+enum IncomingRequestSheetResult { hidden, responded }
+
 class IncomingRequestSheet extends ConsumerStatefulWidget {
   final Emergency emergency;
 
@@ -446,7 +448,9 @@ class _IncomingRequestSheetState extends ConsumerState<IncomingRequestSheet> {
                                   ref.invalidate(
                                     technicianEmergencyHistoryProvider,
                                   );
-                                  context.pop();
+                                  context.pop(
+                                    IncomingRequestSheetResult.responded,
+                                  );
                                   AppHelpers.showSnackBar(
                                     context,
                                     hasOffer
@@ -464,9 +468,9 @@ class _IncomingRequestSheetState extends ConsumerState<IncomingRequestSheet> {
                                   } else {
                                     AppHelpers.showSnackBar(
                                       context,
-                                          ref
-                                                  .read(emergencyNotifierProvider)
-                                                  .error ??
+                                      ref
+                                              .read(emergencyNotifierProvider)
+                                              .error ??
                                           'No se pudo enviar la oferta',
                                       isError: true,
                                     );
@@ -477,10 +481,11 @@ class _IncomingRequestSheetState extends ConsumerState<IncomingRequestSheet> {
                       ),
                       const Gap(10),
 
-                      // ─── Botón Rechazar ───────────────────────────────
+                      // ─── Ocultar sin responder ────────────────────────
                       AppButton(
-                        label: '✗ Rechazar',
-                        onPressed: () => context.pop(),
+                        label: 'Ocultar por ahora',
+                        onPressed: () =>
+                            context.pop(IncomingRequestSheetResult.hidden),
                         variant: AppButtonVariant.outline,
                       ),
                     ],

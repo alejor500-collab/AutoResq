@@ -613,7 +613,7 @@ class _EnRoutePanel extends StatelessWidget {
             _ServiceInfoLine(
               icon: Icons.local_offer_outlined,
               text:
-                  'Precio acordado: ${AppHelpers.formatCurrency(emergency.agreedAmount!)}',
+                  'Precio aproximado ofertado: ${AppHelpers.formatCurrency(emergency.agreedAmount!)}',
             ),
           ],
           const Gap(16),
@@ -753,7 +753,7 @@ class _AttendingPanel extends StatelessWidget {
             _ServiceInfoLine(
               icon: Icons.local_offer_outlined,
               text:
-                  'Precio acordado: ${AppHelpers.formatCurrency(emergency.agreedAmount!)}',
+                  'Precio aproximado ofertado: ${AppHelpers.formatCurrency(emergency.agreedAmount!)}',
             ),
           ],
           const Gap(22),

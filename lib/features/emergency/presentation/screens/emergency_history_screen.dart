@@ -229,7 +229,7 @@ class _HistoryCardState extends State<_HistoryCard> {
                     const Gap(8),
                     _InfoRow(
                       icon: Icons.local_offer_outlined,
-                      label: 'Precio acordado',
+                      label: 'Precio aproximado ofertado',
                       value: AppHelpers.formatCurrency(e.agreedAmount!),
                     ),
                   ],

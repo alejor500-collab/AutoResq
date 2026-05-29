@@ -296,11 +296,17 @@ function buildSystemPrompt(): string {
     'Tu respuesta debe ser exclusivamente JSON válido, sin markdown, sin texto extra, sin explicaciones y sin bloques de código.',
     'Debes usar exactamente una de estas categorías para "categoria":',
     ALLOWED_CATEGORIES.map((value) => `"${value}"`).join(', '),
-    'La categoría representa el tipo de técnico requerido.',
-    '"tipo_danio" debe describir brevemente el posible problema sin inventar datos.',
-    '"resumen_tecnico" debe ser corto, claro y útil para el técnico.',
+    'La categoría representa el rol principal del técnico que debe atender la solicitud, no solo el nombre de la falla.',
+    'Clasifica por capacidad requerida: "Mecánica rápida" para fallas revisables en sitio por mecánico móvil; "Sistema eléctrico y batería" para problemas principalmente eléctricos, batería, arranque o carga; "Llantas y vulcanización" para neumáticos; "Grúa / remolque" cuando el vehículo no debe o no puede circular de forma segura y la atención principal sea traslado/remolque; "Combustible" para falta o error de combustible; "Cerrajería vehicular" para acceso o llaves; "Auxilio general" solo si no hay información suficiente para escoger un rol.',
+    'Si el caso requiere traslado/remolque como servicio principal, "categoria" debe ser "Grúa / remolque" y "requiere_grua" debe ser true.',
+    'Si eliges una categoría diferente de "Grúa / remolque", "requiere_grua" debe ser false, salvo que el conductor pida explícitamente remolque adicional.',
+    '"tipo_danio" debe ser una etiqueta breve del problema probable, tipo titulo, maximo 12 palabras. Debe nombrar el sistema o falla principal sin explicar la causa.',
+    '"resumen_tecnico" debe aportar informacion distinta a "tipo_danio": en 1 o 2 frases cortas, resume sintomas reportados, sistemas/componentes probables y que debe verificar primero el tecnico.',
+    'Para "resumen_tecnico", prioriza señales accionables: ruidos, fugas, perdida de potencia, temperatura, bateria, llanta, frenos, transmision, embrague, direccion, luces o inmovilizacion, segun aplique.',
+    'No repitas la misma frase entre "tipo_danio" y "resumen_tecnico"; si hay poca informacion, indica que el tecnico debe confirmar el sistema afectado en sitio.',
+    'Mantén "resumen_tecnico" preciso y sin listas largas; maximo 45 palabras.',
     '"urgencia" solo puede ser "baja", "media" o "alta".',
-    '"requiere_grua" debe ser true solo cuando el vehículo no pueda movilizarse o el caso indique remolque.',
+    '"requiere_grua" debe ser true solo cuando el rol requerido sea grua/remolque o el conductor indique claramente que necesita remolque.',
     '"recomendacion" debe ser una instrucción inicial breve, prudente y segura.',
     'Si la descripción es ambigua o insuficiente, usa "Auxilio general".',
     'No incluyas precios, costos, tarifas, tiempos, promesas ni información no solicitada.',
@@ -422,25 +428,60 @@ function validateAnalysis(
     return fallback;
   }
 
-  return {
+  const normalized = normalizeRoleConsistency({
     categoria,
+    requiere_grua: requiereGrua,
+  });
+
+  return {
+    categoria: normalized.categoria,
     tipo_danio: tipoDanio,
     resumen_tecnico: resumenTecnico,
     urgencia,
-    requiere_grua: requiereGrua,
+    requiere_grua: normalized.requiere_grua,
     recomendacion,
+  };
+}
+
+function normalizeRoleConsistency({
+  categoria,
+  requiere_grua,
+}: {
+  categoria: AllowedCategory;
+  requiere_grua: boolean;
+}): {
+  categoria: AllowedCategory;
+  requiere_grua: boolean;
+} {
+  if (requiere_grua) {
+    return {
+      categoria: 'Grúa / remolque',
+      requiere_grua: true,
+    };
+  }
+
+  if (categoria === 'Grúa / remolque') {
+    return {
+      categoria,
+      requiere_grua: true,
+    };
+  }
+
+  return {
+    categoria,
+    requiere_grua: false,
   };
 }
 
 function buildFallbackAnalysis(description: string): EmergencyAnalysis {
   const normalizedDescription = sanitizeText(description) ||
     'Problema vehicular por confirmar';
-  const shortened = truncate(normalizedDescription, 120);
+  const shortened = truncate(normalizedDescription, 110);
   return {
     categoria: 'Auxilio general',
     tipo_danio: truncate(normalizedDescription, 80),
     resumen_tecnico:
-      `Conductor reporta: ${shortened}. Revisar en sitio y confirmar diagnostico.`,
+      `Conductor reporta: ${shortened}. Confirmar sintomas en sitio, identificar el rol tecnico requerido y descartar traslado/remolque si el vehiculo no puede circular seguro.`,
     urgencia: 'media',
     requiere_grua: false,
     recomendacion:

@@ -910,12 +910,22 @@ class _TechnicianHomeScreenState extends ConsumerState<TechnicianHomeScreen> {
     });
 
     try {
-      await showModalBottomSheet<void>(
+      final result = await showModalBottomSheet<IncomingRequestSheetResult>(
         context: context,
         isScrollControlled: true,
+        isDismissible: true,
+        enableDrag: true,
         backgroundColor: Colors.transparent,
         builder: (_) => IncomingRequestSheet(emergency: freshEmergency),
       );
+      if (!mounted) return true;
+      if (result != IncomingRequestSheetResult.responded) {
+        AppHelpers.showSnackBar(
+          context,
+          'Solicitud oculta. Puedes retomarla desde la pestaña Solicitudes.',
+          isSuccess: true,
+        );
+      }
     } finally {
       if (mounted) {
         setState(() => _isShowingIncomingRequest = false);

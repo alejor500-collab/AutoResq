@@ -1960,8 +1960,19 @@ class _TimelineStepper extends StatelessWidget {
                 : _StepStatus.pending,
       ),
       _TimelineStep(
+        title: 'Atendiendo tu vehiculo',
+        subtitle: emergency.hasTechnician
+            ? '${emergency.tecnicoNombre} ya esta revisando el problema'
+            : 'Revision inicial del problema',
+        status: currentStatus == AppConstants.assignAttending
+            ? _StepStatus.active
+            : _isAtLeast(currentStatus, AppConstants.assignFinished)
+                ? _StepStatus.completed
+                : _StepStatus.pending,
+      ),
+      _TimelineStep(
         title: 'Finalizado',
-        subtitle: 'Confirmacion de llegada',
+        subtitle: 'Servicio cerrado y confirmado',
         status: currentStatus == AppConstants.assignFinished
             ? _StepStatus.completed
             : _StepStatus.pending,

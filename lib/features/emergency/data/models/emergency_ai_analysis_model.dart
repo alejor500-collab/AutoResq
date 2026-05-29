@@ -70,7 +70,7 @@ class EmergencyAiAnalysisModel {
         90,
       ),
       resumenTecnico:
-          'Conductor reporta: $shortDescription Revisar en sitio y confirmar diagnostico.',
+          'Conductor reporta: $shortDescription Confirmar sintomas en sitio, identificar el rol tecnico requerido y descartar traslado/remolque si el vehiculo no puede circular seguro.',
       urgencia: urgenciaMedia,
       requiereGrua: false,
       recomendacion:
@@ -85,12 +85,15 @@ class EmergencyAiAnalysisModel {
     String? fallbackDescription,
   }) {
     final fallback = EmergencyAiAnalysisModel.fallback(fallbackDescription ?? '');
+    final categoria = _safeEnum(
+      json['categoria'],
+      allowedCategories,
+      fallback: fallback.categoria,
+    );
+    final requiereGrua = json['requiere_grua'] as bool? ?? fallback.requiereGrua;
+    final consistent = _normalizeRoleConsistency(categoria, requiereGrua);
     return EmergencyAiAnalysisModel(
-      categoria: _safeEnum(
-        json['categoria'],
-        allowedCategories,
-        fallback: fallback.categoria,
-      ),
+      categoria: consistent.$1,
       tipoDanio: _safeText(json['tipo_danio'], fallback: fallback.tipoDanio),
       resumenTecnico: _safeText(
         json['resumen_tecnico'],
@@ -101,7 +104,7 @@ class EmergencyAiAnalysisModel {
         allowedUrgencies,
         fallback: fallback.urgencia,
       ),
-      requiereGrua: json['requiere_grua'] as bool? ?? fallback.requiereGrua,
+      requiereGrua: consistent.$2,
       recomendacion: _safeText(
         json['recomendacion'],
         fallback: fallback.recomendacion,
@@ -121,8 +124,13 @@ class EmergencyAiAnalysisModel {
     final rawType =
         (json['emergency_type_code'] ?? json['emergency_type'])?.toString();
     final rawPriority = json['priority']?.toString();
+    final categoria = _legacyTypeToCategory(rawType) ?? fallback.categoria;
+    final requiereGrua =
+        (json['requires_immediate_attention'] as bool? ?? false) &&
+        categoria == gruaRemolque;
+    final consistent = _normalizeRoleConsistency(categoria, requiereGrua);
     return EmergencyAiAnalysisModel(
-      categoria: _legacyTypeToCategory(rawType) ?? fallback.categoria,
+      categoria: consistent.$1,
       tipoDanio: _safeText(
         json['user_friendly_summary'] ?? json['user_message'],
         fallback: fallback.tipoDanio,
@@ -132,9 +140,7 @@ class EmergencyAiAnalysisModel {
         fallback: fallback.resumenTecnico,
       ),
       urgencia: _legacyPriorityToUrgency(rawPriority) ?? fallback.urgencia,
-      requiereGrua:
-          (json['requires_immediate_attention'] as bool? ?? false) &&
-          _legacyTypeToCategory(rawType) == gruaRemolque,
+      requiereGrua: consistent.$2,
       recomendacion: _safeText(
         json['safety_recommendation'],
         fallback: fallback.recomendacion,
@@ -228,6 +234,15 @@ class EmergencyAiAnalysisModel {
   static String _safeText(Object? value, {String fallback = ''}) {
     final text = value?.toString().trim() ?? '';
     return text.isEmpty ? fallback : text;
+  }
+
+  static (String, bool) _normalizeRoleConsistency(
+    String categoria,
+    bool requiereGrua,
+  ) {
+    if (requiereGrua) return (gruaRemolque, true);
+    if (categoria == gruaRemolque) return (categoria, true);
+    return (categoria, false);
   }
 
   static String _truncate(String value, int maxLength) {
