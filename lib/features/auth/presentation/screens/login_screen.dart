@@ -109,7 +109,7 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
     final isDesktop = screenWidth >= 900;
 
     return Scaffold(
-      backgroundColor: const Color(0xFFF6F6F8),
+      backgroundColor: AppColors.background,
       body: AnimatedSwitcher(
         duration: const Duration(milliseconds: 280),
         switchInCurve: Curves.easeOutCubic,
@@ -145,7 +145,7 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
                     fontSize: isDesktop ? 34 : 28,
                     fontWeight: FontWeight.w800,
                     letterSpacing: -0.8,
-                    color: const Color(0xFF141518),
+                    color: AppColors.navy,
                   ),
                 ),
                 SizedBox(height: isDesktop ? 28 : 18),
@@ -158,13 +158,13 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
                       fontSize: isDesktop ? 58 : 36,
                       height: 1.06,
                       fontWeight: FontWeight.w900,
-                      color: const Color(0xFF141518),
+                      color: AppColors.textPrimary,
                     ),
                     children: const [
                       TextSpan(text: 'Asistencia\nVehicular\n'),
                       TextSpan(
                         text: 'Inteligente',
-                        style: TextStyle(color: Color(0xFFD50B14)),
+                        style: TextStyle(color: AppColors.primary),
                       ),
                     ],
                   ),
@@ -178,7 +178,7 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
                     style: TextStyle(
                       fontSize: isDesktop ? 20 : 15.5,
                       height: 1.65,
-                      color: const Color(0xFF6D7178),
+                      color: AppColors.textSecondary,
                     ),
                   ),
                 ),
@@ -188,7 +188,7 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
                   child: FilledButton(
                     onPressed: () => setState(() => _showIntroScreen = false),
                     style: FilledButton.styleFrom(
-                      backgroundColor: const Color(0xFF1A1C1E),
+                      backgroundColor: AppColors.primary,
                       foregroundColor: Colors.white,
                       minimumSize: Size(0, isDesktop ? 90 : 72),
                       elevation: 0,
@@ -282,7 +282,7 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
                                 fontSize: isDesktop ? 28 : 24,
                                 fontWeight: FontWeight.w800,
                                 letterSpacing: -0.6,
-                                color: const Color(0xFF17181B),
+                                color: AppColors.navy,
                               ),
                             ),
                           ),
@@ -299,13 +299,13 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
                             fontSize: isDesktop ? 56 : 36,
                             height: 1.08,
                             fontWeight: FontWeight.w900,
-                            color: const Color(0xFF15171A),
+                            color: AppColors.textPrimary,
                           ),
                           children: const [
                             TextSpan(text: 'Continúa con\n'),
                             TextSpan(
                               text: 'AutoResQ',
-                              style: TextStyle(color: Color(0xFFD30A11)),
+                              style: TextStyle(color: AppColors.primary),
                             ),
                           ],
                         ),
@@ -319,7 +319,7 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
                           style: TextStyle(
                             fontSize: isDesktop ? 18 : 15.5,
                             height: 1.5,
-                            color: const Color(0xFF666A72),
+                            color: AppColors.textSecondary,
                           ),
                         ),
                       ),
@@ -364,7 +364,7 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
                       TextButton(
                         onPressed: () => context.push(AppRoutes.forgotPassword),
                         style: TextButton.styleFrom(
-                          foregroundColor: const Color(0xFF4F5259),
+                          foregroundColor: AppColors.textSecondary,
                         ),
                         child: Text(
                           '¿Olvidaste tu contraseña?',
@@ -526,7 +526,7 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
       hintText: hint,
       hintStyle: TextStyle(color: AppColors.secondary.withValues(alpha: 0.5)),
       filled: true,
-      fillColor: const Color(0xFFF7FAFF),
+      fillColor: AppColors.surfaceContainerLowest,
       border: OutlineInputBorder(
         borderRadius: BorderRadius.circular(22),
         borderSide: BorderSide(
@@ -620,7 +620,7 @@ class _HeaderBackButton extends StatelessWidget {
       onPressed: onPressed,
       style: IconButton.styleFrom(
         minimumSize: const Size(44, 44),
-        foregroundColor: const Color(0xFF1A1B1E),
+        foregroundColor: AppColors.navy,
       ),
       icon: const Icon(Icons.arrow_back_rounded, size: 32),
     );
@@ -641,14 +641,14 @@ class _IntroShowcaseCard extends StatelessWidget {
             center: Alignment(0, -0.35),
             radius: 1.1,
             colors: [
-              Color(0xFF4C575D),
-              Color(0xFF242B2F),
-              Color(0xFF171B1E),
+              Color(0xFF1E293B),
+              Color(0xFF0F172A),
+              AppColors.navy,
             ],
           ),
           boxShadow: [
             BoxShadow(
-              color: Colors.black.withValues(alpha: 0.12),
+              color: AppColors.navy.withValues(alpha: 0.14),
               blurRadius: 34,
               offset: const Offset(0, 22),
             ),
@@ -708,7 +708,7 @@ class _IntroLogoShowcase extends StatelessWidget {
                     color: Colors.white.withValues(alpha: 0.06),
                     boxShadow: [
                       BoxShadow(
-                        color: const Color(0xFFFF8A4C).withValues(alpha: 0.8),
+                        color: AppColors.map.withValues(alpha: 0.55),
                         blurRadius: 42,
                         spreadRadius: 8,
                       ),
@@ -731,8 +731,8 @@ class _IntroLogoShowcase extends StatelessWidget {
                       begin: Alignment.topCenter,
                       end: Alignment.bottomCenter,
                       colors: [
-                        const Color(0xFFFFB184).withValues(alpha: 0.85),
-                        const Color(0xFFFF8A4C).withValues(alpha: 0.06),
+                        AppColors.assistance.withValues(alpha: 0.70),
+                        AppColors.assistance.withValues(alpha: 0.05),
                       ],
                     ),
                   ),
@@ -793,7 +793,7 @@ class _IntroMetaItem extends StatelessWidget {
     return Row(
       mainAxisSize: MainAxisSize.min,
       children: [
-        Icon(icon, size: 18, color: const Color(0xFFB7BAC0)),
+        Icon(icon, size: 18, color: AppColors.textHint),
         const SizedBox(width: 8),
         Text(
           label,
@@ -801,7 +801,7 @@ class _IntroMetaItem extends StatelessWidget {
             fontSize: 14,
             fontWeight: FontWeight.w600,
             letterSpacing: 1.2,
-            color: Color(0xFFB0B3B9),
+            color: AppColors.textHint,
           ),
         ),
       ],
@@ -818,7 +818,7 @@ class _IntroMetaDot extends StatelessWidget {
       '•',
       style: TextStyle(
         fontSize: 16,
-        color: Color(0xFFC6C8CC),
+        color: AppColors.textHint,
         fontWeight: FontWeight.w700,
       ),
     );
@@ -855,10 +855,10 @@ class _AuthHeroCard extends StatelessWidget {
         decoration: BoxDecoration(
           borderRadius: BorderRadius.circular(44),
           color: Colors.white.withValues(alpha: 0.92),
-          border: Border.all(color: const Color(0xFFE7EBF4)),
+          border: Border.all(color: AppColors.outline),
           boxShadow: [
             BoxShadow(
-              color: const Color(0xFFB8C7EA).withValues(alpha: 0.18),
+              color: AppColors.primary.withValues(alpha: 0.12),
               blurRadius: 32,
               offset: const Offset(0, 20),
             ),
@@ -892,8 +892,8 @@ class _AssistanceHeroScene extends StatelessWidget {
                     radius: 1.18,
                     colors: [
                       Colors.white,
-                      const Color(0xFFF8FAFF),
-                      const Color(0xFFEEF3FF),
+                      AppColors.background,
+                      AppColors.primaryFixed,
                     ],
                   ),
                 ),
@@ -963,7 +963,7 @@ class _AssistanceHeroScene extends StatelessWidget {
                 child: Icon(
                   Icons.air_rounded,
                   size: width * 0.05,
-                  color: const Color(0xFF9AA6BD),
+                   color: AppColors.textHint,
                 ),
               ),
             ),
@@ -975,7 +975,7 @@ class _AssistanceHeroScene extends StatelessWidget {
                 height: 4,
                 decoration: BoxDecoration(
                   borderRadius: BorderRadius.circular(999),
-                  color: const Color(0xFFE3ECFF),
+                  color: AppColors.primaryFixed,
                 ),
               ),
             ),
@@ -1031,7 +1031,7 @@ class _SkylineBar extends StatelessWidget {
       width: width,
       height: height,
       decoration: BoxDecoration(
-        color: const Color(0xFFDDE6F7),
+        color: AppColors.primaryFixed,
         borderRadius: const BorderRadius.vertical(top: Radius.circular(8)),
       ),
     );
@@ -1042,7 +1042,7 @@ class _DashedArcPainter extends CustomPainter {
   @override
   void paint(Canvas canvas, Size size) {
     final paint = Paint()
-      ..color = const Color(0xFF2F73FF)
+      ..color = AppColors.map
       ..style = PaintingStyle.stroke
       ..strokeWidth = 2
       ..strokeCap = StrokeCap.round;
@@ -1084,13 +1084,13 @@ class _ToolHeroBadge extends StatelessWidget {
       decoration: BoxDecoration(
         shape: BoxShape.circle,
         gradient: const LinearGradient(
-          colors: [Color(0xFF2F73FF), Color(0xFF0A5BE4)],
+          colors: [AppColors.mapDark, AppColors.map],
           begin: Alignment.topLeft,
           end: Alignment.bottomRight,
         ),
         boxShadow: [
           BoxShadow(
-            color: const Color(0xFF2F73FF).withValues(alpha: 0.2),
+            color: AppColors.map.withValues(alpha: 0.22),
             blurRadius: 18,
             offset: const Offset(0, 8),
           ),
@@ -1130,7 +1130,7 @@ class _BlueCarHero extends StatelessWidget {
               height: height * 0.42,
               decoration: BoxDecoration(
                 gradient: const LinearGradient(
-                  colors: [Color(0xFF2F73FF), Color(0xFF1E59D9)],
+                  colors: [AppColors.primary, AppColors.primaryContainer],
                 ),
                 borderRadius: BorderRadius.circular(height * 0.18),
               ),
@@ -1143,7 +1143,7 @@ class _BlueCarHero extends StatelessWidget {
             child: Container(
               height: height * 0.16,
               decoration: const BoxDecoration(
-                color: Color(0xFF8AB1FF),
+                color: AppColors.primaryFixedDim,
                 borderRadius: BorderRadius.only(
                   topLeft: Radius.circular(20),
                   topRight: Radius.circular(16),
@@ -1160,7 +1160,7 @@ class _BlueCarHero extends StatelessWidget {
                 width: width * 0.04,
                 height: height * 0.42,
                 decoration: BoxDecoration(
-                  color: const Color(0xFF2A67EA),
+                  color: AppColors.primaryContainer,
                   borderRadius: BorderRadius.circular(999),
                 ),
               ),
@@ -1208,7 +1208,7 @@ class _VanHero extends StatelessWidget {
               decoration: BoxDecoration(
                 color: Colors.white,
                 borderRadius: BorderRadius.circular(height * 0.14),
-                border: Border.all(color: const Color(0xFFD7DFED)),
+                border: Border.all(color: AppColors.outline),
               ),
             ),
           ),
@@ -1219,7 +1219,7 @@ class _VanHero extends StatelessWidget {
             child: Container(
               height: height * 0.16,
               decoration: BoxDecoration(
-                color: const Color(0xFFDDEAFF),
+                color: AppColors.primaryFixed,
                 borderRadius: BorderRadius.circular(10),
               ),
             ),
@@ -1240,12 +1240,12 @@ class _VanHero extends StatelessWidget {
                   height: height * 0.24,
                   decoration: BoxDecoration(
                     shape: BoxShape.circle,
-                    color: const Color(0xFFFFF1F1),
-                    border: Border.all(color: const Color(0xFFE64040)),
+                    color: AppColors.errorContainer,
+                    border: Border.all(color: AppColors.error),
                   ),
                   child: const Icon(
                     Icons.location_on_rounded,
-                    color: Color(0xFFE21218),
+                    color: AppColors.error,
                     size: 12,
                   ),
                 ),
@@ -1259,7 +1259,7 @@ class _VanHero extends StatelessWidget {
               width: width * 0.08,
               height: height * 0.07,
               decoration: BoxDecoration(
-                color: const Color(0xFFFFB136),
+                color: AppColors.warning,
                 borderRadius: BorderRadius.circular(999),
               ),
             ),
@@ -1292,7 +1292,7 @@ class _HeroWheel extends StatelessWidget {
       height: size,
       decoration: const BoxDecoration(
         shape: BoxShape.circle,
-        color: Color(0xFF485363),
+        color: AppColors.secondary,
       ),
       child: Center(
         child: Container(
@@ -1300,7 +1300,7 @@ class _HeroWheel extends StatelessWidget {
           height: size * 0.42,
           decoration: const BoxDecoration(
             shape: BoxShape.circle,
-            color: Color(0xFFDDE7FA),
+            color: AppColors.primaryFixed,
           ),
         ),
       ),
@@ -1327,9 +1327,9 @@ class _OutlineActionButton extends StatelessWidget {
       child: OutlinedButton(
         onPressed: onPressed,
         style: OutlinedButton.styleFrom(
-          backgroundColor: Colors.white.withValues(alpha: 0.72),
-          foregroundColor: const Color(0xFF15171A),
-          side: BorderSide(color: const Color(0xFFD9DBE0).withValues(alpha: 0.9)),
+          backgroundColor: AppColors.surfaceContainerLowest.withValues(alpha: 0.84),
+          foregroundColor: AppColors.textPrimary,
+          side: BorderSide(color: AppColors.outline.withValues(alpha: 0.9)),
           shape: RoundedRectangleBorder(
             borderRadius: BorderRadius.circular(999),
           ),
@@ -1365,7 +1365,7 @@ class _PrimaryRedButton extends StatelessWidget {
       child: FilledButton(
         onPressed: onPressed,
         style: FilledButton.styleFrom(
-          backgroundColor: const Color(0xFFE21218),
+          backgroundColor: AppColors.primary,
           foregroundColor: Colors.white,
           elevation: 0,
           shape: RoundedRectangleBorder(
@@ -1394,7 +1394,7 @@ class _AuthDivider extends StatelessWidget {
         Expanded(
           child: Container(
             height: 1,
-            color: const Color(0xFFD9DBDF),
+            color: AppColors.outline,
           ),
         ),
         const Padding(
@@ -1404,14 +1404,14 @@ class _AuthDivider extends StatelessWidget {
             style: TextStyle(
               fontSize: 15,
               fontWeight: FontWeight.w600,
-              color: Color(0xFF5A5E65),
+              color: AppColors.textSecondary,
             ),
           ),
         ),
         Expanded(
           child: Container(
             height: 1,
-            color: const Color(0xFFD9DBDF),
+            color: AppColors.outline,
           ),
         ),
       ],
@@ -1444,7 +1444,7 @@ class _AuthFooter extends StatelessWidget {
             fontSize: 13,
             fontWeight: FontWeight.w500,
             letterSpacing: 2.8,
-            color: Color(0xFFB1B4BA),
+            color: AppColors.textHint,
           ),
         ),
       ],
@@ -1459,7 +1459,7 @@ class _FooterShield extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Icon(icon, size: 32, color: const Color(0xFFB8BBC1));
+    return Icon(icon, size: 32, color: AppColors.textHint);
   }
 }
 
@@ -1484,7 +1484,7 @@ class _GoogleSignInButton extends StatelessWidget {
         style: ElevatedButton.styleFrom(
           elevation: 0,
           backgroundColor: Colors.white,
-          foregroundColor: const Color(0xFF13284D),
+          foregroundColor: AppColors.navy,
           disabledBackgroundColor: Colors.white.withValues(alpha: 0.8),
           shape: RoundedRectangleBorder(
             borderRadius: BorderRadius.circular(24),
@@ -1505,7 +1505,7 @@ class _GoogleSignInButton extends StatelessWidget {
               style: const TextStyle(
                 fontSize: 17,
                 fontWeight: FontWeight.w700,
-                color: Color(0xFF13284D),
+                color: AppColors.navy,
               ),
             ),
           ],

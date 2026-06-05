@@ -1115,7 +1115,7 @@ class _TechnicianHomeScreenState extends ConsumerState<TechnicianHomeScreen> {
     return Scaffold(
       key: _scaffoldKey,
       drawer: const AppDrawer(),
-      backgroundColor: const Color(0xFFF6F1EA),
+      backgroundColor: AppColors.background,
       bottomNavigationBar: _TechnicianBottomNav(
         currentIndex: _navIndex,
         unreadCount: _lastUnreadChatCount,
@@ -1289,7 +1289,7 @@ class _TechnicianTopBar extends StatelessWidget {
         color: Colors.white.withValues(alpha: 0.96),
         border: Border(
           bottom: BorderSide(
-            color: const Color(0xFF5B322A).withValues(alpha: 0.08),
+            color: AppColors.outline.withValues(alpha: 0.7),
           ),
         ),
         boxShadow: [
@@ -1317,7 +1317,7 @@ class _TechnicianTopBar extends StatelessWidget {
                         color: Colors.white,
                         shape: BoxShape.circle,
                         border: Border.all(
-                          color: const Color(0xFFE8DED3),
+                          color: AppColors.outline,
                         ),
                         boxShadow: [
                           BoxShadow(
@@ -1330,7 +1330,7 @@ class _TechnicianTopBar extends StatelessWidget {
                       child: const Icon(
                         Icons.menu_rounded,
                         size: 20,
-                        color: Color(0xFF6A4636),
+                        color: AppColors.primary,
                       ),
                     ),
                   ),
@@ -1372,7 +1372,7 @@ class _TechnicianTopBar extends StatelessWidget {
                         fontSize: isCompact ? 10 : 14,
                         fontWeight: FontWeight.w700,
                         letterSpacing: isCompact ? 1 : 1.5,
-                        color: const Color(0xFF6A4636),
+                        color: AppColors.primary,
                       ),
                     ),
                     const SizedBox(height: 2),
@@ -1383,7 +1383,7 @@ class _TechnicianTopBar extends StatelessWidget {
                       style: TextStyle(
                         fontSize: isCompact ? 22 : 29,
                         fontWeight: FontWeight.w800,
-                        color: const Color(0xFF171717),
+                        color: AppColors.textPrimary,
                         height: 1.05,
                       ),
                     ),
@@ -1404,7 +1404,7 @@ class _TechnicianTopBar extends StatelessWidget {
                             style: TextStyle(
                               fontSize: isCompact ? 10 : 12,
                               fontWeight: FontWeight.w600,
-                              color: const Color(0xFF6E6E6E),
+                              color: AppColors.textSecondary,
                             ),
                           ),
                         ),
@@ -1426,7 +1426,7 @@ class _TechnicianTopBar extends StatelessWidget {
                             style: TextStyle(
                               fontSize: isCompact ? 10 : 12,
                               fontWeight: FontWeight.w600,
-                              color: const Color(0xFF6E6E6E),
+                              color: AppColors.textSecondary,
                             ),
                           ),
                         ),
@@ -1457,7 +1457,7 @@ class _TechnicianTopBar extends StatelessWidget {
                         onPressed: onNotificationsTap,
                         icon: const Icon(
                           Icons.notifications_none_rounded,
-                          color: Color(0xFF171717),
+                          color: AppColors.textPrimary,
                           size: 22,
                         ),
                       ),
@@ -1470,7 +1470,7 @@ class _TechnicianTopBar extends StatelessWidget {
                           width: 10,
                           height: 10,
                           decoration: const BoxDecoration(
-                            color: Color(0xFFD3171A),
+                            color: AppColors.assistance,
                             shape: BoxShape.circle,
                           ),
                         ),
@@ -1511,11 +1511,11 @@ class _TechnicianStatusSheet extends StatelessWidget {
         14 + MediaQuery.of(context).padding.bottom,
       ),
       decoration: const BoxDecoration(
-        color: Color(0xFFFDFCFB),
+        color: AppColors.surfaceContainerLowest,
         borderRadius: BorderRadius.vertical(top: Radius.circular(26)),
         boxShadow: [
           BoxShadow(
-            color: Color(0x14000000),
+            color: AppColors.shadow,
             blurRadius: 22,
             offset: Offset(0, -6),
           ),
@@ -1530,7 +1530,7 @@ class _TechnicianStatusSheet extends StatelessWidget {
               width: 62,
               height: 5,
               decoration: BoxDecoration(
-                color: const Color(0xFFCFCFCF),
+                color: AppColors.outline,
                 borderRadius: BorderRadius.circular(999),
               ),
             ),
@@ -1541,8 +1541,8 @@ class _TechnicianStatusSheet extends StatelessWidget {
                   Icons.circle,
                   size: 12,
                   color: isAvailable
-                      ? const Color(0xFF12C06A)
-                      : const Color(0xFF9CA3AF),
+                      ? AppColors.success
+                      : AppColors.textHint,
                 ),
                 const Gap(12),
                 Expanded(
@@ -1552,8 +1552,8 @@ class _TechnicianStatusSheet extends StatelessWidget {
                       fontSize: 17,
                       fontWeight: FontWeight.w900,
                       color: isAvailable
-                          ? const Color(0xFF12C06A)
-                          : const Color(0xFF6B7280),
+                          ? AppColors.success
+                          : AppColors.textSecondary,
                     ),
                   ),
                 ),
@@ -1571,10 +1571,10 @@ class _TechnicianStatusSheet extends StatelessWidget {
               width: double.infinity,
               padding: const EdgeInsets.all(12),
               decoration: BoxDecoration(
-                color: const Color(0xFFFAFAFA),
+                color: AppColors.surfaceContainerLowest,
                 borderRadius: BorderRadius.circular(18),
                 border: Border.all(
-                  color: const Color(0xFF5B322A).withValues(alpha: 0.08),
+                  color: AppColors.outline,
                 ),
                 boxShadow: [
                   BoxShadow(
@@ -1590,8 +1590,8 @@ class _TechnicianStatusSheet extends StatelessWidget {
                     children: [
                       _StatusIconBubble(
                         icon: Icons.notifications_active_outlined,
-                        color: const Color(0xFFD3171A),
-                        background: const Color(0xFFFDEBEC),
+                        color: AppColors.assistance,
+                        background: AppColors.assistanceContainer,
                       ),
                       const Gap(12),
                       Expanded(
@@ -1600,7 +1600,7 @@ class _TechnicianStatusSheet extends StatelessWidget {
                           style: const TextStyle(
                             fontSize: 13,
                             fontWeight: FontWeight.w500,
-                            color: Color(0xFF231815),
+                            color: AppColors.textPrimary,
                           ),
                         ),
                       ),
@@ -1611,8 +1611,8 @@ class _TechnicianStatusSheet extends StatelessWidget {
                     children: [
                       _StatusIconBubble(
                         icon: Icons.gps_fixed_rounded,
-                        color: AppColors.primary,
-                        background: Color(0xFFE7F1FB),
+                        color: AppColors.map,
+                        background: AppColors.tertiaryContainer,
                       ),
                       Gap(12),
                       Expanded(
@@ -1620,7 +1620,7 @@ class _TechnicianStatusSheet extends StatelessWidget {
                           text: TextSpan(
                             style: TextStyle(
                               fontSize: 13,
-                              color: Color(0xFF5B322A),
+                              color: AppColors.textSecondary,
                             ),
                             children: [
                               TextSpan(text: 'Radio activo: '),
@@ -1719,7 +1719,7 @@ class _TechnicianBottomNav extends StatelessWidget {
           color: Colors.white.withValues(alpha: 0.98),
           border: Border(
             top: BorderSide(
-              color: const Color(0xFF5B322A).withValues(alpha: 0.08),
+              color: AppColors.outline.withValues(alpha: 0.7),
             ),
           ),
           boxShadow: [
@@ -1789,7 +1789,7 @@ class _TechnicianNavItem extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final color = active ? AppColors.primary : const Color(0xFF5B322A);
+    final color = active ? AppColors.primary : AppColors.secondary;
     return InkWell(
       onTap: onTap,
       borderRadius: BorderRadius.circular(26),
@@ -1821,7 +1821,7 @@ class _TechnicianNavItem extends StatelessWidget {
                       width: 10,
                       height: 10,
                       decoration: const BoxDecoration(
-                        color: Color(0xFFD3171A),
+                        color: AppColors.assistance,
                         shape: BoxShape.circle,
                       ),
                     ),

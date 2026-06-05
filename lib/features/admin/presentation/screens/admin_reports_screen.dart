@@ -1396,7 +1396,7 @@ class _ReportsHeroCard extends StatelessWidget {
         gradient: const LinearGradient(
           begin: Alignment.topLeft,
           end: Alignment.bottomRight,
-          colors: [Color(0xFF0F1B3D), Color(0xFF2350D8)],
+          colors: [AppColors.navy, AppColors.primary],
         ),
         borderRadius: BorderRadius.circular(28),
         boxShadow: [

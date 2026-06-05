@@ -262,7 +262,7 @@ class _DriverHomeScreenState extends ConsumerState<DriverHomeScreen> {
             builder: (context, scrollController) {
               return Container(
                 decoration: const BoxDecoration(
-                  color: Color(0xFFF8F6F3),
+                  color: AppColors.background,
                   borderRadius: BorderRadius.vertical(
                     top: Radius.circular(30),
                   ),
@@ -274,7 +274,7 @@ class _DriverHomeScreenState extends ConsumerState<DriverHomeScreen> {
                       width: 58,
                       height: 6,
                       decoration: BoxDecoration(
-                        color: const Color(0xFFD0D0D0),
+                        color: AppColors.outline,
                         borderRadius: BorderRadius.circular(999),
                       ),
                     ),
@@ -289,19 +289,19 @@ class _DriverHomeScreenState extends ConsumerState<DriverHomeScreen> {
                               children: [
                                 Text(
                                   'Servicios cercanos',
-                                  style: TextStyle(
-                                    fontSize: 22,
-                                    fontWeight: FontWeight.w900,
-                                    color: Color(0xFF171717),
+                                   style: TextStyle(
+                                     fontSize: 22,
+                                     fontWeight: FontWeight.w900,
+                                     color: AppColors.textPrimary,
                                   ),
                                 ),
                                 SizedBox(height: 4),
                                 Text(
                                   'Explora los puntos disponibles cerca de tu ubicación.',
-                                  style: TextStyle(
-                                    fontSize: 13,
-                                    fontWeight: FontWeight.w600,
-                                    color: Color(0xFF6E6E6E),
+                                   style: TextStyle(
+                                     fontSize: 13,
+                                     fontWeight: FontWeight.w600,
+                                     color: AppColors.textSecondary,
                                   ),
                                 ),
                               ],
@@ -360,9 +360,9 @@ class _DriverHomeScreenState extends ConsumerState<DriverHomeScreen> {
                             child: Text(
                               'No pudimos cargar los servicios cercanos en este momento.',
                               textAlign: TextAlign.center,
-                              style: TextStyle(
-                                fontSize: 14,
-                                color: Color(0xFF6E6E6E),
+                               style: TextStyle(
+                                 fontSize: 14,
+                                 color: AppColors.textSecondary,
                               ),
                             ),
                           ),
@@ -383,9 +383,9 @@ class _DriverHomeScreenState extends ConsumerState<DriverHomeScreen> {
                                 child: Text(
                                   'No hay servicios cercanos para ese filtro dentro del radio disponible.',
                                   textAlign: TextAlign.center,
-                                  style: TextStyle(
-                                    fontSize: 14,
-                                    color: Color(0xFF6E6E6E),
+                                   style: TextStyle(
+                                     fontSize: 14,
+                                     color: AppColors.textSecondary,
                                   ),
                                 ),
                               ),
@@ -489,7 +489,7 @@ class _DriverHomeScreenState extends ConsumerState<DriverHomeScreen> {
 
     return Scaffold(
       key: _scaffoldKey,
-      backgroundColor: const Color(0xFFF4F4F2),
+      backgroundColor: AppColors.background,
       drawer: const AppDrawer(),
       body: Column(
         children: [
@@ -513,10 +513,10 @@ class _DriverHomeScreenState extends ConsumerState<DriverHomeScreen> {
                         width: isCompact ? 34 : 42,
                         height: isCompact ? 52 : 64,
                         decoration: BoxDecoration(
-                          color: const Color(0xFFF6F1EA),
+                          color: AppColors.surfaceContainerLow,
                           borderRadius: BorderRadius.circular(20),
                           border: Border.all(
-                            color: const Color(0xFFE8DED3),
+                            color: AppColors.outline,
                           ),
                           boxShadow: [
                             BoxShadow(
@@ -532,13 +532,13 @@ class _DriverHomeScreenState extends ConsumerState<DriverHomeScreen> {
                             Icon(
                               Icons.menu_rounded,
                               size: 18,
-                              color: Color(0xFF6A4636),
+                              color: AppColors.primary,
                             ),
                             SizedBox(height: 4),
                             Icon(
                               Icons.drag_handle_rounded,
                               size: 16,
-                              color: Color(0xFFB08974),
+                              color: AppColors.map,
                             ),
                           ],
                         ),
@@ -579,7 +579,7 @@ class _DriverHomeScreenState extends ConsumerState<DriverHomeScreen> {
                           fontSize: isCompact ? 10 : 14,
                           fontWeight: FontWeight.w700,
                           letterSpacing: isCompact ? 1 : 1.5,
-                          color: const Color(0xFF6A4636),
+                          color: AppColors.primary,
                         ),
                       ),
                       const SizedBox(height: 2),
@@ -590,7 +590,7 @@ class _DriverHomeScreenState extends ConsumerState<DriverHomeScreen> {
                         style: TextStyle(
                           fontSize: isCompact ? 22 : 29,
                           fontWeight: FontWeight.w800,
-                          color: const Color(0xFF171717),
+                          color: AppColors.textPrimary,
                           height: 1.05,
                         ),
                       ),
@@ -613,7 +613,7 @@ class _DriverHomeScreenState extends ConsumerState<DriverHomeScreen> {
                               style: TextStyle(
                                 fontSize: isCompact ? 10 : 12,
                                 fontWeight: FontWeight.w600,
-                                color: const Color(0xFF6E6E6E),
+                                color: AppColors.textSecondary,
                               ),
                             ),
                           ),
@@ -638,7 +638,7 @@ class _DriverHomeScreenState extends ConsumerState<DriverHomeScreen> {
                   ),
                   child: ChatNotificationBell(
                     onTap: _openNotifications,
-                    iconColor: const Color(0xFF171717),
+                    iconColor: AppColors.textPrimary,
                   ),
                 ),
               ],
@@ -761,7 +761,7 @@ class _DriverHomeScreenState extends ConsumerState<DriverHomeScreen> {
             'No se encontraron servicios.',
             style: TextStyle(
               fontSize: 13,
-              color: Color(0xFF7A7A7A),
+               color: AppColors.textSecondary,
             ),
           ),
         ),
@@ -778,7 +778,7 @@ class _DriverHomeScreenState extends ConsumerState<DriverHomeScreen> {
                 'Sin servicios cercanos en 5km.',
                 style: TextStyle(
                   fontSize: 13,
-                  color: Color(0xFF7A7A7A),
+                   color: AppColors.textSecondary,
                 ),
               ),
             ),
@@ -1007,7 +1007,7 @@ class _DriverBottomSheet extends StatelessWidget {
         isCompact ? 10 : 16,
       ),
       decoration: BoxDecoration(
-        color: Colors.white.withValues(alpha: 0.96),
+        color: AppColors.surfaceContainerLowest.withValues(alpha: 0.96),
         borderRadius: BorderRadius.circular(isCompact ? 24 : 34),
         boxShadow: [
           BoxShadow(
@@ -1024,7 +1024,7 @@ class _DriverBottomSheet extends StatelessWidget {
             width: isCompact ? 44 : 72,
             height: isCompact ? 5 : 8,
             decoration: BoxDecoration(
-              color: const Color(0xFFD6D6D6),
+              color: AppColors.outline,
               borderRadius: BorderRadius.circular(999),
             ),
           ),
@@ -1040,11 +1040,11 @@ class _DriverBottomSheet extends StatelessWidget {
                 vertical: isCompact ? 12 : 18,
               ),
               decoration: BoxDecoration(
-                color: const Color(0xFFEB1C1C),
+                gradient: AppColors.assistanceGradient,
                 borderRadius: BorderRadius.circular(isCompact ? 20 : 30),
                 boxShadow: [
                   BoxShadow(
-                    color: const Color(0xFFEB1C1C).withValues(alpha: 0.22),
+                    color: AppColors.assistance.withValues(alpha: 0.24),
                     blurRadius: 26,
                     offset: const Offset(0, 12),
                   ),
@@ -1106,7 +1106,7 @@ class _DriverBottomSheet extends StatelessWidget {
                     ),
                     child: Icon(
                       Icons.arrow_forward_rounded,
-                      color: const Color(0xFFEB1C1C),
+                        color: AppColors.assistance,
                       size: isCompact ? 20 : 24,
                     ),
                   ),
@@ -1143,9 +1143,9 @@ class _NearestServiceCard extends StatelessWidget {
       child: Container(
         padding: EdgeInsets.all(isCompact ? 10 : 14),
         decoration: BoxDecoration(
-          color: const Color(0xFFF2F2F2),
+          color: AppColors.surfaceContainerLow,
           borderRadius: BorderRadius.circular(isCompact ? 18 : 26),
-          border: Border.all(color: const Color(0xFFE3E3E3)),
+          border: Border.all(color: AppColors.outline),
           boxShadow: [
             BoxShadow(
               color: Colors.black.withValues(alpha: 0.04),
@@ -1160,7 +1160,7 @@ class _NearestServiceCard extends StatelessWidget {
               width: isCompact ? 44 : 56,
               height: isCompact ? 44 : 56,
               decoration: BoxDecoration(
-                color: const Color(0xFFD8E6F3),
+                color: AppColors.primaryFixed,
                 shape: BoxShape.circle,
               ),
               child: Icon(
@@ -1179,7 +1179,7 @@ class _NearestServiceCard extends StatelessWidget {
                     style: TextStyle(
                       fontSize: isCompact ? 10 : 12,
                       fontWeight: FontWeight.w700,
-                      color: const Color(0xFF5B4137),
+                      color: AppColors.textSecondary,
                     ),
                   ),
                   SizedBox(height: isCompact ? 1 : 4),
@@ -1188,7 +1188,7 @@ class _NearestServiceCard extends StatelessWidget {
                       style: TextStyle(
                         fontSize: isCompact ? 13 : 16,
                         fontWeight: FontWeight.w800,
-                        color: const Color(0xFF171717),
+                        color: AppColors.textPrimary,
                       ),
                       children: [
                         TextSpan(text: service.name),
@@ -1217,7 +1217,7 @@ class _NearestServiceCard extends StatelessWidget {
               ),
               child: Icon(
                 Icons.chevron_right_rounded,
-                color: const Color(0xFF171717),
+                color: AppColors.textPrimary,
                 size: isCompact ? 22 : 28,
               ),
             ),
@@ -1259,7 +1259,7 @@ class _ServiceFilterChip extends StatelessWidget {
           border: Border.all(
             color: selected
                 ? (color ?? AppColors.primary)
-                : const Color(0xFFE5DED6),
+                : AppColors.outline,
           ),
         ),
         child: Row(
@@ -1301,9 +1301,9 @@ class _NearbyServiceListTile extends StatelessWidget {
       child: Container(
         padding: const EdgeInsets.all(14),
         decoration: BoxDecoration(
-          color: Colors.white,
+          color: AppColors.surfaceContainerLowest,
           borderRadius: BorderRadius.circular(22),
-          border: Border.all(color: const Color(0xFFE8E1D8)),
+          border: Border.all(color: AppColors.outline),
           boxShadow: [
             BoxShadow(
               color: Colors.black.withValues(alpha: 0.04),
@@ -1335,7 +1335,7 @@ class _NearbyServiceListTile extends StatelessWidget {
                     style: const TextStyle(
                       fontSize: 15,
                       fontWeight: FontWeight.w800,
-                      color: Color(0xFF171717),
+                      color: AppColors.textPrimary,
                     ),
                   ),
                   const SizedBox(height: 4),
@@ -1344,7 +1344,7 @@ class _NearbyServiceListTile extends StatelessWidget {
                     style: const TextStyle(
                       fontSize: 12,
                       fontWeight: FontWeight.w700,
-                      color: Color(0xFF6E6E6E),
+                      color: AppColors.textSecondary,
                     ),
                   ),
                 ],
@@ -1375,7 +1375,7 @@ class _NearbyServiceListTile extends StatelessWidget {
                 const SizedBox(height: 8),
                 const Icon(
                   Icons.chevron_right_rounded,
-                  color: Color(0xFF171717),
+                  color: AppColors.textPrimary,
                 ),
               ],
             ),
@@ -1412,7 +1412,7 @@ class _DriverBottomNav extends StatelessWidget {
         vertical: isCompact ? 4 : 8,
       ),
       decoration: BoxDecoration(
-        color: const Color(0xFFF1F1F1),
+        color: AppColors.surfaceContainerLow,
         borderRadius: BorderRadius.circular(isCompact ? 24 : 34),
       ),
       child: Row(
@@ -1428,7 +1428,7 @@ class _DriverBottomNav extends StatelessWidget {
                 curve: Curves.easeOutCubic,
                 padding: EdgeInsets.symmetric(vertical: isCompact ? 5 : 8),
                 decoration: BoxDecoration(
-                  color: isActive ? const Color(0xFFD90F16) : Colors.transparent,
+                  color: isActive ? AppColors.primary : Colors.transparent,
                   borderRadius: BorderRadius.circular(isCompact ? 20 : 28),
                 ),
                 child: Column(
