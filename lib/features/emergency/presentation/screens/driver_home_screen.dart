@@ -1,19 +1,16 @@
-import 'dart:ui';
 import 'package:flutter/material.dart';
+import 'package:flutter_map/flutter_map.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
-import 'package:flutter_map/flutter_map.dart';
 import 'package:latlong2/latlong.dart';
+
 import '../../../../core/constants/app_colors.dart';
 import '../../../../core/constants/app_constants.dart';
 import '../../../../core/router/app_router.dart';
 import '../../../../shared/providers/auth_provider.dart';
-import '../../../../shared/utils/app_responsive.dart';
+import '../../../../shared/providers/role_provider.dart';
 import '../../../../shared/widgets/animated_pressable.dart';
 import '../../../../shared/widgets/app_drawer.dart';
-import '../../../../shared/widgets/app_logo.dart';
-import '../../../../shared/widgets/app_motion.dart';
-import '../../../../shared/widgets/bottom_nav_bar.dart';
 import '../../../../shared/widgets/in_app_message_notice.dart';
 import '../../../../shared/widgets/notification_center_sheet.dart';
 import '../../../../shared/widgets/user_avatar.dart';
@@ -35,7 +32,8 @@ class DriverHomeScreen extends ConsumerStatefulWidget {
 class _DriverHomeScreenState extends ConsumerState<DriverHomeScreen> {
   final _scaffoldKey = GlobalKey<ScaffoldState>();
   final _mapController = MapController();
-  final int _navIndex = 0;
+  final _scrollController = ScrollController();
+  int _navIndex = 1;
   ProviderSubscription<AsyncValue<int>>? _unreadChatSubscription;
   int _lastUnreadChatCount = 0;
   bool _activeWarningShown = false;
@@ -44,6 +42,7 @@ class _DriverHomeScreenState extends ConsumerState<DriverHomeScreen> {
   @override
   void initState() {
     super.initState();
+    ref.read(activeRoleProvider.notifier).switchTo(AppConstants.roleDriver);
     _unreadChatSubscription = ref.listenManual<AsyncValue<int>>(
       unreadChatCountProvider,
       _handleUnreadChatCount,
@@ -58,6 +57,7 @@ class _DriverHomeScreenState extends ConsumerState<DriverHomeScreen> {
   @override
   void dispose() {
     _unreadChatSubscription?.close();
+    _scrollController.dispose();
     super.dispose();
   }
 
@@ -209,20 +209,219 @@ class _DriverHomeScreenState extends ConsumerState<DriverHomeScreen> {
     );
   }
 
-  void _onNavTap(int index) {
+  Future<void> _onNavTap(
+    int index, {
+    required double lat,
+    required double lng,
+  }) async {
     switch (index) {
       case 0:
-        break;
-      case 1:
+        setState(() => _navIndex = 0);
         context.push(AppRoutes.emergencyHistory);
+        return;
+      case 1:
+        if (mounted) setState(() => _navIndex = 1);
+        if (_scrollController.hasClients) {
+          await _scrollController.animateTo(
+            0,
+            duration: const Duration(milliseconds: 320),
+            curve: Curves.easeOutCubic,
+          );
+        }
+        return;
       case 2:
-        context.push(AppRoutes.driverChatHistory);
+        if (mounted) setState(() => _navIndex = 2);
+        await _openNearbyServicesSheet(lat: lat, lng: lng);
+        if (mounted) setState(() => _navIndex = 1);
+        return;
       case 3:
+        setState(() => _navIndex = 3);
         context.push(AppRoutes.profile);
+        return;
     }
   }
 
-  /// Animates the map to the given [lat]/[lng] with zoom 17.
+  Future<void> _openNearbyServicesSheet({
+    required double lat,
+    required double lng,
+  }) async {
+    await showModalBottomSheet<void>(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: Colors.transparent,
+      builder: (context) => Consumer(
+        builder: (context, ref, _) {
+          final nearbyAsync = ref.watch(nearbyServicesProvider((lat, lng)));
+          final selectedCategory = ref.watch(selectedCategoryProvider);
+
+          return DraggableScrollableSheet(
+            initialChildSize: 0.72,
+            minChildSize: 0.52,
+            maxChildSize: 0.94,
+            expand: false,
+            builder: (context, scrollController) {
+              return Container(
+                decoration: const BoxDecoration(
+                  color: Color(0xFFF8F6F3),
+                  borderRadius: BorderRadius.vertical(
+                    top: Radius.circular(30),
+                  ),
+                ),
+                child: Column(
+                  children: [
+                    const SizedBox(height: 10),
+                    Container(
+                      width: 58,
+                      height: 6,
+                      decoration: BoxDecoration(
+                        color: const Color(0xFFD0D0D0),
+                        borderRadius: BorderRadius.circular(999),
+                      ),
+                    ),
+                    const SizedBox(height: 18),
+                    Padding(
+                      padding: const EdgeInsets.symmetric(horizontal: 18),
+                      child: Row(
+                        children: [
+                          const Expanded(
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                Text(
+                                  'Servicios cercanos',
+                                  style: TextStyle(
+                                    fontSize: 22,
+                                    fontWeight: FontWeight.w900,
+                                    color: Color(0xFF171717),
+                                  ),
+                                ),
+                                SizedBox(height: 4),
+                                Text(
+                                  'Explora los puntos disponibles cerca de tu ubicación.',
+                                  style: TextStyle(
+                                    fontSize: 13,
+                                    fontWeight: FontWeight.w600,
+                                    color: Color(0xFF6E6E6E),
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ),
+                          IconButton(
+                            onPressed: () => Navigator.pop(context),
+                            icon: const Icon(Icons.close_rounded),
+                          ),
+                        ],
+                      ),
+                    ),
+                    const SizedBox(height: 12),
+                    SizedBox(
+                      height: 44,
+                      child: ListView(
+                        scrollDirection: Axis.horizontal,
+                        padding: const EdgeInsets.symmetric(horizontal: 18),
+                        children: [
+                          _ServiceFilterChip(
+                            label: 'Todos',
+                            selected: selectedCategory == null,
+                            onTap: () => ref
+                                .read(selectedCategoryProvider.notifier)
+                                .state = null,
+                          ),
+                          const SizedBox(width: 10),
+                          ...ServiceCategory.values.map(
+                            (category) => Padding(
+                              padding: const EdgeInsets.only(right: 10),
+                              child: _ServiceFilterChip(
+                                label: category.label,
+                                icon: category.icon,
+                                color: category.color,
+                                selected: selectedCategory == category,
+                                onTap: () => ref
+                                    .read(selectedCategoryProvider.notifier)
+                                    .state = category,
+                              ),
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                    const SizedBox(height: 16),
+                    Expanded(
+                      child: nearbyAsync.when(
+                        loading: () => const Center(
+                          child: CircularProgressIndicator(
+                            color: AppColors.primary,
+                          ),
+                        ),
+                        error: (_, __) => const Center(
+                          child: Padding(
+                            padding: EdgeInsets.symmetric(horizontal: 24),
+                            child: Text(
+                              'No pudimos cargar los servicios cercanos en este momento.',
+                              textAlign: TextAlign.center,
+                              style: TextStyle(
+                                fontSize: 14,
+                                color: Color(0xFF6E6E6E),
+                              ),
+                            ),
+                          ),
+                        ),
+                        data: (services) {
+                          final filtered = selectedCategory == null
+                              ? services
+                              : services
+                                  .where(
+                                    (service) =>
+                                        service.category == selectedCategory,
+                                  )
+                                  .toList();
+                          if (filtered.isEmpty) {
+                            return const Center(
+                              child: Padding(
+                                padding: EdgeInsets.symmetric(horizontal: 24),
+                                child: Text(
+                                  'No hay servicios cercanos para ese filtro dentro del radio disponible.',
+                                  textAlign: TextAlign.center,
+                                  style: TextStyle(
+                                    fontSize: 14,
+                                    color: Color(0xFF6E6E6E),
+                                  ),
+                                ),
+                              ),
+                            );
+                          }
+
+                          return ListView.separated(
+                            controller: scrollController,
+                            padding: const EdgeInsets.fromLTRB(18, 0, 18, 24),
+                            itemBuilder: (context, index) {
+                              final service = filtered[index];
+                              return _NearbyServiceListTile(
+                                service: service,
+                                onTap: () {
+                                  Navigator.pop(context);
+                                  _flyTo(service.lat, service.lng);
+                                },
+                              );
+                            },
+                            separatorBuilder: (_, __) =>
+                                const SizedBox(height: 12),
+                            itemCount: filtered.length,
+                          );
+                        },
+                      ),
+                    ),
+                  ],
+                ),
+              );
+            },
+          );
+        },
+      ),
+    );
+  }
+
   void _flyTo(double lat, double lng) {
     _mapController.move(LatLng(lat, lng), 17);
   }
@@ -270,484 +469,341 @@ class _DriverHomeScreenState extends ConsumerState<DriverHomeScreen> {
 
     final lat = mapState.currentLocation?.lat ?? AppConstants.defaultLat;
     final lng = mapState.currentLocation?.lng ?? AppConstants.defaultLng;
-    final address =
-        mapState.currentLocation?.address ?? mapState.error ?? 'Ubicación no disponible';
-    final horizontal = AppResponsive.horizontalPadding(context);
+    final address = mapState.currentLocation?.address ??
+        mapState.error ??
+        'Ubicación no disponible';
+    final screenSize = MediaQuery.of(context).size;
     final topInset = MediaQuery.of(context).padding.top;
+    final firstName = user?.name.split(' ').first ?? 'Conductor';
+    final isCompact = screenSize.width < 360;
+    final isWide = screenSize.width >= 900;
+
+    Future<void> recenterMap() async {
+      await ref.read(mapNotifierProvider.notifier).getCurrentLocation();
+      final location = ref.read(mapNotifierProvider).currentLocation;
+      _mapController.move(
+        LatLng(location?.lat ?? lat, location?.lng ?? lng),
+        14.5,
+      );
+    }
 
     return Scaffold(
       key: _scaffoldKey,
-      backgroundColor: AppColors.background,
-      extendBody: true,
+      backgroundColor: const Color(0xFFF4F4F2),
       drawer: const AppDrawer(),
-      body: Stack(
+      body: Column(
         children: [
-          const Positioned.fill(
-            child: DecoratedBox(
-              decoration: BoxDecoration(
-                gradient: AppColors.pageBackgroundGradient,
-              ),
+          Container(
+            color: Colors.white.withValues(alpha: 0.96),
+            padding: EdgeInsets.fromLTRB(
+              isCompact ? 16 : 24,
+              topInset + (isCompact ? 10 : 18),
+              isCompact ? 16 : 24,
+              isCompact ? 12 : 18,
             ),
-          ),
-          // ─── Content ────────────────────────────────────────────────────
-          Positioned.fill(
-            child: SingleChildScrollView(
-              padding: EdgeInsets.only(
-                top: 64 + topInset,
-                bottom: 160,
-              ),
-              child: AppResponsiveContent(
-                maxWidth: 720,
-                child: AppStaggeredColumn(
-                children: [
-                  // Driver hero
-                  Padding(
-                    padding: EdgeInsets.fromLTRB(horizontal, 20, horizontal, 12),
-                    child: Container(
-                      width: double.infinity,
-                      padding: const EdgeInsets.all(18),
-                      decoration: BoxDecoration(
-                        gradient: const LinearGradient(
-                          begin: Alignment.topLeft,
-                          end: Alignment.bottomRight,
-                          colors: [
-                            AppColors.primaryContainer,
-                            AppColors.primary,
+            child: Row(
+              children: [
+                Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    AnimatedPressable(
+                      onTap: () => _scaffoldKey.currentState?.openDrawer(),
+                      borderRadius: BorderRadius.circular(20),
+                      child: Container(
+                        width: isCompact ? 34 : 42,
+                        height: isCompact ? 52 : 64,
+                        decoration: BoxDecoration(
+                          color: const Color(0xFFF6F1EA),
+                          borderRadius: BorderRadius.circular(20),
+                          border: Border.all(
+                            color: const Color(0xFFE8DED3),
+                          ),
+                          boxShadow: [
+                            BoxShadow(
+                              color: Colors.black.withValues(alpha: 0.04),
+                              blurRadius: 10,
+                              offset: const Offset(0, 4),
+                            ),
                           ],
                         ),
-                        borderRadius: BorderRadius.circular(24),
+                        child: Column(
+                          mainAxisAlignment: MainAxisAlignment.center,
+                          children: const [
+                            Icon(
+                              Icons.menu_rounded,
+                              size: 18,
+                              color: Color(0xFF6A4636),
+                            ),
+                            SizedBox(height: 4),
+                            Icon(
+                              Icons.drag_handle_rounded,
+                              size: 16,
+                              color: Color(0xFFB08974),
+                            ),
+                          ],
+                        ),
+                      ),
+                    ),
+                    SizedBox(width: isCompact ? 8 : 10),
+                    Container(
+                      width: isCompact ? 44 : 58,
+                      height: isCompact ? 44 : 58,
+                      padding: const EdgeInsets.all(3),
+                      decoration: BoxDecoration(
+                        shape: BoxShape.circle,
+                        color: Colors.white,
                         boxShadow: [
                           BoxShadow(
-                            color: AppColors.primary.withValues(alpha: 0.18),
-                            blurRadius: 26,
-                            offset: const Offset(0, 14),
+                            color: Colors.black.withValues(alpha: 0.08),
+                            blurRadius: 14,
+                            offset: const Offset(0, 4),
                           ),
                         ],
                       ),
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
+                      child: UserAvatar(
+                        imageUrl: user?.avatarUrl,
+                        name: user?.name ?? 'U',
+                        radius: isCompact ? 18 : 24,
+                      ),
+                    ),
+                  ],
+                ),
+                SizedBox(width: isCompact ? 12 : 18),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        'BIENVENIDO',
+                        style: TextStyle(
+                          fontSize: isCompact ? 10 : 14,
+                          fontWeight: FontWeight.w700,
+                          letterSpacing: isCompact ? 1 : 1.5,
+                          color: const Color(0xFF6A4636),
+                        ),
+                      ),
+                      const SizedBox(height: 2),
+                      Text(
+                        'Hola, $firstName',
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                        style: TextStyle(
+                          fontSize: isCompact ? 22 : 29,
+                          fontWeight: FontWeight.w800,
+                          color: const Color(0xFF171717),
+                          height: 1.05,
+                        ),
+                      ),
+                      const SizedBox(height: 6),
+                      Row(
                         children: [
-                          Text(
-                            'BIENVENIDO DE VUELTA',
-                            style: TextStyle(
-                              fontSize: 12,
-                              fontWeight: FontWeight.w700,
-                              letterSpacing: 0.5,
-                              color: Colors.white.withValues(alpha: 0.72),
-                            ),
+                          const Icon(
+                            Icons.location_on_rounded,
+                            size: 14,
+                            color: AppColors.primary,
                           ),
-                          const SizedBox(height: 4),
-                          Text(
-                            'Hola, ${user?.name.split(' ').first ?? 'Conductor'}',
-                            style: TextStyle(
-                              fontSize: AppResponsive.heroTitleSize(context),
-                              fontWeight: FontWeight.w800,
-                              color: Colors.white,
-                              letterSpacing: 0,
-                              height: 1.1,
+                          const SizedBox(width: 4),
+                          Expanded(
+                            child: Text(
+                              mapState.isLoading
+                                  ? 'Obteniendo ubicaciÃ³n...'
+                                  : address,
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis,
+                              style: TextStyle(
+                                fontSize: isCompact ? 10 : 12,
+                                fontWeight: FontWeight.w600,
+                                color: const Color(0xFF6E6E6E),
+                              ),
                             ),
-                          ),
-                          const SizedBox(height: 8),
-                          Row(
-                            children: [
-                              Icon(Icons.location_on_rounded,
-                                  size: 16,
-                                  color: Colors.white.withValues(alpha: 0.84)),
-                              const SizedBox(width: 4),
-                              Expanded(
-                                child: Text(
-                                  mapState.isLoading
-                                      ? 'Obteniendo ubicación...'
-                                      : address,
-                                  overflow: TextOverflow.ellipsis,
-                                  style: TextStyle(
-                                    fontSize: 13,
-                                    color: Colors.white.withValues(alpha: 0.84),
-                                    fontWeight: FontWeight.w500,
-                                  ),
-                                ),
-                              ),
-                              IconButton(
-                                tooltip: 'Editar ubicacion',
-                                visualDensity: VisualDensity.compact,
-                                onPressed: _editLocation,
-                                icon: const Icon(
-                                  Icons.edit_location_alt_rounded,
-                                  size: 20,
-                                  color: Colors.white,
-                                ),
-                              ),
-                            ],
                           ),
                         ],
-                      ),
-                    ),
-                  ),
-
-                  // Map (with service markers)
-                  _MapSection(
-                    lat: lat,
-                    lng: lng,
-                    mapController: _mapController,
-                    mapState: mapState,
-                    onRecenter: () async {
-                      await ref
-                          .read(mapNotifierProvider.notifier)
-                          .getCurrentLocation();
-                      final location =
-                          ref.read(mapNotifierProvider).currentLocation;
-                      _mapController.move(
-                        LatLng(location?.lat ?? lat, location?.lng ?? lng),
-                        14.5,
-                      );
-                    },
-                  ),
-
-                  const SizedBox(height: 8),
-
-                  // Nearby Services
-                  _buildNearbyServices(lat, lng),
-                ],
-                ),
-              ),
-            ),
-          ),
-
-          // ─── FAB ──────────────────────────────────────────────────────
-          Positioned(
-            bottom: 80 + MediaQuery.of(context).padding.bottom + 16,
-            left: 0,
-            right: 0,
-            child: Center(
-              child: ConstrainedBox(
-                constraints: BoxConstraints(
-                  maxWidth: AppResponsive.actionMaxWidth(context),
-                ),
-                child: AnimatedPressable(
-                  onTap: _openCreateEmergency,
-                  borderRadius: BorderRadius.circular(9999),
-                  pressedScale: 0.94,
-                  hoverScale: 1.02,
-                  child: Container(
-                    padding: const EdgeInsets.symmetric(
-                      horizontal: 24,
-                      vertical: 16,
-                    ),
-                    decoration: BoxDecoration(
-                      gradient: AppColors.emergencyGradient,
-                      borderRadius: BorderRadius.circular(9999),
-                      border: Border.all(
-                        color: Colors.white.withValues(alpha: 0.45),
-                        width: 1.2,
-                      ),
-                      boxShadow: [
-                        BoxShadow(
-                          color: AppColors.emergency.withValues(alpha: 0.25),
-                          blurRadius: 40,
-                          offset: const Offset(0, 20),
-                        ),
-                      ],
-                    ),
-                    child: const Row(
-                      mainAxisAlignment: MainAxisAlignment.center,
-                      mainAxisSize: MainAxisSize.min,
-                      children: [
-                        Icon(
-                          Icons.report_problem_rounded,
-                          color: Colors.white,
-                          size: 22,
-                        ),
-                        SizedBox(width: 10),
-                        Flexible(
-                          child: Text(
-                            'REPORTAR EMERGENCIA',
-                            maxLines: 1,
-                            overflow: TextOverflow.ellipsis,
-                            style: TextStyle(
-                              color: Colors.white,
-                              fontSize: 13,
-                              fontWeight: FontWeight.w800,
-                              letterSpacing: 0.4,
-                            ),
-                          ),
-                        ),
-                      ],
-                    ),
-                  ),
-                ),
-              ),
-            ),
-          ),
-
-          // ─── Bottom Nav ────────────────────────────────────────────────
-          Positioned(
-            bottom: 0,
-            left: 0,
-            right: 0,
-            child: AppBottomNavBar(
-              currentIndex: _navIndex,
-              onTap: _onNavTap,
-            ),
-          ),
-
-          // ─── Glass App Bar (last = on top) ─────────────────────────────
-          Positioned(
-            top: 0,
-            left: 0,
-            right: 0,
-            child: ClipRRect(
-              child: BackdropFilter(
-                filter: ImageFilter.blur(sigmaX: 20, sigmaY: 20),
-                child: Container(
-                  height: 64 + MediaQuery.of(context).padding.top,
-                  padding:
-                      EdgeInsets.only(top: MediaQuery.of(context).padding.top),
-                  decoration: BoxDecoration(
-                    color: Colors.white.withValues(alpha: 0.82),
-                    border: Border(
-                      bottom: BorderSide(
-                        color: Colors.white.withValues(alpha: 0.65),
-                      ),
-                    ),
-                    boxShadow: [
-                      BoxShadow(
-                        color: AppColors.onSurface.withValues(alpha: 0.06),
-                        blurRadius: 40,
-                        offset: const Offset(0, 40),
                       ),
                     ],
                   ),
-                  child: Padding(
-                    padding: EdgeInsets.symmetric(horizontal: horizontal),
-                    child: Row(
-                      children: [
-                        Material(
-                          color: Colors.transparent,
-                          borderRadius: BorderRadius.circular(10),
-                          child: InkWell(
-                            borderRadius: BorderRadius.circular(10),
-                            splashColor: AppColors.primary.withValues(alpha: 0.08),
-                            onTap: () =>
-                                _scaffoldKey.currentState?.openDrawer(),
-                            child: const Padding(
-                              padding: EdgeInsets.all(8),
-                              child: Icon(Icons.menu_rounded,
-                                  color: AppColors.secondary, size: 24),
-                            ),
-                          ),
-                        ),
-                        const Spacer(),
-                        const AppLogo(height: 32, width: 132),
-                        const Spacer(),
-                        ChatNotificationBell(
-                          onTap: _openNotifications,
-                          iconColor: AppColors.secondary,
-                        ),
-                        const SizedBox(width: 8),
-                        Material(
-                          color: Colors.transparent,
-                          shape: const CircleBorder(),
-                          child: InkWell(
-                            customBorder: const CircleBorder(),
-                            splashColor: AppColors.primary.withValues(alpha: 0.08),
-                            onTap: () => context.push(AppRoutes.profile),
-                            child: Container(
-                              width: 40,
-                              height: 40,
-                              decoration: BoxDecoration(
-                                shape: BoxShape.circle,
-                                border: Border.all(
-                                  color: AppColors.primary.withValues(alpha: 0.15),
-                                  width: 2,
-                                ),
-                              ),
-                              child: UserAvatar(
-                                imageUrl: user?.avatarUrl,
-                                name: user?.name ?? 'U',
-                                radius: 18,
-                              ),
-                            ),
-                          ),
-                        ),
-                      ],
-                    ),
-                  ),
                 ),
-              ),
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-
-  // ─── Nearby Services section ─────────────────────────────────────────────
-  Widget _buildNearbyServices(double lat, double lng) {
-    final nearbyAsync = ref.watch(nearbyServicesProvider((lat, lng)));
-    final selectedCat = ref.watch(selectedCategoryProvider);
-    final horizontal = AppResponsive.horizontalPadding(context);
-
-    return Padding(
-      padding: const EdgeInsets.fromLTRB(0, 8, 0, 8),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          // Header row
-          Padding(
-            padding: EdgeInsets.symmetric(horizontal: horizontal),
-            child: Row(
-              children: [
-                const Text(
-                  'Servicios Cercanos',
-                  style: TextStyle(
-                    fontSize: 18,
-                    fontWeight: FontWeight.w700,
-                    color: AppColors.onSurface,
+                Container(
+                  width: isCompact ? 44 : 58,
+                  height: isCompact ? 44 : 58,
+                  decoration: BoxDecoration(
+                    color: Colors.white,
+                    shape: BoxShape.circle,
+                    boxShadow: [
+                      BoxShadow(
+                        color: Colors.black.withValues(alpha: 0.08),
+                        blurRadius: 14,
+                        offset: const Offset(0, 4),
+                      ),
+                    ],
                   ),
-                ),
-                const Spacer(),
-                nearbyAsync.when(
-                  data: (s) {
-                    final filtered = selectedCat == null
-                        ? s
-                        : s.where((x) => x.category == selectedCat).toList();
-                    return Text(
-                      '${filtered.length} encontrados',
-                      style: const TextStyle(
-                          fontSize: 13, color: AppColors.secondary),
-                    );
-                  },
-                  loading: () => const SizedBox(
-                      width: 14,
-                      height: 14,
-                      child: CircularProgressIndicator(
-                          strokeWidth: 2, color: AppColors.primary)),
-                  error: (_, __) => const SizedBox.shrink(),
+                  child: ChatNotificationBell(
+                    onTap: _openNotifications,
+                    iconColor: const Color(0xFF171717),
+                  ),
                 ),
               ],
             ),
           ),
-
-          const SizedBox(height: 10),
-
-          // ── Category filter chips ────────────────────────────────────
-          nearbyAsync.when(
-            data: (services) {
-              // Only show categories that have at least one service
-              final available = ServiceCategory.values
-                  .where((c) => services.any((s) => s.category == c))
-                  .toList();
-              if (available.isEmpty) return const SizedBox.shrink();
-              return SizedBox(
-                height: 36,
-                child: ListView.separated(
-                  scrollDirection: Axis.horizontal,
-                  padding: EdgeInsets.symmetric(horizontal: horizontal),
-                  itemCount: available.length + 1, // +1 for "Todos"
-                  separatorBuilder: (_, __) => const SizedBox(width: 8),
-                  itemBuilder: (_, i) {
-                    if (i == 0) {
-                      final isAll = selectedCat == null;
-                      return _CategoryChip(
-                        label: 'Todos',
-                        icon: Icons.apps_rounded,
-                        color: AppColors.primary,
-                        selected: isAll,
-                        onTap: () => ref
-                            .read(selectedCategoryProvider.notifier)
-                            .state = null,
-                      );
-                    }
-                    final cat = available[i - 1];
-                    return _CategoryChip(
-                      label: cat.label,
-                      icon: cat.icon,
-                      color: cat.color,
-                      selected: selectedCat == cat,
-                      onTap: () => ref
-                          .read(selectedCategoryProvider.notifier)
-                          .state = selectedCat == cat ? null : cat,
-                    );
-                  },
-                ),
-              );
-            },
-            loading: () => const SizedBox.shrink(),
-            error: (_, __) => const SizedBox.shrink(),
-          ),
-
-          const SizedBox(height: 12),
-
-          // ── Cards ────────────────────────────────────────────────────
-          nearbyAsync.when(
-            loading: () => SizedBox(
-              height: 150,
-              child: ListView.separated(
-                scrollDirection: Axis.horizontal,
-                padding: EdgeInsets.symmetric(horizontal: horizontal),
-                itemCount: 4,
-                separatorBuilder: (_, __) => const SizedBox(width: 12),
-                itemBuilder: (_, __) => Container(
-                  width: 148,
-                  decoration: BoxDecoration(
-                    color: AppColors.surfaceContainerLow,
-                    borderRadius: BorderRadius.circular(16),
+          Expanded(
+            child: isWide
+                ? Stack(
+                    children: [
+                      Positioned.fill(
+                        child: Padding(
+                          padding: const EdgeInsets.only(bottom: 188),
+                          child: _MapSection(
+                            lat: lat,
+                            lng: lng,
+                            mapController: _mapController,
+                            mapState: mapState,
+                            onRecenter: recenterMap,
+                            onEditLocation: _editLocation,
+                            onServiceTap: _flyTo,
+                            fillHeight: true,
+                          ),
+                        ),
+                      ),
+                      Positioned(
+                        left: 24,
+                        right: 24,
+                        bottom: 16,
+                        child: Center(
+                          child: ConstrainedBox(
+                            constraints: const BoxConstraints(maxWidth: 1120),
+                            child: _DriverBottomSheet(
+                          address: mapState.isLoading
+                              ? 'Obteniendo ubicaciÃ³n...'
+                              : address,
+                          onEmergencyTap: _openCreateEmergency,
+                          nearestCard: _buildNearestServiceCard(lat, lng),
+                          navBar: _DriverBottomNav(
+                            currentIndex: _navIndex,
+                            onTap: (index) => _onNavTap(
+                              index,
+                              lat: lat,
+                              lng: lng,
+                            ),
+                          ),
+                              dense: true,
+                            ),
+                          ),
+                        ),
+                      ),
+                    ],
+                  )
+                : Stack(
+              children: [
+                Positioned.fill(
+                  child: Padding(
+                    padding: EdgeInsets.only(
+                      bottom: (screenSize.height * 0.24).clamp(160.0, 220.0),
+                    ),
+                    child: _MapSection(
+                      lat: lat,
+                      lng: lng,
+                      mapController: _mapController,
+                      mapState: mapState,
+                      onRecenter: recenterMap,
+                      onEditLocation: _editLocation,
+                      onServiceTap: _flyTo,
+                      fillHeight: true,
+                    ),
                   ),
                 ),
-              ),
+                Positioned(
+                  left: 12,
+                  right: 12,
+                  bottom: 8 + MediaQuery.of(context).padding.bottom,
+                  child: Center(
+                    child: ConstrainedBox(
+                      constraints: const BoxConstraints(maxWidth: 460),
+                      child: _DriverBottomSheet(
+                    address: mapState.isLoading
+                        ? 'Obteniendo ubicación...'
+                        : address,
+                    onEmergencyTap: _openCreateEmergency,
+                    nearestCard: _buildNearestServiceCard(lat, lng),
+                    navBar: _DriverBottomNav(
+                      currentIndex: _navIndex,
+                      onTap: (index) => _onNavTap(
+                        index,
+                        lat: lat,
+                        lng: lng,
+                      ),
+                    ),
+                      ),
+                    ),
+                  ),
+                ),
+              ],
             ),
-            error: (_, __) => const SizedBox.shrink(),
-            data: (services) {
-              final filtered = selectedCat == null
-                  ? services
-                  : services.where((s) => s.category == selectedCat).toList();
-              if (filtered.isEmpty) {
-                return Padding(
-                  padding: EdgeInsets.symmetric(horizontal: horizontal),
-                  child: Container(
-                    width: double.infinity,
-                    padding: const EdgeInsets.all(20),
-                    decoration: BoxDecoration(
-                      color: AppColors.surfaceContainerLow,
-                      borderRadius: BorderRadius.circular(16),
-                    ),
-                    child: const Text(
-                      'Sin servicios cercanos en 5km',
-                      style:
-                          TextStyle(color: AppColors.secondary, fontSize: 13),
-                      textAlign: TextAlign.center,
-                    ),
-                  ),
-                );
-              }
-              return SizedBox(
-                height: 150,
-                child: ListView.separated(
-                  scrollDirection: Axis.horizontal,
-                  padding: EdgeInsets.symmetric(horizontal: horizontal),
-                  itemCount: filtered.length,
-                  separatorBuilder: (_, __) => const SizedBox(width: 12),
-                  itemBuilder: (_, i) => _NearbyServiceCard(
-                    service: filtered[i],
-                    onTap: () => _flyTo(filtered[i].lat, filtered[i].lng),
-                  ),
-                ),
-              );
-            },
           ),
         ],
       ),
     );
   }
+
+  Widget _buildNearestServiceCard(double lat, double lng) {
+    final nearbyAsync = ref.watch(nearbyServicesProvider((lat, lng)));
+    final selectedCat = ref.watch(selectedCategoryProvider);
+
+    return nearbyAsync.when(
+      loading: () => const SizedBox(
+        height: 102,
+        child: Center(
+          child: CircularProgressIndicator(color: AppColors.primary),
+        ),
+      ),
+      error: (_, __) => const SizedBox(
+        height: 76,
+        child: Center(
+          child: Text(
+            'No se encontraron servicios.',
+            style: TextStyle(
+              fontSize: 13,
+              color: Color(0xFF7A7A7A),
+            ),
+          ),
+        ),
+      ),
+      data: (services) {
+        final filtered = selectedCat == null
+            ? services
+            : services.where((s) => s.category == selectedCat).toList();
+        if (filtered.isEmpty) {
+          return const SizedBox(
+            height: 76,
+            child: Center(
+              child: Text(
+                'Sin servicios cercanos en 5km.',
+                style: TextStyle(
+                  fontSize: 13,
+                  color: Color(0xFF7A7A7A),
+                ),
+              ),
+            ),
+          );
+        }
+        final nearest = filtered.first;
+        return _NearestServiceCard(
+          service: nearest,
+          onTap: () => _flyTo(nearest.lat, nearest.lng),
+        );
+      },
+    );
+  }
+
 }
 
-// ─── Map section widget ────────────────────────────────────────────────────────
 class _MapSection extends ConsumerWidget {
   final double lat;
   final double lng;
   final MapController mapController;
   final MapState mapState;
   final Future<void> Function() onRecenter;
+  final Future<void> Function() onEditLocation;
+  final void Function(double lat, double lng) onServiceTap;
+  final bool fillHeight;
 
   const _MapSection({
     required this.lat,
@@ -755,14 +811,19 @@ class _MapSection extends ConsumerWidget {
     required this.mapController,
     required this.mapState,
     required this.onRecenter,
+    required this.onEditLocation,
+    required this.onServiceTap,
+    this.fillHeight = false,
   });
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final nearbyAsync = ref.watch(nearbyServicesProvider((lat, lng)));
     final selectedCat = ref.watch(selectedCategoryProvider);
+    final screenSize = MediaQuery.of(context).size;
+    final isCompact = screenSize.width < 360;
+    final isWide = screenSize.width >= 900;
 
-    // Build service markers from loaded data
     final serviceMarkers = nearbyAsync.maybeWhen(
       data: (services) {
         final visible = selectedCat == null
@@ -772,8 +833,8 @@ class _MapSection extends ConsumerWidget {
             .map(
               (s) => Marker(
                 point: LatLng(s.lat, s.lng),
-                width: 38,
-                height: 38,
+                width: 42,
+                height: 42,
                 child: _ServiceMapPin(color: s.color, icon: s.icon),
               ),
             )
@@ -782,133 +843,697 @@ class _MapSection extends ConsumerWidget {
       orElse: () => <Marker>[],
     );
 
-    return Padding(
-      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-      child: Container(
-        height: AppResponsive.mapHeight(
-          context,
-          compact: 260,
-          regular: 340,
-          tablet: 380,
-        ),
-        decoration: BoxDecoration(
-          color: AppColors.surfaceContainerLowest,
-          borderRadius: BorderRadius.circular(24),
-          border: Border.all(color: Colors.white.withValues(alpha: 0.72)),
-          boxShadow: [
-            BoxShadow(
-              color: AppColors.onSurface.withValues(alpha: 0.08),
-              blurRadius: 24,
-              offset: const Offset(0, 12),
-            ),
-          ],
-        ),
-        child: ClipRRect(
-          borderRadius: BorderRadius.circular(24),
-          child: Stack(
-            children: [
-              FlutterMap(
-                mapController: mapController,
-                options: MapOptions(
-                  initialCenter: LatLng(lat, lng),
-                  initialZoom: 14.5,
+    final quickActions = nearbyAsync.maybeWhen(
+      data: (services) {
+        final available = ServiceCategory.values
+            .where((c) => services.any((s) => s.category == c))
+            .take(4)
+            .toList();
+        return available.isEmpty
+            ? <ServiceCategory>[
+                ServiceCategory.fuel,
+                ServiceCategory.charging,
+                ServiceCategory.carRepair,
+                ServiceCategory.tires,
+              ]
+            : available;
+      },
+      orElse: () => <ServiceCategory>[
+        ServiceCategory.fuel,
+        ServiceCategory.charging,
+        ServiceCategory.carRepair,
+        ServiceCategory.tires,
+      ],
+    );
+
+    final mapStack = Stack(
+        children: [
+          Positioned.fill(
+            child: FlutterMap(
+              mapController: mapController,
+              options: MapOptions(
+                initialCenter: LatLng(lat, lng),
+                initialZoom: 14.5,
+              ),
+              children: [
+                TileLayer(
+                  urlTemplate: AppConstants.osmTileUrl,
+                  userAgentPackageName: 'com.autoresq.app',
                 ),
-                children: [
-                  TileLayer(
-                    urlTemplate: AppConstants.osmTileUrl,
-                    userAgentPackageName: 'com.autoresq.app',
-                  ),
-                  MarkerLayer(
-                    markers: [
-                      // User position marker
-                      Marker(
-                        point: LatLng(lat, lng),
-                        width: 52,
-                        height: 52,
-                        child: Container(
-                          decoration: BoxDecoration(
-                            color: AppColors.primary,
-                            shape: BoxShape.circle,
-                            border: Border.all(color: Colors.white, width: 2.5),
-                            boxShadow: [
-                              BoxShadow(
-                                color: AppColors.primary.withValues(alpha: 0.35),
-                                blurRadius: 14,
-                                spreadRadius: 2,
-                              ),
-                            ],
-                          ),
-                          child: const Icon(Icons.person_pin_circle,
-                              color: Colors.white, size: 26),
+                MarkerLayer(
+                  markers: [
+                    Marker(
+                      point: LatLng(lat, lng),
+                      width: 56,
+                      height: 56,
+                      child: Container(
+                        decoration: BoxDecoration(
+                          color: AppColors.primary,
+                          shape: BoxShape.circle,
+                          border: Border.all(color: Colors.white, width: 3),
+                          boxShadow: [
+                            BoxShadow(
+                              color: AppColors.primary.withValues(alpha: 0.30),
+                              blurRadius: 18,
+                              spreadRadius: 2,
+                            ),
+                          ],
+                        ),
+                        child: const Icon(
+                          Icons.person_pin_circle,
+                          color: Colors.white,
+                          size: 28,
                         ),
                       ),
-                      // Service markers
-                      ...serviceMarkers,
-                    ],
+                    ),
+                    ...serviceMarkers,
+                  ],
+                ),
+              ],
+            ),
+          ),
+          Positioned.fill(
+            child: Container(
+              color: Colors.white.withValues(alpha: isWide ? 0.10 : 0.24),
+            ),
+          ),
+          Positioned(
+            left: isWide ? 24 : (isCompact ? 16 : 24),
+            top: isWide ? 76 : (isCompact ? 42 : 76),
+            child: Column(
+              children: quickActions
+                  .map(
+                    (category) => Padding(
+                      padding: EdgeInsets.only(
+                        bottom: isWide ? 14 : (isCompact ? 18 : 28),
+                      ),
+                      child: _QuickActionButton(
+                        icon: category.icon,
+                        label: category.label,
+                        selected: selectedCat == category,
+                        onTap: () {
+                          final next = selectedCat == category ? null : category;
+                          ref.read(selectedCategoryProvider.notifier).state = next;
+                          final list = nearbyAsync.valueOrNull ?? <NearbyService>[];
+                          final target = list.cast<NearbyService?>().firstWhere(
+                                (s) => s?.category == category,
+                                orElse: () => null,
+                              );
+                          if (target != null) {
+                            onServiceTap(target.lat, target.lng);
+                          }
+                        },
+                      ),
+                    ),
+                  )
+                  .toList(),
+            ),
+          ),
+          Positioned(
+            right: isWide ? 24 : (isCompact ? 14 : 24),
+            bottom: isWide ? 208 : 18,
+            child: Column(
+              children: [
+                _MapControlButton(
+                  icon: Icons.my_location_rounded,
+                  onTap: onRecenter,
+                ),
+                SizedBox(height: isWide ? 10 : (isCompact ? 12 : 18)),
+                _MapControlButton(
+                  icon: Icons.edit_location_alt_rounded,
+                  onTap: onEditLocation,
+                ),
+              ],
+            ),
+          ),
+        ],
+      );
+
+    if (fillHeight) return mapStack;
+
+    return SizedBox(
+      height: (screenSize.height * (isCompact ? 0.54 : 0.58))
+          .clamp(330.0, 520.0),
+      child: mapStack,
+    );
+  }
+}
+
+class _DriverBottomSheet extends StatelessWidget {
+  final String address;
+  final VoidCallback onEmergencyTap;
+  final Widget nearestCard;
+  final Widget navBar;
+  final bool dense;
+
+  const _DriverBottomSheet({
+    required this.address,
+    required this.onEmergencyTap,
+    required this.nearestCard,
+    required this.navBar,
+    this.dense = false,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final width = MediaQuery.of(context).size.width;
+    final isCompact = dense || width < 520;
+
+    return Container(
+      padding: EdgeInsets.fromLTRB(
+        isCompact ? 10 : 16,
+        isCompact ? 6 : 10,
+        isCompact ? 10 : 16,
+        isCompact ? 10 : 16,
+      ),
+      decoration: BoxDecoration(
+        color: Colors.white.withValues(alpha: 0.96),
+        borderRadius: BorderRadius.circular(isCompact ? 24 : 34),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withValues(alpha: 0.10),
+            blurRadius: 28,
+            offset: const Offset(0, -8),
+          ),
+        ],
+      ),
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Container(
+            width: isCompact ? 44 : 72,
+            height: isCompact ? 5 : 8,
+            decoration: BoxDecoration(
+              color: const Color(0xFFD6D6D6),
+              borderRadius: BorderRadius.circular(999),
+            ),
+          ),
+          SizedBox(height: isCompact ? 8 : 14),
+          AnimatedPressable(
+            onTap: onEmergencyTap,
+            borderRadius: BorderRadius.circular(isCompact ? 20 : 30),
+            pressedScale: 0.97,
+            child: Container(
+              width: double.infinity,
+              padding: EdgeInsets.symmetric(
+                horizontal: isCompact ? 14 : 20,
+                vertical: isCompact ? 12 : 18,
+              ),
+              decoration: BoxDecoration(
+                color: const Color(0xFFEB1C1C),
+                borderRadius: BorderRadius.circular(isCompact ? 20 : 30),
+                boxShadow: [
+                  BoxShadow(
+                    color: const Color(0xFFEB1C1C).withValues(alpha: 0.22),
+                    blurRadius: 26,
+                    offset: const Offset(0, 12),
                   ),
                 ],
               ),
-              // Map controls
-              Positioned(
-                top: 14,
-                left: 14,
-                child: ClipRRect(
-                  borderRadius: BorderRadius.circular(18),
-                  child: BackdropFilter(
-                    filter: ImageFilter.blur(sigmaX: 18, sigmaY: 18),
-                    child: Container(
-                      padding: const EdgeInsets.symmetric(
-                          horizontal: 14, vertical: 10),
-                      decoration: BoxDecoration(
-                        color: Colors.white.withValues(alpha: 0.82),
-                        borderRadius: BorderRadius.circular(18),
+              child: Row(
+                children: [
+                  Container(
+                    width: isCompact ? 40 : 52,
+                    height: isCompact ? 40 : 52,
+                    decoration: BoxDecoration(
+                      color: Colors.white.withValues(alpha: 0.16),
+                      borderRadius: BorderRadius.circular(isCompact ? 16 : 20),
+                      border: Border.all(
+                        color: Colors.white.withValues(alpha: 0.22),
                       ),
-                      child: Row(
-                        mainAxisSize: MainAxisSize.min,
-                        children: [
-                          Container(
-                            width: 28,
-                            height: 28,
-                            decoration: const BoxDecoration(
-                              color: AppColors.primary,
-                              shape: BoxShape.circle,
-                            ),
-                            child: const Icon(
-                              Icons.near_me_rounded,
-                              color: Colors.white,
-                              size: 15,
-                            ),
+                    ),
+                    child: Icon(
+                      Icons.sos_rounded,
+                      color: Colors.white,
+                      size: isCompact ? 20 : 24,
+                    ),
+                  ),
+                  SizedBox(width: isCompact ? 10 : 16),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        Text(
+                          'Necesito ayuda',
+                          style: TextStyle(
+                            color: Colors.white.withValues(alpha: 0.82),
+                            fontSize: isCompact ? 10 : 12,
+                            fontWeight: FontWeight.w700,
+                            letterSpacing: 0.2,
                           ),
-                          const SizedBox(width: 8),
-                          Text(
-                            'Servicios en ruta',
-                            style: TextStyle(
-                              fontSize: 12,
-                              fontWeight: FontWeight.w700,
-                              color: AppColors.onSurface,
-                            ),
+                        ),
+                        SizedBox(height: isCompact ? 1 : 3),
+                        Text(
+                          'Reportar emergencia',
+                          style: TextStyle(
+                            color: Colors.white,
+                            fontSize: isCompact ? 14 : 18,
+                            fontWeight: FontWeight.w900,
+                            height: 1.05,
                           ),
-                        ],
+                        ),
+                      ],
+                    ),
+                  ),
+                  SizedBox(width: isCompact ? 6 : 10),
+                  Container(
+                    width: isCompact ? 34 : 42,
+                    height: isCompact ? 34 : 42,
+                    decoration: BoxDecoration(
+                      color: Colors.white,
+                      shape: BoxShape.circle,
+                    ),
+                    child: Icon(
+                      Icons.arrow_forward_rounded,
+                      color: const Color(0xFFEB1C1C),
+                      size: isCompact ? 20 : 24,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ),
+          SizedBox(height: isCompact ? 8 : 12),
+          nearestCard,
+          SizedBox(height: isCompact ? 8 : 12),
+          navBar,
+        ],
+      ),
+    );
+  }
+}
+
+class _NearestServiceCard extends StatelessWidget {
+  final NearbyService service;
+  final VoidCallback onTap;
+
+  const _NearestServiceCard({
+    required this.service,
+    required this.onTap,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final isCompact = MediaQuery.of(context).size.width < 520;
+
+    return AnimatedPressable(
+      onTap: onTap,
+      borderRadius: BorderRadius.circular(isCompact ? 18 : 26),
+      child: Container(
+        padding: EdgeInsets.all(isCompact ? 10 : 14),
+        decoration: BoxDecoration(
+          color: const Color(0xFFF2F2F2),
+          borderRadius: BorderRadius.circular(isCompact ? 18 : 26),
+          border: Border.all(color: const Color(0xFFE3E3E3)),
+          boxShadow: [
+            BoxShadow(
+              color: Colors.black.withValues(alpha: 0.04),
+              blurRadius: 10,
+              offset: const Offset(0, 4),
+            ),
+          ],
+        ),
+        child: Row(
+          children: [
+            Container(
+              width: isCompact ? 44 : 56,
+              height: isCompact ? 44 : 56,
+              decoration: BoxDecoration(
+                color: const Color(0xFFD8E6F3),
+                shape: BoxShape.circle,
+              ),
+              child: Icon(
+                service.icon,
+                color: AppColors.primary,
+                size: isCompact ? 22 : 26,
+              ),
+            ),
+            SizedBox(width: isCompact ? 10 : 14),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    'Más cercano',
+                    style: TextStyle(
+                      fontSize: isCompact ? 10 : 12,
+                      fontWeight: FontWeight.w700,
+                      color: const Color(0xFF5B4137),
+                    ),
+                  ),
+                  SizedBox(height: isCompact ? 1 : 4),
+                  RichText(
+                    text: TextSpan(
+                      style: TextStyle(
+                        fontSize: isCompact ? 13 : 16,
+                        fontWeight: FontWeight.w800,
+                        color: const Color(0xFF171717),
                       ),
+                      children: [
+                        TextSpan(text: service.name),
+                        TextSpan(
+                          text: ' (${service.distanceLabel})',
+                          style: TextStyle(
+                            color: AppColors.primary,
+                            fontSize: isCompact ? 13 : 16,
+                          ),
+                        ),
+                      ],
+                    ),
+                    maxLines: 2,
+                    overflow: TextOverflow.ellipsis,
+                  ),
+                ],
+              ),
+            ),
+            SizedBox(width: isCompact ? 6 : 10),
+            Container(
+              width: isCompact ? 38 : 46,
+              height: isCompact ? 38 : 46,
+              decoration: const BoxDecoration(
+                color: Colors.white,
+                shape: BoxShape.circle,
+              ),
+              child: Icon(
+                Icons.chevron_right_rounded,
+                color: const Color(0xFF171717),
+                size: isCompact ? 22 : 28,
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+class _ServiceFilterChip extends StatelessWidget {
+  final String label;
+  final IconData? icon;
+  final Color? color;
+  final bool selected;
+  final VoidCallback onTap;
+
+  const _ServiceFilterChip({
+    required this.label,
+    required this.selected,
+    required this.onTap,
+    this.icon,
+    this.color,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final foreground = selected ? Colors.white : (color ?? AppColors.primary);
+    return AnimatedPressable(
+      onTap: onTap,
+      borderRadius: BorderRadius.circular(999),
+      child: AnimatedContainer(
+        duration: const Duration(milliseconds: 180),
+        curve: Curves.easeOutCubic,
+        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+        decoration: BoxDecoration(
+          color: selected ? (color ?? AppColors.primary) : Colors.white,
+          borderRadius: BorderRadius.circular(999),
+          border: Border.all(
+            color: selected
+                ? (color ?? AppColors.primary)
+                : const Color(0xFFE5DED6),
+          ),
+        ),
+        child: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            if (icon != null) ...[
+              Icon(icon, size: 16, color: foreground),
+              const SizedBox(width: 6),
+            ],
+            Text(
+              label,
+              style: TextStyle(
+                fontSize: 12,
+                fontWeight: FontWeight.w800,
+                color: foreground,
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+class _NearbyServiceListTile extends StatelessWidget {
+  final NearbyService service;
+  final VoidCallback onTap;
+
+  const _NearbyServiceListTile({
+    required this.service,
+    required this.onTap,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return AnimatedPressable(
+      onTap: onTap,
+      borderRadius: BorderRadius.circular(22),
+      child: Container(
+        padding: const EdgeInsets.all(14),
+        decoration: BoxDecoration(
+          color: Colors.white,
+          borderRadius: BorderRadius.circular(22),
+          border: Border.all(color: const Color(0xFFE8E1D8)),
+          boxShadow: [
+            BoxShadow(
+              color: Colors.black.withValues(alpha: 0.04),
+              blurRadius: 12,
+              offset: const Offset(0, 4),
+            ),
+          ],
+        ),
+        child: Row(
+          children: [
+            Container(
+              width: 52,
+              height: 52,
+              decoration: BoxDecoration(
+                color: service.color.withValues(alpha: 0.12),
+                borderRadius: BorderRadius.circular(16),
+              ),
+              child: Icon(service.icon, color: service.color, size: 26),
+            ),
+            const SizedBox(width: 12),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    service.name,
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: const TextStyle(
+                      fontSize: 15,
+                      fontWeight: FontWeight.w800,
+                      color: Color(0xFF171717),
+                    ),
+                  ),
+                  const SizedBox(height: 4),
+                  Text(
+                    service.typeLabel,
+                    style: const TextStyle(
+                      fontSize: 12,
+                      fontWeight: FontWeight.w700,
+                      color: Color(0xFF6E6E6E),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+            const SizedBox(width: 10),
+            Column(
+              crossAxisAlignment: CrossAxisAlignment.end,
+              children: [
+                Container(
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 10,
+                    vertical: 6,
+                  ),
+                  decoration: BoxDecoration(
+                    color: service.color.withValues(alpha: 0.12),
+                    borderRadius: BorderRadius.circular(999),
+                  ),
+                  child: Text(
+                    service.distanceLabel,
+                    style: TextStyle(
+                      fontSize: 12,
+                      fontWeight: FontWeight.w900,
+                      color: service.color,
                     ),
                   ),
                 ),
-              ),
-              Positioned(
-                bottom: 16,
-                right: 16,
+                const SizedBox(height: 8),
+                const Icon(
+                  Icons.chevron_right_rounded,
+                  color: Color(0xFF171717),
+                ),
+              ],
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+class _DriverBottomNav extends StatelessWidget {
+  final int currentIndex;
+  final ValueChanged<int> onTap;
+
+  const _DriverBottomNav({
+    required this.currentIndex,
+    required this.onTap,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final isCompact = MediaQuery.of(context).size.width < 520;
+    const items = [
+      _NavItem('History', Icons.history_rounded, Icons.history_rounded),
+      _NavItem('Home', Icons.home_outlined, Icons.home_rounded),
+      _NavItem('Servicios', Icons.storefront_outlined, Icons.storefront_rounded),
+      _NavItem('Profile', Icons.person_outline_rounded,
+          Icons.person_rounded),
+    ];
+
+    return Container(
+      padding: EdgeInsets.symmetric(
+        horizontal: isCompact ? 4 : 8,
+        vertical: isCompact ? 4 : 8,
+      ),
+      decoration: BoxDecoration(
+        color: const Color(0xFFF1F1F1),
+        borderRadius: BorderRadius.circular(isCompact ? 24 : 34),
+      ),
+      child: Row(
+        children: List.generate(items.length, (index) {
+          final item = items[index];
+          final isActive = index == currentIndex;
+          return Expanded(
+            child: AnimatedPressable(
+              onTap: () => onTap(index),
+              borderRadius: BorderRadius.circular(28),
+              child: AnimatedContainer(
+                duration: const Duration(milliseconds: 220),
+                curve: Curves.easeOutCubic,
+                padding: EdgeInsets.symmetric(vertical: isCompact ? 5 : 8),
+                decoration: BoxDecoration(
+                  color: isActive ? const Color(0xFFD90F16) : Colors.transparent,
+                  borderRadius: BorderRadius.circular(isCompact ? 20 : 28),
+                ),
                 child: Column(
+                  mainAxisSize: MainAxisSize.min,
                   children: [
-                    _MapControlButton(Icons.my_location, () {
-                      onRecenter();
-                    }),
-                    const SizedBox(height: 8),
-                    _MapControlButton(Icons.layers, () {}),
+                    Icon(
+                      isActive ? item.activeIcon : item.icon,
+                      size: isCompact ? 18 : 24,
+                      color: isActive ? Colors.white : AppColors.primary,
+                    ),
+                    SizedBox(height: isCompact ? 2 : 4),
+                    Text(
+                      item.label,
+                      style: TextStyle(
+                        fontSize: isCompact ? 8 : 11,
+                        fontWeight: FontWeight.w700,
+                        color: isActive ? Colors.white : AppColors.primary,
+                      ),
+                    ),
                   ],
                 ),
               ),
-            ],
+            ),
+          );
+        }),
+      ),
+    );
+  }
+}
+
+class _NavItem {
+  final String label;
+  final IconData icon;
+  final IconData activeIcon;
+
+  const _NavItem(this.label, this.icon, this.activeIcon);
+}
+
+class _QuickActionButton extends StatelessWidget {
+  final IconData icon;
+  final String label;
+  final bool selected;
+  final VoidCallback onTap;
+
+  const _QuickActionButton({
+    required this.icon,
+    required this.label,
+    required this.selected,
+    required this.onTap,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final isCompact = MediaQuery.of(context).size.width < 360;
+    final isWide = MediaQuery.of(context).size.width >= 900;
+    final size = isWide ? 54.0 : (isCompact ? 50.0 : 58.0);
+
+    return AnimatedPressable(
+      onTap: onTap,
+      borderRadius: BorderRadius.circular(18),
+      pressedScale: 0.94,
+      child: AnimatedContainer(
+        duration: const Duration(milliseconds: 180),
+        width: size,
+        padding: const EdgeInsets.symmetric(vertical: 8),
+        decoration: BoxDecoration(
+          color: selected ? AppColors.primary : Colors.white,
+          borderRadius: BorderRadius.circular(18),
+          border: Border.all(
+            color: selected
+                ? AppColors.primary
+                : AppColors.primary.withValues(alpha: 0.14),
+            width: 1.2,
           ),
+          boxShadow: [
+            BoxShadow(
+              color: selected
+                  ? AppColors.primary.withValues(alpha: 0.24)
+                  : Colors.black.withValues(alpha: 0.10),
+              blurRadius: selected ? 18 : 12,
+              offset: const Offset(0, 6),
+            ),
+          ],
+        ),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Icon(
+              icon,
+              color: selected ? Colors.white : AppColors.primary,
+              size: isWide ? 21 : 23,
+            ),
+            const SizedBox(height: 3),
+            Text(
+              label.split(' ').first,
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+              style: TextStyle(
+                fontSize: 8,
+                height: 1,
+                fontWeight: FontWeight.w800,
+                color: selected ? Colors.white : AppColors.primary,
+              ),
+            ),
+          ],
         ),
       ),
     );
@@ -918,225 +1543,71 @@ class _MapSection extends ConsumerWidget {
 class _ServiceMapPin extends StatelessWidget {
   final Color color;
   final IconData icon;
-  const _ServiceMapPin({required this.color, required this.icon});
+
+  const _ServiceMapPin({
+    required this.color,
+    required this.icon,
+  });
 
   @override
   Widget build(BuildContext context) {
     return Container(
-      width: 32,
-      height: 32,
+      width: 38,
+      height: 38,
       decoration: BoxDecoration(
         color: color,
         shape: BoxShape.circle,
-        border: Border.all(color: Colors.white, width: 2),
+        border: Border.all(color: Colors.white, width: 2.4),
         boxShadow: [
           BoxShadow(
-            color: color.withValues(alpha: 0.45),
-            blurRadius: 8,
+            color: color.withValues(alpha: 0.30),
+            blurRadius: 12,
             spreadRadius: 1,
           ),
         ],
       ),
-      child: Icon(icon, color: Colors.white, size: 16),
+      child: Icon(icon, color: Colors.white, size: 18),
     );
   }
 }
 
 class _MapControlButton extends StatelessWidget {
   final IconData icon;
-  final VoidCallback onTap;
-  const _MapControlButton(this.icon, this.onTap);
+  final Future<void> Function() onTap;
 
-  @override
-  Widget build(BuildContext context) {
-    return AnimatedPressable(
-      onTap: onTap,
-      borderRadius: BorderRadius.circular(9999),
-      pressedScale: 0.92,
-      child: Container(
-        width: 46,
-        height: 46,
-        decoration: BoxDecoration(
-          color: Colors.white,
-          shape: BoxShape.circle,
-          boxShadow: [
-            BoxShadow(
-              color: AppColors.onSurface.withValues(alpha: 0.1),
-              blurRadius: 12,
-            ),
-          ],
-        ),
-        child: Icon(icon, color: AppColors.onSurface, size: 22),
-      ),
-    );
-  }
-}
-
-// ─── Category Chip ─────────────────────────────────────────────────────────────
-class _CategoryChip extends StatelessWidget {
-  final String label;
-  final IconData icon;
-  final Color color;
-  final bool selected;
-  final VoidCallback onTap;
-
-  const _CategoryChip({
-    required this.label,
+  const _MapControlButton({
     required this.icon,
-    required this.color,
-    required this.selected,
     required this.onTap,
   });
 
   @override
   Widget build(BuildContext context) {
+    final isCompact = MediaQuery.of(context).size.width < 360;
+    final isWide = MediaQuery.of(context).size.width >= 900;
+    final size = isWide ? 44.0 : (isCompact ? 42.0 : 48.0);
+
     return AnimatedPressable(
       onTap: onTap,
-      borderRadius: BorderRadius.circular(22),
-      pressedScale: 0.94,
-      hoverScale: 1.025,
-      child: AnimatedContainer(
-        duration: const Duration(milliseconds: 200),
-        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 6),
+      borderRadius: BorderRadius.circular(999),
+      child: Container(
+        width: size,
+        height: size,
         decoration: BoxDecoration(
-          color: selected ? color : Colors.white,
-          borderRadius: BorderRadius.circular(22),
+          color: Colors.white,
+          shape: BoxShape.circle,
           border: Border.all(
-            color: selected
-                ? Colors.white.withValues(alpha: 0.0)
-                : color.withValues(alpha: 0.22),
+            color: AppColors.primary.withValues(alpha: 0.12),
             width: 1,
           ),
           boxShadow: [
             BoxShadow(
-              color: selected
-                  ? color.withValues(alpha: 0.26)
-                  : AppColors.onSurface.withValues(alpha: 0.04),
-              blurRadius: selected ? 14 : 8,
-              offset: Offset(0, selected ? 5 : 2),
+              color: Colors.black.withValues(alpha: 0.10),
+              blurRadius: 12,
+              offset: const Offset(0, 5),
             ),
           ],
         ),
-        child: Row(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            Icon(
-              icon,
-              size: 14,
-              color: selected ? Colors.white : color,
-            ),
-            const SizedBox(width: 6),
-            Text(
-              label,
-              style: TextStyle(
-                fontSize: 12,
-                fontWeight: FontWeight.w800,
-                color: selected ? Colors.white : color,
-              ),
-            ),
-          ],
-        ),
-      ),
-    );
-  }
-}
-
-// ─── Service Card ──────────────────────────────────────────────────────────────
-class _NearbyServiceCard extends StatelessWidget {
-  final NearbyService service;
-  final VoidCallback onTap;
-
-  const _NearbyServiceCard({required this.service, required this.onTap});
-
-  @override
-  Widget build(BuildContext context) {
-    return AnimatedPressable(
-      onTap: onTap,
-      borderRadius: BorderRadius.circular(22),
-      pressedScale: 0.96,
-      hoverScale: 1.025,
-      child: Container(
-        width: 148,
-        padding: const EdgeInsets.all(14),
-        decoration: BoxDecoration(
-          color: AppColors.surfaceContainerLowest,
-          borderRadius: BorderRadius.circular(18),
-          border: Border.all(color: service.color.withValues(alpha: 0.14)),
-          boxShadow: [
-            BoxShadow(
-              color: AppColors.onSurface.withValues(alpha: 0.07),
-              blurRadius: 18,
-              offset: const Offset(0, 8),
-            ),
-          ],
-        ),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          mainAxisSize: MainAxisSize.max,
-          children: [
-            Row(
-              children: [
-                Container(
-                  padding: const EdgeInsets.all(7),
-                  decoration: BoxDecoration(
-                    color: service.color.withValues(alpha: 0.12),
-                    borderRadius: BorderRadius.circular(9),
-                  ),
-                  child: Icon(service.icon, color: service.color, size: 18),
-                ),
-                const Spacer(),
-                // Category badge
-                Container(
-                  padding:
-                      const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
-                  decoration: BoxDecoration(
-                    color: service.color.withValues(alpha: 0.08),
-                    borderRadius: BorderRadius.circular(6),
-                  ),
-                  child: Text(
-                    service.typeLabel,
-                    style: TextStyle(
-                      fontSize: 9,
-                      fontWeight: FontWeight.w700,
-                      color: service.color,
-                    ),
-                  ),
-                ),
-              ],
-            ),
-            const SizedBox(height: 10),
-            Text(
-              service.name,
-              maxLines: 2,
-              overflow: TextOverflow.ellipsis,
-              style: const TextStyle(
-                fontSize: 12,
-                fontWeight: FontWeight.w700,
-                color: AppColors.onSurface,
-                height: 1.3,
-              ),
-            ),
-            const Spacer(),
-            Row(
-              children: [
-                const Icon(Icons.near_me_rounded,
-                    size: 11, color: AppColors.secondary),
-                const SizedBox(width: 3),
-                Text(
-                  service.distanceLabel,
-                  style: const TextStyle(
-                    fontSize: 11,
-                    color: AppColors.secondary,
-                    fontWeight: FontWeight.w600,
-                  ),
-                ),
-                const Spacer(),
-                Icon(Icons.chevron_right_rounded,
-                    size: 14, color: service.color.withValues(alpha: 0.6)),
-              ],
-            ),
-          ],
-        ),
+        child: Icon(icon, color: AppColors.primary, size: isWide ? 21 : 23),
       ),
     );
   }

@@ -239,6 +239,15 @@ class AppDrawer extends ConsumerWidget {
           context.go(AppRoutes.emergencyMonitor);
         },
       ),
+      _DrawerItem(
+        icon: Icons.picture_as_pdf_outlined,
+        label: 'Reportes Administrativos',
+        color: AppColors.primary,
+        onTap: () {
+          Navigator.of(context).pop();
+          context.go(AppRoutes.adminReports);
+        },
+      ),
     ];
   }
 

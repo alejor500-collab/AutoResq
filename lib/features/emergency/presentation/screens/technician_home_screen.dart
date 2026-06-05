@@ -1,5 +1,5 @@
 import 'dart:async';
-import 'dart:ui';
+import 'dart:math' as math;
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
@@ -15,17 +15,12 @@ import '../../../../core/utils/helpers.dart';
 import '../../../../shared/providers/auth_provider.dart';
 import '../../../../shared/providers/role_provider.dart';
 import '../../../../shared/providers/technician_stats_provider.dart';
-import '../../../../shared/utils/app_responsive.dart';
 import '../../../../shared/widgets/animated_pressable.dart';
 import '../../../../shared/widgets/app_drawer.dart';
-import '../../../../shared/widgets/app_logo.dart';
-import '../../../../shared/widgets/app_motion.dart';
-import '../../../../shared/widgets/bottom_nav_bar.dart';
 import '../../../../shared/widgets/in_app_message_notice.dart';
 import '../../../../shared/widgets/notification_center_sheet.dart';
 import '../../../../shared/widgets/user_avatar.dart';
 import '../../../chat/presentation/providers/chat_provider.dart';
-import '../../../chat/presentation/widgets/chat_notification_bell.dart';
 import '../../../map/presentation/providers/map_provider.dart';
 import '../../../map/presentation/widgets/map_widget.dart';
 import 'incoming_request_sheet.dart';
@@ -66,6 +61,9 @@ class _TechnicianHomeScreenState extends ConsumerState<TechnicianHomeScreen> {
   @override
   void initState() {
     super.initState();
+    ref
+        .read(activeRoleProvider.notifier)
+        .switchTo(AppConstants.roleTechnician);
     _navIndex = widget.initialTab.clamp(0, 4);
     _pendingEmergenciesSubscription =
         ref.listenManual<AsyncValue<List<Emergency>>>(
@@ -404,138 +402,6 @@ class _TechnicianHomeScreenState extends ConsumerState<TechnicianHomeScreen> {
     );
   }
 
-  Widget _buildProfileCard({
-    required String technicianName,
-    required String specialty,
-    required bool isApproved,
-    required bool isAvailable,
-    required double rating,
-    required int totalServices,
-    required int pendingCount,
-  }) {
-    final chipColor = isApproved ? AppColors.success : AppColors.warning;
-
-    return Container(
-      margin: const EdgeInsets.fromLTRB(16, 12, 16, 12),
-      padding: const EdgeInsets.all(16),
-      decoration: BoxDecoration(
-        color: AppColors.surfaceContainerLowest,
-        borderRadius: BorderRadius.circular(24),
-        border: Border.all(color: Colors.white.withValues(alpha: 0.75)),
-        boxShadow: [
-          BoxShadow(
-            color: AppColors.onSurface.withValues(alpha: 0.08),
-            blurRadius: 24,
-            offset: const Offset(0, 12),
-          ),
-        ],
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Row(
-            children: [
-              Container(
-                width: 48,
-                height: 48,
-                decoration: BoxDecoration(
-                  gradient: AppColors.primaryGradient,
-                  borderRadius: BorderRadius.circular(16),
-                  boxShadow: [
-                    BoxShadow(
-                      color: AppColors.primary.withValues(alpha: 0.22),
-                      blurRadius: 18,
-                      offset: const Offset(0, 8),
-                    ),
-                  ],
-                ),
-                child: const Icon(
-                  Icons.engineering_rounded,
-                  color: Colors.white,
-                  size: 23,
-                ),
-              ),
-              const Gap(12),
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(
-                      technicianName,
-                      style: TextStyle(
-                        fontSize: 15,
-                        fontWeight: FontWeight.w800,
-                        color: AppColors.onSurface,
-                      ),
-                      maxLines: 1,
-                      overflow: TextOverflow.ellipsis,
-                    ),
-                    const Gap(2),
-                    Text(
-                      specialty,
-                      style: TextStyle(
-                        fontSize: 12,
-                        fontWeight: FontWeight.w600,
-                        color: AppColors.textSecondary,
-                      ),
-                      maxLines: 1,
-                      overflow: TextOverflow.ellipsis,
-                    ),
-                  ],
-                ),
-              ),
-              const Gap(8),
-              Switch(
-                value: isAvailable,
-                onChanged: _toggleAvailability,
-                thumbColor: WidgetStateProperty.resolveWith<Color>((states) {
-                  if (states.contains(WidgetState.selected)) {
-                    return AppColors.success;
-                  }
-                  return AppColors.disabled;
-                }),
-                materialTapTargetSize: MaterialTapTargetSize.shrinkWrap,
-              ),
-            ],
-          ),
-          const Gap(14),
-          Row(
-            children: [
-              Expanded(
-                child: _TechnicianMetricPill(
-                  icon: isApproved
-                      ? Icons.verified_rounded
-                      : Icons.hourglass_top_rounded,
-                  label: isApproved ? 'Verificado' : 'Pendiente',
-                  value: isAvailable ? 'Disponible' : 'No disponible',
-                  color: chipColor,
-                ),
-              ),
-              const Gap(8),
-              Expanded(
-                child: _TechnicianMetricPill(
-                  icon: Icons.report_problem_outlined,
-                  label: 'Solicitudes',
-                  value: '$pendingCount activas',
-                  color: AppColors.primary,
-                ),
-              ),
-              const Gap(8),
-              Expanded(
-                child: _TechnicianMetricPill(
-                  icon: Icons.star_rounded,
-                  label: rating.toStringAsFixed(1),
-                  value: '$totalServices servicios',
-                  color: Colors.amber.shade700,
-                ),
-              ),
-            ],
-          ),
-        ],
-      ),
-    );
-  }
-
   Widget _buildMapView({
     required double lat,
     required double lng,
@@ -553,25 +419,20 @@ class _TechnicianHomeScreenState extends ConsumerState<TechnicianHomeScreen> {
           controller: _mapController,
           markers: markers,
         ),
+        Positioned.fill(
+          child: IgnorePointer(
+            child: Container(
+              color: Colors.white.withValues(alpha: 0.05),
+            ),
+          ),
+        ),
         Positioned(
-          right: 16,
-          bottom: 24,
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              _MapActionButton(
-                icon: Icons.my_location_rounded,
-                tooltip: 'Localizarme',
-                onTap: _recenterToCurrentLocation,
-              ),
-              const Gap(10),
-              _MapActionButton(
-                icon: Icons.refresh_rounded,
-                tooltip: 'Actualizar emergencias',
-                onTap: _refreshEmergencies,
-                showProgress: isLoading,
-              ),
-            ],
+          right: 18,
+          bottom: 18,
+          child: _MapCornerButton(
+            icon: Icons.my_location_rounded,
+            tooltip: 'Localizarme',
+            onTap: _recenterToCurrentLocation,
           ),
         ),
       ],
@@ -1247,57 +1108,39 @@ class _TechnicianHomeScreenState extends ConsumerState<TechnicianHomeScreen> {
       ),
     ];
 
-    final horizontal = AppResponsive.horizontalPadding(context);
     final topInset = MediaQuery.of(context).padding.top;
+    final technicianName = user?.name ?? 'Tecnico';
+    final specialty = TechnicianSpecialties.labelForCode(user?.specialty);
 
     return Scaffold(
       key: _scaffoldKey,
       drawer: const AppDrawer(),
-      backgroundColor: AppColors.background,
-      bottomNavigationBar: AppBottomNavBar(
+      backgroundColor: const Color(0xFFF6F1EA),
+      bottomNavigationBar: _TechnicianBottomNav(
         currentIndex: _navIndex,
+        unreadCount: _lastUnreadChatCount,
         onTap: _onNavTap,
-        isTechnician: true,
       ),
       body: Stack(
         children: [
-          const Positioned.fill(
-            child: DecoratedBox(
-              decoration: BoxDecoration(
-                gradient: AppColors.pageBackgroundGradient,
-              ),
-            ),
-          ),
+          
           // ── Content: spacer + profile card + map ──────────────────────
           Column(
             children: [
-              SizedBox(height: 64 + topInset),
-              if (_navIndex == 2)
-                AppFadeSlideIn(
-                  child: _buildProfileCard(
-                    technicianName: user?.name ?? 'Tecnico',
-                    specialty: TechnicianSpecialties.labelForCode(
-                      user?.specialty,
-                    ),
-                    isApproved: user?.isApproved ?? false,
-                    isAvailable: isAvailable,
-                    rating: stats?.rating ?? user?.rating ?? 0.0,
-                    totalServices:
-                        stats?.totalServices ?? user?.totalServices ?? 0,
-                    pendingCount: pendingEmergencies.length,
-                  ),
-                ),
-              if (_navIndex == 2 && activeEmergency != null)
-                Padding(
-                  padding: EdgeInsets.fromLTRB(horizontal, 0, horizontal, 12),
-                  child: _ActiveServiceNotice(
-                    emergency: activeEmergency,
-                    onOpen: () => context.push(
-                      AppRoutes.activeService,
-                      extra: activeEmergency.id,
-                    ),
-                  ),
-                ),
+              SizedBox(height: topInset),
+              _TechnicianTopBar(
+                unreadCount: _lastUnreadChatCount,
+                avatarUrl: user?.avatarUrl,
+                userName: technicianName,
+                specialty: specialty,
+                isAvailable: isAvailable,
+                isApproved: user?.isApproved ?? false,
+                pendingCount: pendingEmergencies.length,
+                onMenuTap: () => _scaffoldKey.currentState?.openDrawer(),
+                onNotificationsTap: _openNotifications,
+                onAvatarTap: () => context.push(AppRoutes.profile),
+                onAvailabilityChanged: _toggleAvailability,
+              ),
               Expanded(
                 child: switch (_navIndex) {
                   0 => _buildTechnicianHistoryView(
@@ -1310,13 +1153,27 @@ class _TechnicianHomeScreenState extends ConsumerState<TechnicianHomeScreen> {
                       isAvailable: isAvailable,
                       isLoading: isPendingLoading,
                     ),
-                  2 => _buildMapView(
-                      lat: lat,
-                      lng: lng,
-                      markers: markers,
-                      emergencies: pendingEmergencies,
-                      isAvailable: isAvailable,
-                      isLoading: isPendingLoading,
+                  2 => _TechnicianDashboard(
+                      map: _buildMapView(
+                        lat: lat,
+                        lng: lng,
+                        markers: markers,
+                        emergencies: pendingEmergencies,
+                        isAvailable: isAvailable,
+                        isLoading: isPendingLoading,
+                      ),
+                      sheet: _TechnicianStatusSheet(
+                        isAvailable: isAvailable,
+                        pendingCount: pendingEmergencies.length,
+                        activeEmergency: activeEmergency,
+                        onOpenActiveService: activeEmergency == null
+                            ? null
+                            : () => context.push(
+                                  AppRoutes.activeService,
+                                  extra: activeEmergency.id,
+                                ),
+                        onViewRequests: () => setState(() => _navIndex = 1),
+                      ),
                     ),
                   3 => _buildTechnicianChatHistoryView(
                       technicianHistory,
@@ -1336,100 +1193,11 @@ class _TechnicianHomeScreenState extends ConsumerState<TechnicianHomeScreen> {
           ),
 
           // ── Glass AppBar (on top) ──────────────────────────────────────
-          Positioned(
-            top: 0,
-            left: 0,
-            right: 0,
-            child: ClipRRect(
-              child: BackdropFilter(
-                filter: ImageFilter.blur(sigmaX: 20, sigmaY: 20),
-                child: Container(
-                  height: 64 + topInset,
-                  padding: EdgeInsets.only(top: topInset),
-                  decoration: BoxDecoration(
-                    color: Colors.white.withValues(alpha: 0.82),
-                    border: Border(
-                      bottom: BorderSide(
-                        color: Colors.white.withValues(alpha: 0.65),
-                      ),
-                    ),
-                    boxShadow: [
-                      BoxShadow(
-                        color: AppColors.onSurface.withValues(alpha: 0.06),
-                        blurRadius: 40,
-                        offset: const Offset(0, 40),
-                      ),
-                    ],
-                  ),
-                  child: Padding(
-                    padding: EdgeInsets.symmetric(horizontal: horizontal),
-                    child: Row(
-                      children: [
-                        // Menu
-                        Material(
-                          color: Colors.transparent,
-                          borderRadius: BorderRadius.circular(10),
-                          child: InkWell(
-                            borderRadius: BorderRadius.circular(10),
-                            splashColor:
-                                AppColors.primary.withValues(alpha: 0.08),
-                            onTap: () =>
-                                _scaffoldKey.currentState?.openDrawer(),
-                            child: const Padding(
-                              padding: EdgeInsets.all(8),
-                              child: Icon(Icons.menu_rounded,
-                                  color: AppColors.secondary, size: 24),
-                            ),
-                          ),
-                        ),
-                        const Spacer(),
-                        const AppLogo(height: 32, width: 132),
-                        const Spacer(),
-                        ChatNotificationBell(
-                          onTap: _openNotifications,
-                          iconColor: AppColors.secondary,
-                        ),
-                        const Gap(8),
-                        // Avatar
-                        Material(
-                          color: Colors.transparent,
-                          shape: const CircleBorder(),
-                          child: InkWell(
-                            customBorder: const CircleBorder(),
-                            splashColor:
-                                AppColors.primary.withValues(alpha: 0.08),
-                            onTap: () => context.push(AppRoutes.profile),
-                            child: Container(
-                              width: 40,
-                              height: 40,
-                              decoration: BoxDecoration(
-                                shape: BoxShape.circle,
-                                border: Border.all(
-                                  color:
-                                      AppColors.primary.withValues(alpha: 0.15),
-                                  width: 2,
-                                ),
-                              ),
-                              child: UserAvatar(
-                                imageUrl: user?.avatarUrl,
-                                name: user?.name ?? 'U',
-                                radius: 18,
-                              ),
-                            ),
-                          ),
-                        ),
-                      ],
-                    ),
-                  ),
-                ),
-              ),
-            ),
-          ),
           if (_bannerEmergencies.isNotEmpty)
             Positioned(
-              top: 72 + topInset,
-              left: horizontal,
-              right: horizontal,
+              top: topInset + 92,
+              left: 16,
+              right: 16,
               child: _NewEmergencyBanner(
                 emergencies: _bannerEmergencies,
                 onOpen: _openBannerEmergency,
@@ -1441,6 +1209,681 @@ class _TechnicianHomeScreenState extends ConsumerState<TechnicianHomeScreen> {
               ),
             ),
         ],
+      ),
+    );
+  }
+}
+
+class _TechnicianDashboard extends StatelessWidget {
+  final Widget map;
+  final Widget sheet;
+
+  const _TechnicianDashboard({
+    required this.map,
+    required this.sheet,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final screenWidth = MediaQuery.of(context).size.width;
+    final isWide = screenWidth >= 900;
+
+    return Column(
+      children: [
+        Expanded(child: map),
+        Padding(
+          padding: EdgeInsets.fromLTRB(
+            isWide ? 16 : 12,
+            10,
+            isWide ? 16 : 12,
+            math.max(10, MediaQuery.of(context).padding.bottom),
+          ),
+          child: Center(
+            child: ConstrainedBox(
+              constraints: BoxConstraints(maxWidth: isWide ? 1120 : 720),
+              child: sheet,
+            ),
+          ),
+        ),
+      ],
+    );
+  }
+}
+
+class _TechnicianTopBar extends StatelessWidget {
+  final int unreadCount;
+  final String? avatarUrl;
+  final String userName;
+  final String specialty;
+  final bool isAvailable;
+  final bool isApproved;
+  final int pendingCount;
+  final VoidCallback onMenuTap;
+  final VoidCallback onNotificationsTap;
+  final VoidCallback onAvatarTap;
+  final ValueChanged<bool> onAvailabilityChanged;
+
+  const _TechnicianTopBar({
+    required this.unreadCount,
+    required this.avatarUrl,
+    required this.userName,
+    required this.specialty,
+    required this.isAvailable,
+    required this.isApproved,
+    required this.pendingCount,
+    required this.onMenuTap,
+    required this.onNotificationsTap,
+    required this.onAvatarTap,
+    required this.onAvailabilityChanged,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final isCompact = MediaQuery.of(context).size.width < 520;
+    final statusColor = isApproved ? AppColors.success : AppColors.warning;
+    final statusLabel = isApproved ? 'Aprobado' : 'Pendiente';
+
+    return Container(
+      padding: const EdgeInsets.fromLTRB(16, 10, 16, 10),
+      decoration: BoxDecoration(
+        color: Colors.white.withValues(alpha: 0.96),
+        border: Border(
+          bottom: BorderSide(
+            color: const Color(0xFF5B322A).withValues(alpha: 0.08),
+          ),
+        ),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withValues(alpha: 0.04),
+            blurRadius: 24,
+            offset: const Offset(0, 8),
+          ),
+        ],
+      ),
+      child: Column(
+        children: [
+          Row(
+            children: [
+              Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  AnimatedPressable(
+                    onTap: onMenuTap,
+                    borderRadius: BorderRadius.circular(999),
+                    child: Container(
+                      width: isCompact ? 36 : 42,
+                      height: isCompact ? 36 : 42,
+                      decoration: BoxDecoration(
+                        color: Colors.white,
+                        shape: BoxShape.circle,
+                        border: Border.all(
+                          color: const Color(0xFFE8DED3),
+                        ),
+                        boxShadow: [
+                          BoxShadow(
+                            color: Colors.black.withValues(alpha: 0.04),
+                            blurRadius: 12,
+                            offset: const Offset(0, 4),
+                          ),
+                        ],
+                      ),
+                      child: const Icon(
+                        Icons.menu_rounded,
+                        size: 20,
+                        color: Color(0xFF6A4636),
+                      ),
+                    ),
+                  ),
+                  SizedBox(width: isCompact ? 8 : 10),
+                  GestureDetector(
+                    onTap: onAvatarTap,
+                    child: Container(
+                      width: isCompact ? 44 : 58,
+                      height: isCompact ? 44 : 58,
+                      padding: const EdgeInsets.all(3),
+                      decoration: BoxDecoration(
+                        shape: BoxShape.circle,
+                        color: Colors.white,
+                        boxShadow: [
+                          BoxShadow(
+                            color: Colors.black.withValues(alpha: 0.08),
+                            blurRadius: 14,
+                            offset: const Offset(0, 4),
+                          ),
+                        ],
+                      ),
+                      child: UserAvatar(
+                        imageUrl: avatarUrl,
+                        name: userName,
+                        radius: isCompact ? 18 : 24,
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+              SizedBox(width: isCompact ? 12 : 18),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      'BIENVENIDO',
+                      style: TextStyle(
+                        fontSize: isCompact ? 10 : 14,
+                        fontWeight: FontWeight.w700,
+                        letterSpacing: isCompact ? 1 : 1.5,
+                        color: const Color(0xFF6A4636),
+                      ),
+                    ),
+                    const SizedBox(height: 2),
+                    Text(
+                      'Hola, $userName',
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: TextStyle(
+                        fontSize: isCompact ? 22 : 29,
+                        fontWeight: FontWeight.w800,
+                        color: const Color(0xFF171717),
+                        height: 1.05,
+                      ),
+                    ),
+                    const SizedBox(height: 6),
+                    Row(
+                      children: [
+                        const Icon(
+                          Icons.engineering_rounded,
+                          size: 14,
+                          color: AppColors.primary,
+                        ),
+                        const SizedBox(width: 4),
+                        Expanded(
+                          child: Text(
+                            specialty,
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                            style: TextStyle(
+                              fontSize: isCompact ? 10 : 12,
+                              fontWeight: FontWeight.w600,
+                              color: const Color(0xFF6E6E6E),
+                            ),
+                          ),
+                        ),
+                        const SizedBox(width: 10),
+                        Container(
+                          width: 6,
+                          height: 6,
+                          decoration: BoxDecoration(
+                            color: statusColor,
+                            shape: BoxShape.circle,
+                          ),
+                        ),
+                        const SizedBox(width: 6),
+                        Expanded(
+                          child: Text(
+                            '$statusLabel · $pendingCount solicitudes',
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                            style: TextStyle(
+                              fontSize: isCompact ? 10 : 12,
+                              fontWeight: FontWeight.w600,
+                              color: const Color(0xFF6E6E6E),
+                            ),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ],
+                ),
+              ),
+              Container(
+                width: isCompact ? 44 : 58,
+                height: isCompact ? 44 : 58,
+                decoration: BoxDecoration(
+                  color: Colors.white,
+                  shape: BoxShape.circle,
+                  boxShadow: [
+                    BoxShadow(
+                      color: Colors.black.withValues(alpha: 0.08),
+                      blurRadius: 14,
+                      offset: const Offset(0, 4),
+                    ),
+                  ],
+                ),
+                child: Stack(
+                  clipBehavior: Clip.none,
+                  children: [
+                    Center(
+                      child: IconButton(
+                        onPressed: onNotificationsTap,
+                        icon: const Icon(
+                          Icons.notifications_none_rounded,
+                          color: Color(0xFF171717),
+                          size: 22,
+                        ),
+                      ),
+                    ),
+                    if (unreadCount > 0)
+                      Positioned(
+                        top: 11,
+                        right: 11,
+                        child: Container(
+                          width: 10,
+                          height: 10,
+                          decoration: const BoxDecoration(
+                            color: Color(0xFFD3171A),
+                            shape: BoxShape.circle,
+                          ),
+                        ),
+                      ),
+                  ],
+                ),
+              ),
+            ],
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _TechnicianStatusSheet extends StatelessWidget {
+  final bool isAvailable;
+  final int pendingCount;
+  final Emergency? activeEmergency;
+  final VoidCallback? onOpenActiveService;
+  final VoidCallback onViewRequests;
+
+  const _TechnicianStatusSheet({
+    required this.isAvailable,
+    required this.pendingCount,
+    required this.activeEmergency,
+    required this.onOpenActiveService,
+    required this.onViewRequests,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: EdgeInsets.fromLTRB(
+        0,
+        8,
+        0,
+        14 + MediaQuery.of(context).padding.bottom,
+      ),
+      decoration: const BoxDecoration(
+        color: Color(0xFFFDFCFB),
+        borderRadius: BorderRadius.vertical(top: Radius.circular(26)),
+        boxShadow: [
+          BoxShadow(
+            color: Color(0x14000000),
+            blurRadius: 22,
+            offset: Offset(0, -6),
+          ),
+        ],
+      ),
+      child: Padding(
+        padding: const EdgeInsets.symmetric(horizontal: 16),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Container(
+              width: 62,
+              height: 5,
+              decoration: BoxDecoration(
+                color: const Color(0xFFCFCFCF),
+                borderRadius: BorderRadius.circular(999),
+              ),
+            ),
+            const Gap(14),
+            Row(
+              children: [
+                Icon(
+                  Icons.circle,
+                  size: 12,
+                  color: isAvailable
+                      ? const Color(0xFF12C06A)
+                      : const Color(0xFF9CA3AF),
+                ),
+                const Gap(12),
+                Expanded(
+                  child: Text(
+                    isAvailable ? 'DISPONIBLE' : 'NO DISPONIBLE',
+                    style: TextStyle(
+                      fontSize: 17,
+                      fontWeight: FontWeight.w900,
+                      color: isAvailable
+                          ? const Color(0xFF12C06A)
+                          : const Color(0xFF6B7280),
+                    ),
+                  ),
+                ),
+              ],
+            ),
+            if (activeEmergency != null && onOpenActiveService != null) ...[
+              const Gap(10),
+              _ActiveServiceNotice(
+                emergency: activeEmergency!,
+                onOpen: onOpenActiveService!,
+              ),
+            ],
+            const Gap(12),
+            Container(
+              width: double.infinity,
+              padding: const EdgeInsets.all(12),
+              decoration: BoxDecoration(
+                color: const Color(0xFFFAFAFA),
+                borderRadius: BorderRadius.circular(18),
+                border: Border.all(
+                  color: const Color(0xFF5B322A).withValues(alpha: 0.08),
+                ),
+                boxShadow: [
+                  BoxShadow(
+                    color: Colors.black.withValues(alpha: 0.03),
+                    blurRadius: 18,
+                    offset: const Offset(0, 10),
+                  ),
+                ],
+              ),
+              child: Column(
+                children: [
+                  Row(
+                    children: [
+                      _StatusIconBubble(
+                        icon: Icons.notifications_active_outlined,
+                        color: const Color(0xFFD3171A),
+                        background: const Color(0xFFFDEBEC),
+                      ),
+                      const Gap(12),
+                      Expanded(
+                        child: Text(
+                          '$pendingCount solicitudes cercanas',
+                          style: const TextStyle(
+                            fontSize: 13,
+                            fontWeight: FontWeight.w500,
+                            color: Color(0xFF231815),
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
+                  const Gap(10),
+                  Row(
+                    children: [
+                      _StatusIconBubble(
+                        icon: Icons.gps_fixed_rounded,
+                        color: AppColors.primary,
+                        background: Color(0xFFE7F1FB),
+                      ),
+                      Gap(12),
+                      Expanded(
+                        child: RichText(
+                          text: TextSpan(
+                            style: TextStyle(
+                              fontSize: 13,
+                              color: Color(0xFF5B322A),
+                            ),
+                            children: [
+                              TextSpan(text: 'Radio activo: '),
+                              TextSpan(
+                                text: '5 km',
+                                style: TextStyle(fontWeight: FontWeight.w900),
+                              ),
+                            ],
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
+                ],
+              ),
+            ),
+            const Gap(14),
+            SizedBox(
+              width: double.infinity,
+              child: FilledButton(
+                onPressed: onViewRequests,
+                style: FilledButton.styleFrom(
+                  backgroundColor: AppColors.primary,
+                  foregroundColor: Colors.white,
+                  padding: const EdgeInsets.symmetric(vertical: 14),
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(999),
+                  ),
+                  textStyle: const TextStyle(
+                    fontSize: 15,
+                    fontWeight: FontWeight.w900,
+                  ),
+                  elevation: 10,
+                  shadowColor: AppColors.primary.withValues(alpha: 0.25),
+                ),
+                child: const Row(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: [
+                    Text('Ver solicitudes'),
+                    Gap(12),
+                    Icon(Icons.arrow_forward_rounded, size: 22),
+                  ],
+                ),
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+class _StatusIconBubble extends StatelessWidget {
+  final IconData icon;
+  final Color color;
+  final Color background;
+
+  const _StatusIconBubble({
+    required this.icon,
+    required this.color,
+    required this.background,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      width: 36,
+      height: 36,
+      decoration: BoxDecoration(
+        color: background,
+        shape: BoxShape.circle,
+      ),
+      child: Icon(icon, color: color, size: 19),
+    );
+  }
+}
+
+class _TechnicianBottomNav extends StatelessWidget {
+  final int currentIndex;
+  final int unreadCount;
+  final ValueChanged<int> onTap;
+
+  const _TechnicianBottomNav({
+    required this.currentIndex,
+    required this.unreadCount,
+    required this.onTap,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return SafeArea(
+      top: false,
+      child: Container(
+        padding: const EdgeInsets.fromLTRB(18, 10, 18, 16),
+        decoration: BoxDecoration(
+          color: Colors.white.withValues(alpha: 0.98),
+          border: Border(
+            top: BorderSide(
+              color: const Color(0xFF5B322A).withValues(alpha: 0.08),
+            ),
+          ),
+          boxShadow: [
+            BoxShadow(
+              color: Colors.black.withValues(alpha: 0.05),
+              blurRadius: 18,
+              offset: const Offset(0, -6),
+            ),
+          ],
+        ),
+        child: Row(
+          children: [
+            Expanded(
+              child: _TechnicianNavItem(
+                label: 'History',
+                icon: Icons.receipt_long_outlined,
+                active: currentIndex == 0,
+                onTap: () => onTap(0),
+              ),
+            ),
+            Expanded(
+              child: _TechnicianNavItem(
+                label: 'Chat',
+                icon: Icons.chat_bubble_outline_rounded,
+                active: currentIndex == 3,
+                badgeCount: unreadCount,
+                onTap: () => onTap(3),
+              ),
+            ),
+            Expanded(
+              child: _TechnicianNavItem(
+                label: 'Home',
+                icon: Icons.location_on_outlined,
+                active: currentIndex == 2,
+                onTap: () => onTap(2),
+              ),
+            ),
+            Expanded(
+              child: _TechnicianNavItem(
+                label: 'Profile',
+                icon: Icons.person_outline_rounded,
+                active: false,
+                onTap: () => onTap(4),
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+class _TechnicianNavItem extends StatelessWidget {
+  final String label;
+  final IconData icon;
+  final bool active;
+  final int badgeCount;
+  final VoidCallback onTap;
+
+  const _TechnicianNavItem({
+    required this.label,
+    required this.icon,
+    required this.active,
+    required this.onTap,
+    this.badgeCount = 0,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final color = active ? AppColors.primary : const Color(0xFF5B322A);
+    return InkWell(
+      onTap: onTap,
+      borderRadius: BorderRadius.circular(26),
+      child: Padding(
+        padding: const EdgeInsets.symmetric(vertical: 2),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Stack(
+              clipBehavior: Clip.none,
+              children: [
+                AnimatedContainer(
+                  duration: const Duration(milliseconds: 220),
+                  width: 64,
+                  height: 46,
+                  decoration: BoxDecoration(
+                    color: active
+                        ? AppColors.primary.withValues(alpha: 0.72)
+                        : Colors.transparent,
+                    borderRadius: BorderRadius.circular(18),
+                  ),
+                  child: Icon(icon, color: color, size: 28),
+                ),
+                if (badgeCount > 0)
+                  Positioned(
+                    top: 2,
+                    right: 4,
+                    child: Container(
+                      width: 10,
+                      height: 10,
+                      decoration: const BoxDecoration(
+                        color: Color(0xFFD3171A),
+                        shape: BoxShape.circle,
+                      ),
+                    ),
+                  ),
+              ],
+            ),
+            const Gap(6),
+            Text(
+              label,
+              style: TextStyle(
+                fontSize: 16,
+                fontWeight: active ? FontWeight.w900 : FontWeight.w500,
+                color: color,
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+class _MapCornerButton extends StatelessWidget {
+  final IconData icon;
+  final String tooltip;
+  final VoidCallback onTap;
+
+  const _MapCornerButton({
+    required this.icon,
+    required this.tooltip,
+    required this.onTap,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return Tooltip(
+      message: tooltip,
+      child: AnimatedPressable(
+        onTap: onTap,
+        borderRadius: BorderRadius.circular(18),
+        pressedScale: 0.94,
+        hoverScale: 1.02,
+        child: Container(
+          width: 58,
+          height: 58,
+          decoration: BoxDecoration(
+            color: AppColors.primary,
+            borderRadius: BorderRadius.circular(18),
+            border: Border.all(
+              color: Colors.white.withValues(alpha: 0.9),
+              width: 2,
+            ),
+            boxShadow: [
+              BoxShadow(
+                color: AppColors.primary.withValues(alpha: 0.28),
+                blurRadius: 18,
+                offset: const Offset(0, 10),
+              ),
+            ],
+          ),
+          child: Icon(icon, color: Colors.white, size: 26),
+        ),
       ),
     );
   }
@@ -2512,117 +2955,6 @@ class _RequestMetaLine extends StatelessWidget {
           ),
         ),
       ],
-    );
-  }
-}
-
-class _TechnicianMetricPill extends StatelessWidget {
-  final IconData icon;
-  final String label;
-  final String value;
-  final Color color;
-
-  const _TechnicianMetricPill({
-    required this.icon,
-    required this.label,
-    required this.value,
-    required this.color,
-  });
-
-  @override
-  Widget build(BuildContext context) {
-    return Container(
-      constraints: const BoxConstraints(minHeight: 54),
-      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 9),
-      decoration: BoxDecoration(
-        color: color.withValues(alpha: 0.08),
-        borderRadius: BorderRadius.circular(14),
-        border: Border.all(color: color.withValues(alpha: 0.16)),
-      ),
-      child: Row(
-        children: [
-          Icon(icon, size: 17, color: color),
-          const Gap(7),
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              mainAxisAlignment: MainAxisAlignment.center,
-              children: [
-                Text(
-                  label,
-                  maxLines: 1,
-                  overflow: TextOverflow.ellipsis,
-                  style: TextStyle(
-                    fontSize: 10,
-                    fontWeight: FontWeight.w800,
-                    color: color,
-                  ),
-                ),
-                const Gap(2),
-                Text(
-                  value,
-                  maxLines: 1,
-                  overflow: TextOverflow.ellipsis,
-                  style: TextStyle(
-                    fontSize: 11,
-                    fontWeight: FontWeight.w700,
-                    color: AppColors.onSurface,
-                  ),
-                ),
-              ],
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-}
-
-class _MapActionButton extends StatelessWidget {
-  final IconData icon;
-  final String tooltip;
-  final VoidCallback onTap;
-  final bool showProgress;
-
-  const _MapActionButton({
-    required this.icon,
-    required this.tooltip,
-    required this.onTap,
-    this.showProgress = false,
-  });
-
-  @override
-  Widget build(BuildContext context) {
-    return Tooltip(
-      message: tooltip,
-      child: AnimatedPressable(
-        onTap: showProgress ? null : onTap,
-        borderRadius: BorderRadius.circular(16),
-        pressedScale: 0.92,
-        hoverScale: 1.02,
-        child: Material(
-          color: AppColors.primary,
-          borderRadius: BorderRadius.circular(16),
-          elevation: 8,
-          shadowColor: AppColors.primary.withValues(alpha: 0.30),
-          child: SizedBox(
-            width: 52,
-            height: 52,
-            child: Center(
-              child: showProgress
-                  ? const SizedBox(
-                      width: 20,
-                      height: 20,
-                      child: CircularProgressIndicator(
-                        strokeWidth: 2.2,
-                        color: Colors.white,
-                      ),
-                    )
-                  : Icon(icon, color: Colors.white, size: 23),
-            ),
-          ),
-        ),
-      ),
     );
   }
 }

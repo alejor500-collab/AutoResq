@@ -18,6 +18,7 @@ class AdminBottomNav extends StatelessWidget {
     _NavItem(icon: Icons.people_rounded, label: 'Usuarios'),
     _NavItem(icon: Icons.verified_user_rounded, label: 'Validaciones'),
     _NavItem(icon: Icons.monitor_heart_rounded, label: 'Monitor'),
+    _NavItem(icon: Icons.picture_as_pdf_rounded, label: 'Reportes'),
   ];
 
   @override

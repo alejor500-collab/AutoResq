@@ -3,7 +3,6 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import '../constants/app_constants.dart';
 import '../../features/auth/presentation/screens/splash_screen.dart';
-import '../../features/auth/presentation/screens/welcome_screen.dart';
 import '../../features/auth/presentation/screens/login_screen.dart';
 import '../../features/auth/presentation/screens/register_screen.dart';
 import '../../features/auth/presentation/screens/role_selection_screen.dart';
@@ -30,6 +29,7 @@ import '../../features/profile/presentation/screens/edit_vehicle_screen.dart';
 import '../../features/profile/presentation/screens/payment_methods_screen.dart';
 import '../../features/profile/presentation/screens/security_privacy_screen.dart';
 import '../../features/admin/presentation/screens/admin_dashboard_screen.dart';
+import '../../features/admin/presentation/screens/admin_reports_screen.dart';
 import '../../features/admin/presentation/screens/user_management_screen.dart';
 import '../../features/admin/presentation/screens/technician_validation_screen.dart';
 import '../../features/admin/presentation/screens/emergency_monitor_screen.dart';
@@ -72,6 +72,7 @@ abstract class AppRoutes {
 
   // Admin
   static const String adminDashboard = '/admin';
+  static const String adminReports = '/admin/reports';
   static const String userManagement = '/admin/users';
   static const String technicianValidation = '/admin/validate';
   static const String emergencyMonitor = '/admin/monitor';
@@ -122,6 +123,13 @@ final appRouterProvider = Provider<GoRouter>((ref) {
         AppRoutes.serviceClosure,
         AppRoutes.serviceCompleted,
       ].contains(path);
+      final isAdminRoute = [
+        AppRoutes.adminDashboard,
+        AppRoutes.adminReports,
+        AppRoutes.userManagement,
+        AppRoutes.technicianValidation,
+        AppRoutes.emergencyMonitor,
+      ].contains(path);
 
       if (isSplash) return null;
 
@@ -141,6 +149,13 @@ final appRouterProvider = Provider<GoRouter>((ref) {
 
       if (isLoggedIn && user.isActive && isAccountDisabledRoute) {
         if (user.isAdmin) return AppRoutes.adminDashboard;
+        if (user.isTechnician && user.isApproved) {
+          return AppRoutes.technicianHome;
+        }
+        return AppRoutes.driverHome;
+      }
+
+      if (isLoggedIn && isAdminRoute && !user.isAdmin) {
         if (user.isTechnician && user.isApproved) {
           return AppRoutes.technicianHome;
         }
@@ -173,7 +188,7 @@ final appRouterProvider = Provider<GoRouter>((ref) {
       ),
       GoRoute(
         path: AppRoutes.welcome,
-        builder: (context, state) => const WelcomeScreen(),
+        builder: (context, state) => const LoginScreen(),
       ),
       GoRoute(
         path: AppRoutes.login,
@@ -355,6 +370,10 @@ final appRouterProvider = Provider<GoRouter>((ref) {
       GoRoute(
         path: AppRoutes.adminDashboard,
         builder: (context, state) => const AdminDashboardScreen(),
+      ),
+      GoRoute(
+        path: AppRoutes.adminReports,
+        builder: (context, state) => const AdminReportsScreen(),
       ),
       GoRoute(
         path: AppRoutes.userManagement,

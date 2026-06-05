@@ -16,6 +16,7 @@ import '../../../../core/router/app_router.dart';
 import '../../../../core/utils/helpers.dart';
 import '../../../../shared/providers/auth_provider.dart';
 import '../../../../shared/utils/app_responsive.dart';
+import '../../../../shared/widgets/app_logo.dart';
 import '../../../../shared/widgets/app_motion.dart';
 import '../../../map/domain/entities/location_entity.dart';
 import '../../../map/presentation/providers/map_provider.dart';
@@ -453,17 +454,8 @@ class _CreateEmergencyScreenState extends ConsumerState<CreateEmergencyScreen> {
                         ),
                         const Gap(8),
                         const Expanded(
-                          child: Text(
-                            'Reportar Emergencia',
-                            maxLines: 1,
-                            overflow: TextOverflow.ellipsis,
-                            textAlign: TextAlign.center,
-                            style: TextStyle(
-                              fontSize: 18,
-                              fontWeight: FontWeight.w600,
-                              letterSpacing: 0,
-                              color: AppColors.onSurface,
-                            ),
+                          child: Center(
+                            child: AppLogo(height: 28, width: 118),
                           ),
                         ),
                         const Gap(8),
@@ -499,27 +491,29 @@ class _CreateEmergencyScreenState extends ConsumerState<CreateEmergencyScreen> {
                   _StepProgress(currentStep: _currentStep),
                   const Gap(16),
 
-                  // Step Title
-                  Text(
-                    _stepTitle,
-                    style: TextStyle(
-                      fontSize: AppResponsive.titleSize(context),
-                      fontWeight: FontWeight.w800,
-                      color: AppColors.onSurface,
-                      letterSpacing: 0,
-                      height: 1.2,
+                  if (_currentStep != 2) ...[
+                    Text(
+                      _stepTitle,
+                      style: TextStyle(
+                        fontSize: AppResponsive.titleSize(context),
+                        fontWeight: FontWeight.w800,
+                        color: AppColors.onSurface,
+                        letterSpacing: 0,
+                        height: 1.2,
+                      ),
                     ),
-                  ),
-                  const Gap(4),
-                  Text(
-                    _stepSubtitle,
-                    style: const TextStyle(
-                      fontSize: 14,
-                      color: AppColors.secondary,
-                      height: 1.5,
+                    const Gap(4),
+                    Text(
+                      _stepSubtitle,
+                      style: const TextStyle(
+                        fontSize: 14,
+                        color: AppColors.secondary,
+                        height: 1.5,
+                      ),
                     ),
-                  ),
-                  const Gap(24),
+                    const Gap(24),
+                  ] else
+                    const Gap(18),
 
                   // Step Content
                   AppStepSwitcher(
@@ -1385,213 +1379,333 @@ class _DiagnosticStep extends StatelessWidget {
     final requiereGrua = analysis?.requiereGrua ?? false;
     final failed = analysis == null;
     final categoryForeground = _categoryForeground(categoria);
-    final categoryBackground = _categoryBackground(categoria);
     final categoryIcon = _categoryIcon(categoria);
+    final confidencePercent =
+        ((analysis?.confidence ?? 0.25) * 100).round().clamp(1, 99);
     final categoryBandText = EmergencyMatchPolicy.isTowCategory(categoria)
         ? 'Radio inicial sugerido: 10 km'
         : 'Radio inicial sugerido: 5 km';
 
-    return Container(
-      padding: EdgeInsets.all(AppResponsive.cardPadding(context)),
-      decoration: BoxDecoration(
-        gradient: LinearGradient(
-          begin: Alignment.topLeft,
-          end: Alignment.bottomRight,
-          colors: [
-            AppColors.primary.withValues(alpha: 0.04),
-            Colors.white,
-          ],
-        ),
-        borderRadius: BorderRadius.circular(22),
-        border: Border.all(color: AppColors.primary.withValues(alpha: 0.10)),
-        boxShadow: [
-          BoxShadow(
-            color: AppColors.onSurface.withValues(alpha: 0.03),
-            blurRadius: 20,
-          ),
-        ],
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Row(
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 4),
+          child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              Container(
-                padding: const EdgeInsets.all(12),
-                decoration: BoxDecoration(
-                  color: failed ? AppColors.primary : categoryForeground,
-                  borderRadius: BorderRadius.circular(16),
+              Text(
+                failed ? 'Diagnóstico no disponible' : 'Diagnóstico generado',
+                style: TextStyle(
+                  fontSize: AppResponsive.titleSize(context) + 4,
+                  fontWeight: FontWeight.w900,
+                  color: AppColors.onSurface,
+                  height: 1.05,
                 ),
-                child: Icon(categoryIcon, color: Colors.white, size: 24),
               ),
-              const Gap(16),
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    const Text(
-                      'DIAGNÓSTICO PRELIMINAR',
-                      style: TextStyle(
-                        fontSize: 10,
-                        fontWeight: FontWeight.w700,
-                        color: AppColors.primary,
-                        letterSpacing: 1.5,
-                      ),
-                    ),
-                    const Gap(10),
-                    if (failed)
-                      const Text(
-                        'Análisis no disponible',
-                        style: TextStyle(
-                          fontSize: 20,
-                          fontWeight: FontWeight.w700,
-                          color: AppColors.onSurface,
-                        ),
+              const Gap(8),
+              Text(
+                failed
+                    ? 'Usaremos tu descripción original para publicar la solicitud.'
+                    : 'La IA organizó la información para ayudarte a solicitar la asistencia correcta.',
+                style: const TextStyle(
+                  fontSize: 14,
+                  color: AppColors.secondary,
+                  height: 1.45,
+                ),
+              ),
+            ],
+          ),
+        ),
+        const Gap(18),
+        Container(
+          decoration: BoxDecoration(
+            gradient: LinearGradient(
+              begin: Alignment.topLeft,
+              end: Alignment.bottomRight,
+              colors: [
+                AppColors.primary.withValues(alpha: 0.05),
+                Colors.white,
+              ],
+            ),
+            borderRadius: BorderRadius.circular(28),
+            border: Border.all(color: AppColors.primary.withValues(alpha: 0.10)),
+            boxShadow: [
+              BoxShadow(
+                color: AppColors.onSurface.withValues(alpha: 0.04),
+                blurRadius: 26,
+                offset: const Offset(0, 16),
+              ),
+            ],
+          ),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Padding(
+                padding: const EdgeInsets.fromLTRB(20, 20, 20, 18),
+                child: failed
+                    ? Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: const [
+                          _AnalysisHeroHeader(
+                            icon: Icons.psychology_alt_rounded,
+                            title: 'Diagnóstico por confirmar',
+                            subtitle:
+                                'La solicitud continuará con revisión técnica en sitio.',
+                          ),
+                        ],
                       )
-                    else ...[
-                      Container(
-                        width: double.infinity,
-                        padding: const EdgeInsets.all(14),
-                        decoration: BoxDecoration(
-                          color: categoryBackground,
-                          borderRadius: BorderRadius.circular(16),
-                          border: Border.all(
-                            color: categoryForeground.withValues(alpha: 0.18),
-                          ),
-                        ),
-                        child: Row(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            Icon(
-                              categoryIcon,
-                              color: categoryForeground,
-                              size: 22,
-                            ),
-                            const Gap(10),
-                            Expanded(
-                              child: Column(
-                                crossAxisAlignment: CrossAxisAlignment.start,
-                                children: [
-                                  Text(
-                                    categoria,
-                                    style: TextStyle(
-                                      fontSize: 20,
-                                      fontWeight: FontWeight.w900,
-                                      color: categoryForeground,
-                                      height: 1.15,
-                                    ),
-                                  ),
-                                  const Gap(4),
-                                  Text(
-                                    categoryBandText,
-                                    style: TextStyle(
-                                      fontSize: 12,
-                                      fontWeight: FontWeight.w700,
-                                      color: categoryForeground
-                                          .withValues(alpha: 0.78),
-                                      height: 1.25,
-                                    ),
-                                  ),
-                                ],
-                              ),
-                            ),
-                          ],
-                        ),
-                      ),
-                      const Gap(10),
-                      Wrap(
-                        spacing: 8,
-                        runSpacing: 8,
+                    : Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
-                          _AnalysisPill(
-                            icon: Icons.flag_outlined,
-                            label: _urgencyLabel(urgencia),
-                            foreground: _urgencyForeground(urgencia),
-                            background: _urgencyBackground(urgencia),
+                          _AnalysisHeroHeader(
+                            icon: categoryIcon,
+                            title: categoria,
+                            subtitle: categoryBandText,
+                            iconBackground: categoryForeground,
                           ),
-                          _AnalysisPill(
-                            icon: requiereGrua
-                                ? Icons.local_shipping_outlined
-                                : Icons.directions_car_outlined,
-                            label: requiereGrua
-                                ? 'Requiere grúa'
-                                : 'Sin grúa inicial',
-                            foreground: AppColors.onSurface,
-                            background: AppColors.surfaceContainerLow,
+                          const Gap(14),
+                          Wrap(
+                            spacing: 10,
+                            runSpacing: 10,
+                            children: [
+                              _AnalysisScoreBadge(
+                                label: 'Confianza IA',
+                                value: '$confidencePercent%',
+                                color: AppColors.primary,
+                              ),
+                              _AnalysisPill(
+                                icon: Icons.flag_outlined,
+                                label: _urgencyLabel(urgencia),
+                                foreground: _urgencyForeground(urgencia),
+                                background: _urgencyBackground(urgencia),
+                              ),
+                              _AnalysisPill(
+                                icon: requiereGrua
+                                    ? Icons.local_shipping_outlined
+                                    : Icons.directions_car_outlined,
+                                label: requiereGrua
+                                    ? 'Requiere grúa'
+                                    : 'Sin grúa inicial',
+                                foreground: AppColors.onSurface,
+                                background: AppColors.surfaceContainerLow,
+                              ),
+                            ],
                           ),
                         ],
                       ),
+              ),
+              Container(
+                width: double.infinity,
+                padding: const EdgeInsets.fromLTRB(20, 0, 20, 18),
+                decoration: BoxDecoration(
+                  color: Colors.white.withValues(alpha: 0.72),
+                  borderRadius: const BorderRadius.vertical(
+                    bottom: Radius.circular(28),
+                  ),
+                  border: Border(
+                    top: BorderSide(
+                      color: AppColors.outlineVariant.withValues(alpha: 0.35),
+                    ),
+                  ),
+                ),
+                child: Column(
+                  children: [
+                    if (!failed) ...[
+                      const Gap(18),
+                      _AnalysisDetailRow(
+                        icon: Icons.warning_amber_rounded,
+                        title: 'Posible problema',
+                        body: tipoDanio,
+                      ),
+                      if (resumenTecnico.isNotEmpty)
+                        _AnalysisDetailRow(
+                          icon: Icons.handyman_outlined,
+                          title: 'Resumen técnico',
+                          body: resumenTecnico,
+                        ),
+                      if (recomendacion.isNotEmpty)
+                        _AnalysisDetailRow(
+                          icon: Icons.lightbulb_outline_rounded,
+                          title: 'Recomendación inicial',
+                          body: recomendacion,
+                        ),
+                    ] else ...[
+                      const Gap(18),
+                      const _AnalysisDetailRow(
+                        icon: Icons.info_outline_rounded,
+                        title: 'Continuaremos con tu solicitud',
+                        body:
+                            'Usaremos tu descripción original y un técnico validará el caso cuando llegue al sitio.',
+                        showDivider: false,
+                      ),
                     ],
+                    const _AnalysisDetailRow(
+                      icon: Icons.timer_outlined,
+                      title: 'Tiempo estimado',
+                      body: '15 a 20 min',
+                    ),
+                    _AnalysisDetailRow(
+                      icon: Icons.payments_outlined,
+                      title: 'Rango referencial',
+                      body: pricingQuote?.displayMessage ??
+                          'Te mostraremos la tarifa estimada antes de publicar la solicitud.',
+                      showDivider: false,
+                    ),
+                    const Gap(8),
+                    Text(
+                      'Cualquier reparación, repuesto o costo adicional deberá aprobarse contigo antes de continuar.',
+                      style: TextStyle(
+                        fontSize: 12,
+                        height: 1.4,
+                        color: AppColors.secondary.withValues(alpha: 0.92),
+                      ),
+                    ),
                   ],
                 ),
               ),
             ],
           ),
-          const Gap(20),
-          if (!failed) ...[
-            _AnalysisSection(
-              label: 'POSIBLE DAÑO',
-              value: tipoDanio,
-            ),
-            if (resumenTecnico.isNotEmpty) ...[
-              const Gap(12),
-              _AnalysisSection(
-                label: 'RESUMEN TÉCNICO',
-                value: resumenTecnico,
-                emphasize: true,
+        ),
+        const Gap(14),
+        _PricingCard(
+          quote: pricingQuote,
+          isLoading: isPricingLoading,
+          destination: destination,
+          onSelectDestination: onSelectDestination,
+        ),
+        if (pricingQuote?.pricingType == 'distance_based' ||
+            EmergencyMatchPolicy.isTowCategory(categoria)) ...[
+          const Gap(14),
+          _TowRoutePreview(
+            origin: origin,
+            destination: destination,
+            onSelectDestination: onSelectDestination,
+          ),
+        ],
+        const Gap(14),
+        _PaymentMethodCard(
+          selected: paymentMethod,
+          onChanged: onPaymentMethodChanged,
+        ),
+      ],
+    );
+  }
+}
+
+class _AnalysisHeroHeader extends StatelessWidget {
+  final IconData icon;
+  final String title;
+  final String subtitle;
+  final Color? iconBackground;
+
+  const _AnalysisHeroHeader({
+    required this.icon,
+    required this.title,
+    required this.subtitle,
+    this.iconBackground,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return Row(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Container(
+          width: 58,
+          height: 58,
+          decoration: BoxDecoration(
+            color: iconBackground ?? AppColors.primary,
+            borderRadius: BorderRadius.circular(18),
+            boxShadow: [
+              BoxShadow(
+                color: (iconBackground ?? AppColors.primary)
+                    .withValues(alpha: 0.20),
+                blurRadius: 18,
+                offset: const Offset(0, 10),
               ),
             ],
-            if (recomendacion.isNotEmpty) ...[
-              const Gap(12),
-              _AnalysisSection(
-                label: 'RECOMENDACIÓN INICIAL',
-                value: recomendacion,
-              ),
-            ],
-            const Gap(18),
-          ] else ...[
-            const Text(
-              'Continuaremos con tu descripción original y un técnico validará el caso en sitio.',
-              style: TextStyle(
-                fontSize: 13,
-                color: AppColors.secondary,
-                height: 1.45,
-              ),
-            ),
-            const Gap(18),
-          ],
-          const Row(
+          ),
+          child: Icon(icon, color: Colors.white, size: 28),
+        ),
+        const Gap(14),
+        Expanded(
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              Expanded(
-                child: _MiniInfoCard(
-                  icon: Icons.timer,
-                  label: 'TIEMPO ESTIMADO',
-                  value: '15 a 20 min',
+              Text(
+                title,
+                style: const TextStyle(
+                  fontSize: 20,
+                  fontWeight: FontWeight.w900,
+                  color: AppColors.onSurface,
+                  height: 1.1,
+                ),
+              ),
+              const Gap(6),
+              Text(
+                subtitle,
+                style: const TextStyle(
+                  fontSize: 13,
+                  fontWeight: FontWeight.w600,
+                  color: AppColors.secondary,
+                  height: 1.35,
                 ),
               ),
             ],
           ),
-          const Gap(14),
-          _PricingCard(
-            quote: pricingQuote,
-            isLoading: isPricingLoading,
-            destination: destination,
-            onSelectDestination: onSelectDestination,
-          ),
-          if (pricingQuote?.pricingType == 'distance_based' ||
-              EmergencyMatchPolicy.isTowCategory(categoria)) ...[
-            const Gap(14),
-            _TowRoutePreview(
-              origin: origin,
-              destination: destination,
-              onSelectDestination: onSelectDestination,
+        ),
+      ],
+    );
+  }
+}
+
+class _AnalysisScoreBadge extends StatelessWidget {
+  final String label;
+  final String value;
+  final Color color;
+
+  const _AnalysisScoreBadge({
+    required this.label,
+    required this.value,
+    required this.color,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+      decoration: BoxDecoration(
+        color: color.withValues(alpha: 0.10),
+        borderRadius: BorderRadius.circular(18),
+        border: Border.all(color: color.withValues(alpha: 0.12)),
+      ),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Text(
+            label,
+            style: TextStyle(
+              fontSize: 11,
+              fontWeight: FontWeight.w700,
+              color: color,
             ),
-          ],
-          const Gap(14),
-          _PaymentMethodCard(
-            selected: paymentMethod,
-            onChanged: onPaymentMethodChanged,
+          ),
+          const Gap(8),
+          Container(
+            padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
+            decoration: BoxDecoration(
+              color: color,
+              borderRadius: BorderRadius.circular(999),
+            ),
+            child: Text(
+              value,
+              style: const TextStyle(
+                fontSize: 12,
+                fontWeight: FontWeight.w900,
+                color: Colors.white,
+              ),
+            ),
           ),
         ],
       ),
@@ -1599,55 +1713,67 @@ class _DiagnosticStep extends StatelessWidget {
   }
 }
 
-class _AnalysisSection extends StatelessWidget {
-  final String label;
-  final String value;
-  final bool emphasize;
+class _AnalysisDetailRow extends StatelessWidget {
+  final IconData icon;
+  final String title;
+  final String body;
+  final bool showDivider;
 
-  const _AnalysisSection({
-    required this.label,
-    required this.value,
-    this.emphasize = false,
+  const _AnalysisDetailRow({
+    required this.icon,
+    required this.title,
+    required this.body,
+    this.showDivider = true,
   });
 
   @override
   Widget build(BuildContext context) {
-    return Container(
-      width: double.infinity,
-      padding: const EdgeInsets.all(16),
-      decoration: BoxDecoration(
-        color: emphasize
-            ? AppColors.primary.withValues(alpha: 0.06)
-            : Colors.white,
-        borderRadius: BorderRadius.circular(14),
-        border: Border.all(
-          color: emphasize
-              ? AppColors.primary.withValues(alpha: 0.16)
-              : AppColors.outlineVariant.withValues(alpha: 0.35),
-        ),
-      ),
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 14),
       child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Text(
-            label,
-            style: TextStyle(
-              fontSize: 10,
-              fontWeight: FontWeight.w800,
-              letterSpacing: 0.9,
-              color: emphasize ? AppColors.primary : AppColors.secondary,
-            ),
+          Row(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Padding(
+                padding: const EdgeInsets.only(top: 2),
+                child: Icon(icon, color: AppColors.primary, size: 22),
+              ),
+              const Gap(12),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      title,
+                      style: const TextStyle(
+                        fontSize: 15,
+                        fontWeight: FontWeight.w900,
+                        color: AppColors.onSurface,
+                      ),
+                    ),
+                    const Gap(6),
+                    Text(
+                      body,
+                      style: const TextStyle(
+                        fontSize: 14,
+                        fontWeight: FontWeight.w500,
+                        color: AppColors.onSurface,
+                        height: 1.45,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ],
           ),
-          const Gap(8),
-          Text(
-            value,
-            style: const TextStyle(
-              fontSize: 14,
-              fontWeight: FontWeight.w600,
-              color: AppColors.onSurface,
-              height: 1.45,
+          if (showDivider) ...[
+            const Gap(14),
+            Divider(
+              height: 1,
+              color: AppColors.outlineVariant.withValues(alpha: 0.4),
             ),
-          ),
+          ],
         ],
       ),
     );
@@ -1741,10 +1867,6 @@ Color _categoryForeground(String categoria) {
     EmergencyAiAnalysisModel.cerrajeriaVehicular => AppColors.secondary,
     _ => AppColors.primary,
   };
-}
-
-Color _categoryBackground(String categoria) {
-  return _categoryForeground(categoria).withValues(alpha: 0.10);
 }
 
 class _PaymentMethodCard extends StatelessWidget {
@@ -2030,61 +2152,6 @@ class _MapBubbleMarker extends StatelessWidget {
         ],
       ),
       child: Icon(icon, color: Colors.white, size: 18),
-    );
-  }
-}
-
-class _MiniInfoCard extends StatelessWidget {
-  final IconData icon;
-  final String label;
-  final String value;
-
-  const _MiniInfoCard({
-    required this.icon,
-    required this.label,
-    required this.value,
-  });
-
-  @override
-  Widget build(BuildContext context) {
-    return Container(
-      padding: const EdgeInsets.all(12),
-      decoration: BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.circular(16),
-      ),
-      child: Row(
-        children: [
-          Icon(icon, color: AppColors.primary, size: 20),
-          const Gap(10),
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(
-                  label,
-                  style: const TextStyle(
-                    fontSize: 9,
-                    fontWeight: FontWeight.w700,
-                    color: AppColors.secondary,
-                    letterSpacing: 0.5,
-                  ),
-                ),
-                Text(
-                  value,
-                  maxLines: 1,
-                  overflow: TextOverflow.ellipsis,
-                  style: const TextStyle(
-                    fontSize: 13,
-                    fontWeight: FontWeight.w700,
-                    color: AppColors.onSurface,
-                  ),
-                ),
-              ],
-            ),
-          ),
-        ],
-      ),
     );
   }
 }

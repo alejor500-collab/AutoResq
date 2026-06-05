@@ -47,6 +47,9 @@ class _AdminDashboardScreenState extends ConsumerState<AdminDashboardScreen> {
       case 3:
         context.go(AppRoutes.emergencyMonitor);
         break;
+      case 4:
+        context.go(AppRoutes.adminReports);
+        break;
     }
   }
 
@@ -107,12 +110,105 @@ class _AdminDashboardScreenState extends ConsumerState<AdminDashboardScreen> {
                         context.go(AppRoutes.technicianValidation),
                     onOpenMonitor: () => context.go(AppRoutes.emergencyMonitor),
                   ),
+                  const Gap(24),
+                  const _SectionTitle('Herramientas administrativas'),
+                  const Gap(12),
+                  _QuickLaunchCard(
+                    title: 'Reportes administrativos',
+                    description:
+                        'Configura filtros, elige el tipo de reporte y deja listo el PDF para exportacion.',
+                    icon: Icons.picture_as_pdf_rounded,
+                    accent: AppColors.primary,
+                    onTap: () => context.go(AppRoutes.adminReports),
+                  ),
                 ],
               ),
             ),
       bottomNavigationBar: AdminBottomNav(
         selectedIndex: 0,
         onItemTapped: _onNavTap,
+      ),
+    );
+  }
+}
+
+class _QuickLaunchCard extends StatelessWidget {
+  final String title;
+  final String description;
+  final IconData icon;
+  final Color accent;
+  final VoidCallback onTap;
+
+  const _QuickLaunchCard({
+    required this.title,
+    required this.description,
+    required this.icon,
+    required this.accent,
+    required this.onTap,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return InkWell(
+      onTap: onTap,
+      borderRadius: BorderRadius.circular(24),
+      child: Ink(
+        padding: const EdgeInsets.all(18),
+        decoration: BoxDecoration(
+          color: AppColors.surfaceContainerLowest,
+          borderRadius: BorderRadius.circular(24),
+          border: Border.all(color: AppColors.surfaceContainerHigh),
+          boxShadow: [
+            BoxShadow(
+              color: AppColors.onSurface.withValues(alpha: 0.04),
+              blurRadius: 18,
+              offset: const Offset(0, 8),
+            ),
+          ],
+        ),
+        child: Row(
+          children: [
+            Container(
+              width: 52,
+              height: 52,
+              decoration: BoxDecoration(
+                color: accent.withValues(alpha: 0.12),
+                borderRadius: BorderRadius.circular(16),
+              ),
+              child: Icon(icon, color: accent, size: 26),
+            ),
+            const Gap(14),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    title,
+                    style: const TextStyle(
+                      fontSize: 15,
+                      fontWeight: FontWeight.w800,
+                      color: AppColors.textPrimary,
+                    ),
+                  ),
+                  const Gap(4),
+                  Text(
+                    description,
+                    style: const TextStyle(
+                      fontSize: 12,
+                      height: 1.45,
+                      color: AppColors.textSecondary,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+            const Gap(8),
+            const Icon(
+              Icons.arrow_forward_rounded,
+              color: AppColors.secondary,
+            ),
+          ],
+        ),
       ),
     );
   }

@@ -57,6 +57,9 @@ class _TechnicianValidationScreenState
       case 3:
         context.go(AppRoutes.emergencyMonitor);
         break;
+      case 4:
+        context.go(AppRoutes.adminReports);
+        break;
     }
   }
 
