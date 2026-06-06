@@ -11,7 +11,7 @@ const OPENAI_RESPONSES_URL = 'https://api.openai.com/v1/responses';
 const OPENAI_DEFAULT_MODEL = 'gpt-5.4-mini';
 const MIN_DESCRIPTION_LENGTH = 8;
 const MAX_DESCRIPTION_LENGTH = 1800;
-const MAX_OUTPUT_TOKENS = 300;
+const MAX_OUTPUT_TOKENS = 700;
 
 const ALLOWED_CATEGORIES = [
   'Mecánica rápida',
@@ -300,14 +300,14 @@ function buildSystemPrompt(): string {
     'Clasifica por capacidad requerida: "Mecánica rápida" para fallas revisables en sitio por mecánico móvil; "Sistema eléctrico y batería" para problemas principalmente eléctricos, batería, arranque o carga; "Llantas y vulcanización" para neumáticos; "Grúa / remolque" cuando el vehículo no debe o no puede circular de forma segura y la atención principal sea traslado/remolque; "Combustible" para falta o error de combustible; "Cerrajería vehicular" para acceso o llaves; "Auxilio general" solo si no hay información suficiente para escoger un rol.',
     'Si el caso requiere traslado/remolque como servicio principal, "categoria" debe ser "Grúa / remolque" y "requiere_grua" debe ser true.',
     'Si eliges una categoría diferente de "Grúa / remolque", "requiere_grua" debe ser false, salvo que el conductor pida explícitamente remolque adicional.',
-    '"tipo_danio" debe ser una etiqueta breve del problema probable, tipo titulo, maximo 12 palabras. Debe nombrar el sistema o falla principal sin explicar la causa.',
-    '"resumen_tecnico" debe aportar informacion distinta a "tipo_danio": en 1 o 2 frases cortas, resume sintomas reportados, sistemas/componentes probables y que debe verificar primero el tecnico.',
+    '"tipo_danio" es la explicación para el conductor. Escribe 2 o 3 frases claras, entre 35 y 70 palabras: indica qué sistema podría estar afectado, qué significan los síntomas reportados y por qué conviene una revisión. Usa lenguaje cotidiano y aclara que es una evaluación preliminar, no un diagnóstico definitivo.',
+    '"resumen_tecnico" es información operativa para el técnico. Escribe entre 70 y 130 palabras en un solo párrafo compacto. Incluye síntomas y contexto aportados; una o dos hipótesis compatibles ordenadas por probabilidad; sistemas que conviene inspeccionar primero; comprobaciones iniciales; riesgos; y datos que faltan por confirmar.',
     'Para "resumen_tecnico", prioriza señales accionables: ruidos, fugas, perdida de potencia, temperatura, bateria, llanta, frenos, transmision, embrague, direccion, luces o inmovilizacion, segun aplique.',
-    'No repitas la misma frase entre "tipo_danio" y "resumen_tecnico"; si hay poca informacion, indica que el tecnico debe confirmar el sistema afectado en sitio.',
-    'Mantén "resumen_tecnico" preciso y sin listas largas; maximo 45 palabras.',
+    'Diferencia explícitamente lo reportado de lo inferido. Usa expresiones prudentes como "compatible con", "podría relacionarse con" o "confirmar". No afirmes que una pieza está dañada sin evidencia suficiente.',
+    'No repitas literalmente la explicación del conductor en "resumen_tecnico". Si hay poca información, explica qué preguntas o verificaciones permitirán distinguir las causas probables.',
     '"urgencia" solo puede ser "baja", "media" o "alta".',
     '"requiere_grua" debe ser true solo cuando el rol requerido sea grua/remolque o el conductor indique claramente que necesita remolque.',
-    '"recomendacion" debe ser una instrucción inicial breve, prudente y segura.',
+    '"recomendacion" debe contener 2 o 3 instrucciones concretas, entre 25 y 55 palabras: qué hacer ahora, qué evitar y qué señal justificaría alejarse del vehículo o pedir atención urgente. No sugieras reparaciones peligrosas para el conductor.',
     'Si la descripción es ambigua o insuficiente, usa "Auxilio general".',
     'No incluyas precios, costos, tarifas, tiempos, promesas ni información no solicitada.',
   ].join(' ');
@@ -479,13 +479,14 @@ function buildFallbackAnalysis(description: string): EmergencyAnalysis {
   const shortened = truncate(normalizedDescription, 110);
   return {
     categoria: 'Auxilio general',
-    tipo_danio: truncate(normalizedDescription, 80),
+    tipo_danio:
+      `La información disponible sugiere un problema vehicular que todavía no puede asociarse con seguridad a un sistema específico. La descripción fue: "${truncate(normalizedDescription, 120)}". Es necesaria una revisión en sitio para identificar la causa y confirmar si el vehículo puede circular.`,
     resumen_tecnico:
-      `Conductor reporta: ${shortened}. Confirmar sintomas en sitio, identificar el rol tecnico requerido y descartar traslado/remolque si el vehiculo no puede circular seguro.`,
+      `Reportado por el conductor: ${shortened}. El detalle no permite aislar una causa con suficiente confianza. Confirmar condición de arranque y marcha, testigos del tablero, ruidos, olores, humo, fugas, temperatura y momento en que apareció la falla. Inspeccionar primero los sistemas relacionados con los síntomas observables y verificar si existe riesgo eléctrico, mecánico o de rodamiento. Determinar en sitio si procede reparación básica o traslado seguro.`,
     urgencia: 'media',
     requiere_grua: false,
     recomendacion:
-      'Ubicate en un lugar seguro y espera la revision inicial del tecnico.',
+      'Estaciona en un lugar seguro, enciende las luces de emergencia y evita seguir conduciendo si notas humo, olor a combustible, temperatura alta, pérdida de frenos o ruidos fuertes. Espera la evaluación del técnico sin manipular componentes calientes o eléctricos.',
   };
 }
 

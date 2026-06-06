@@ -296,12 +296,16 @@ class EmergencyModel extends Emergency {
   }
 
   static Map<String, dynamic>? _pickAssignment(dynamic value) {
-    if (value is Map) return Map<String, dynamic>.from(value);
+    if (value is Map) {
+      final row = Map<String, dynamic>.from(value);
+      return _isCurrentAssignment(row['estado'] as String?) ? row : null;
+    }
     if (value is! List || value.isEmpty) return null;
 
     final rows = value
         .whereType<Map>()
         .map((row) => Map<String, dynamic>.from(row))
+        .where((row) => _isCurrentAssignment(row['estado'] as String?))
         .toList();
     if (rows.isEmpty) return null;
 
@@ -321,6 +325,13 @@ class EmergencyModel extends Emergency {
     });
 
     return rows.first;
+  }
+
+  static bool _isCurrentAssignment(String? status) {
+    return switch (status) {
+      'aceptada' || 'en_ruta' || 'atendiendo' || 'finalizada' => true,
+      _ => false,
+    };
   }
 
   static double? _acceptedOfferAmount(

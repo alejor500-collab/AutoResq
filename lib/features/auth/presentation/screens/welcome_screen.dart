@@ -79,16 +79,9 @@ class WelcomeScreen extends ConsumerWidget {
                   // Brand
                   Column(
                     children: [
-                      const AppLogo(height: 118),
-                      const SizedBox(height: 16),
-                      const Text(
-                        'Asistencia automotriz al instante',
-                        style: TextStyle(
-                          fontSize: 16,
-                          fontWeight: FontWeight.w500,
-                          color: AppColors.secondary,
-                          letterSpacing: 0,
-                        ),
+                      const AppLogo(
+                        height: 118,
+                        variant: AppLogoVariant.withSloganLight,
                       ),
                     ],
                   ),

@@ -5,6 +5,7 @@ import 'package:go_router/go_router.dart';
 
 import '../../../../core/constants/app_colors.dart';
 import '../../../../core/constants/app_constants.dart';
+import '../../../../core/constants/payment_methods.dart';
 import '../../../../core/router/app_router.dart';
 import '../../../../core/utils/helpers.dart';
 import '../../data/services/admin_report_pdf_service.dart';
@@ -107,6 +108,7 @@ class _AdminReportsScreenState extends ConsumerState<AdminReportsScreen> {
           break;
         case _ReportType.requests:
           await _loadDetailedEmergencies();
+          await _loadTechnicianDetails();
           break;
         case _ReportType.ratings:
           await adminNotifier.loadUsers();
@@ -165,7 +167,7 @@ class _AdminReportsScreenState extends ConsumerState<AdminReportsScreen> {
         .read(supabaseClientProvider)
         .from(AppConstants.tableTecnicos)
         .select(
-          'usuario_id, especialidad, estado_verificacion, disponible, calificacion_promedio, total_servicios, ubicacion_lat, ubicacion_lng',
+          'usuario_id, especialidad, estado_verificacion, disponible, calificacion_promedio, total_servicios, ubicacion_lat, ubicacion_lng, usuarios!usuario_id(nombre)',
         );
 
     _technicianDetailsByUserId = {
@@ -312,7 +314,7 @@ class _AdminReportsScreenState extends ConsumerState<AdminReportsScreen> {
         'problem_type': _extractProblemType(item) ?? _extractCatalogProblemType(item) ?? 'Sin clasificar',
         'accepted_at': _extractAcceptedAt(item)?.toIso8601String(),
         'closed_at': _extractClosedAt(item)?.toIso8601String(),
-        'response_minutes': _responseTimeMinutes(item),
+        'service_minutes': _serviceTimeMinutes(item),
         'zone': _extractZone(item),
         'reference_fee': _referenceFeeFor(item),
       };
@@ -387,7 +389,7 @@ class _AdminReportsScreenState extends ConsumerState<AdminReportsScreen> {
         .where((item) => item['estado'] == AppConstants.statusPending)
         .length;
     final responseTimes = emergencies
-        .map((item) => item['response_minutes'] as double?)
+        .map((item) => item['service_minutes'] as double?)
         .whereType<double>()
         .toList();
     final avgResponse = responseTimes.isEmpty
@@ -531,7 +533,12 @@ class _AdminReportsScreenState extends ConsumerState<AdminReportsScreen> {
 
   String? _extractZone(Map<String, dynamic>? item) {
     final location = _firstMap(item?['ubicaciones']);
-    return location?['direccion']?.toString();
+    final address = location?['direccion']?.toString().trim();
+    if (address?.isNotEmpty == true) return address;
+
+    final lat = (location?['latitud'] as num?)?.toDouble();
+    final lng = (location?['longitud'] as num?)?.toDouble();
+    return _formatApproxLocation(lat, lng);
   }
 
   Map<String, dynamic>? _firstMap(dynamic value) {
@@ -561,7 +568,13 @@ class _AdminReportsScreenState extends ConsumerState<AdminReportsScreen> {
   Set<String> _availableStatuses(AdminState state) {
     switch (_selectedType) {
       case _ReportType.users:
-        return const {'activo', 'inactivo', 'bloqueado'};
+        return const {
+          'activo',
+          'pendiente',
+          'rechazado',
+          'inactivo',
+          'bloqueado',
+        };
       case _ReportType.technicians:
         return const {
           AppConstants.verificationApproved,
@@ -691,6 +704,8 @@ class _AdminReportsScreenState extends ConsumerState<AdminReportsScreen> {
   Map<String, dynamic> _buildUsersReportPayload(List<Map<String, dynamic>> rows) {
     final byRole = <String, int>{};
     var active = 0;
+    var pending = 0;
+    var rejected = 0;
     var inactive = 0;
     var blocked = 0;
     for (final row in rows) {
@@ -698,6 +713,8 @@ class _AdminReportsScreenState extends ConsumerState<AdminReportsScreen> {
       final state = row['account_state']?.toString() ?? 'activo';
       byRole[role] = (byRole[role] ?? 0) + 1;
       if (state == 'activo') active++;
+      if (state == AppConstants.verificationPending) pending++;
+      if (state == AppConstants.verificationRejected) rejected++;
       if (state == 'inactivo') inactive++;
       if (state == 'bloqueado') blocked++;
     }
@@ -709,6 +726,8 @@ class _AdminReportsScreenState extends ConsumerState<AdminReportsScreen> {
         'total_users': rows.length,
         'users_by_role': byRole,
         'active_users': active,
+        'pending_users': pending,
+        'rejected_users': rejected,
         'inactive_users': inactive,
         'blocked_users': blocked,
       },
@@ -795,10 +814,10 @@ class _AdminReportsScreenState extends ConsumerState<AdminReportsScreen> {
           'fecha_creacion': row['fecha'],
           'fecha_aceptacion': row['accepted_at'],
           'fecha_cierre': row['closed_at'],
-          'tiempo_respuesta_minutos': row['response_minutes'],
+          'tiempo_servicio_minutos': row['service_minutes'],
           'ubicacion_zona': row['zone'],
           'cuota_referencial': row['reference_fee'],
-          'metodo_pago': row['payment_method'],
+          'metodo_pago': PaymentMethods.label(row['payment_method']?.toString()),
         };
       }).toList(),
       'ready_for_pdf': true,
@@ -885,7 +904,7 @@ class _AdminReportsScreenState extends ConsumerState<AdminReportsScreen> {
         .where((item) => item['estado'] == AppConstants.statusPending)
         .length;
     final responseValues = emergencies
-        .map((item) => item['response_minutes'] as double?)
+        .map((item) => item['service_minutes'] as double?)
         .whereType<double>()
         .toList();
     final avgResponse = responseValues.isEmpty
@@ -963,6 +982,15 @@ class _AdminReportsScreenState extends ConsumerState<AdminReportsScreen> {
   }
 
   String _userAccountState(Map<String, dynamic> user) {
+    final technician = _firstMap(user['tecnicos']);
+    final verification = technician?['estado_verificacion']?.toString();
+    if (verification == AppConstants.verificationPending) {
+      return AppConstants.verificationPending;
+    }
+    if (verification == AppConstants.verificationRejected) {
+      return AppConstants.verificationRejected;
+    }
+
     final active = (user['activo'] as bool?) ?? true;
     if (active) return 'activo';
     final disabledAt = user['account_disabled_at']?.toString();
@@ -981,36 +1009,19 @@ class _AdminReportsScreenState extends ConsumerState<AdminReportsScreen> {
     return '${appDate.day}/${appDate.month}/${appDate.year}';
   }
 
-  double? _responseTimeMinutes(Map<String, dynamic> item) {
-    final createdAt = DateTime.tryParse(item['fecha']?.toString() ?? '');
+  double? _serviceTimeMinutes(Map<String, dynamic> item) {
     final acceptedAt = _extractAcceptedAt(item);
-    if (createdAt == null || acceptedAt == null) return null;
-    return acceptedAt.difference(createdAt).inMinutes.toDouble();
+    final closedAt = _extractClosedAt(item);
+    if (acceptedAt == null || closedAt == null) return null;
+    final minutes = closedAt.difference(acceptedAt).inMinutes;
+    return minutes < 0 ? null : minutes.toDouble();
   }
 
   DateTime? _extractAcceptedAt(Map<String, dynamic> item) {
-    final assignments = item['asignaciones'];
-    if (assignments is List) {
-      final validAssignments = assignments
-          .map((entry) => entry is Map ? Map<String, dynamic>.from(entry) : null)
-          .whereType<Map<String, dynamic>>()
-          .where((row) => row['estado'] != AppConstants.assignRejected)
-          .toList()
-        ..sort((a, b) {
-          final aDate = DateTime.tryParse(a['fecha_asignacion']?.toString() ?? '');
-          final bDate = DateTime.tryParse(b['fecha_asignacion']?.toString() ?? '');
-          if (aDate == null && bDate == null) return 0;
-          if (aDate == null) return 1;
-          if (bDate == null) return -1;
-          return aDate.compareTo(bDate);
-        });
-      if (validAssignments.isNotEmpty) {
-        return DateTime.tryParse(
-          validAssignments.first['fecha_asignacion']?.toString() ?? '',
-        );
-      }
-    }
-    return null;
+    final assignment = _effectiveAssignment(item);
+    return DateTime.tryParse(
+      assignment?['fecha_asignacion']?.toString() ?? '',
+    );
   }
 
   DateTime? _extractClosedAt(Map<String, dynamic> item) {
@@ -1021,7 +1032,13 @@ class _AdminReportsScreenState extends ConsumerState<AdminReportsScreen> {
           .whereType<Map<String, dynamic>>()
           .where((row) {
             final event = row['tipo_evento']?.toString();
-            return event == 'finalizacion' || event == 'cancelacion';
+            final description =
+                row['descripcion']?.toString().toLowerCase() ?? '';
+            return event == 'finalizacion' ||
+                event == 'cancelacion' ||
+                (event == 'cambio_estado' &&
+                    (description.contains('finalizada') ||
+                        description.contains('atendida')));
           })
           .toList()
         ..sort((a, b) => (a['fecha']?.toString() ?? '').compareTo(b['fecha']?.toString() ?? ''));
@@ -1033,10 +1050,52 @@ class _AdminReportsScreenState extends ConsumerState<AdminReportsScreen> {
   }
 
   String? _extractAssignedTechnicianName(Map<String, dynamic> item) {
-    final assignment = _firstMap(item['asignaciones']);
+    final assignment = _effectiveAssignment(item);
     final tech = _firstMap(assignment?['tecnicos']);
     final techUser = _firstMap(tech?['usuarios']);
-    return techUser?['nombre']?.toString();
+    final joinedName = techUser?['nombre']?.toString().trim();
+    if (joinedName?.isNotEmpty == true) return joinedName;
+
+    final userId = tech?['usuario_id']?.toString();
+    if (userId == null || userId.isEmpty) return null;
+    final details = _technicianDetailsByUserId[userId];
+    final user = _firstMap(details?['usuarios']);
+    final fallbackName = user?['nombre']?.toString().trim();
+    return fallbackName?.isNotEmpty == true ? fallbackName : null;
+  }
+
+  Map<String, dynamic>? _effectiveAssignment(Map<String, dynamic> item) {
+    final raw = item['asignaciones'];
+    if (raw is! List) return _firstMap(raw);
+
+    final assignments = raw
+        .map(_firstMap)
+        .whereType<Map<String, dynamic>>()
+        .where((row) => row['estado'] != AppConstants.assignRejected)
+        .toList();
+    if (assignments.isEmpty) return null;
+
+    assignments.sort((a, b) {
+      final priority = _assignmentReportPriority(b['estado']?.toString())
+          .compareTo(_assignmentReportPriority(a['estado']?.toString()));
+      if (priority != 0) return priority;
+      final aDate =
+          DateTime.tryParse(a['fecha_asignacion']?.toString() ?? '');
+      final bDate =
+          DateTime.tryParse(b['fecha_asignacion']?.toString() ?? '');
+      return (bDate ?? DateTime(0)).compareTo(aDate ?? DateTime(0));
+    });
+    return assignments.first;
+  }
+
+  int _assignmentReportPriority(String? status) {
+    return switch (status) {
+      AppConstants.assignFinished => 4,
+      AppConstants.assignAttending => 3,
+      AppConstants.assignEnRoute => 2,
+      AppConstants.assignAccepted => 1,
+      _ => 0,
+    };
   }
 
   String? _resolveSuggestedSpecialty(Map<String, dynamic> item) {
@@ -1218,43 +1277,35 @@ class _AdminReportsScreenState extends ConsumerState<AdminReportsScreen> {
               const Gap(20),
               _SectionLabel('Tipo de reporte'),
               const Gap(10),
-              Wrap(
-                spacing: 10,
-                runSpacing: 10,
-                children: _ReportType.values.map((type) {
-                  final selected = _selectedType == type;
-                  return ChoiceChip(
-                    label: Text(_reportTypeLabel(type)),
-                    selected: selected,
-                    onSelected: (_) {
-                      setState(() {
-                        _selectedType = type;
-                        _selectedRole = null;
-                        _selectedStatus = null;
-                        _selectedSpecialty = null;
-                        _selectedProblemType = null;
-                        _selectedZone = null;
-                      });
-                      _loadReportData();
-                    },
-                    selectedColor: AppColors.primary.withValues(alpha: 0.12),
-                    labelStyle: TextStyle(
-                      color:
-                          selected ? AppColors.primary : AppColors.textPrimary,
-                      fontWeight:
-                          selected ? FontWeight.w700 : FontWeight.w600,
-                    ),
-                    side: BorderSide(
-                      color: selected
-                          ? AppColors.primary.withValues(alpha: 0.28)
-                          : AppColors.surfaceContainerHigh,
-                    ),
-                    backgroundColor: AppColors.surfaceContainerLowest,
-                    shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(18),
-                    ),
+              LayoutBuilder(
+                builder: (context, constraints) {
+                  final cardWidth = constraints.maxWidth >= 720
+                      ? (constraints.maxWidth - 20) / 3
+                      : (constraints.maxWidth - 10) / 2;
+                  return Wrap(
+                    spacing: 10,
+                    runSpacing: 10,
+                    children: _ReportType.values.map((type) {
+                      return _ReportTypeCard(
+                        width: cardWidth,
+                        label: _reportTypeLabel(type),
+                        icon: _reportTypeIcon(type),
+                        selected: _selectedType == type,
+                        onTap: () {
+                          setState(() {
+                            _selectedType = type;
+                            _selectedRole = null;
+                            _selectedStatus = null;
+                            _selectedSpecialty = null;
+                            _selectedProblemType = null;
+                            _selectedZone = null;
+                          });
+                          _loadReportData();
+                        },
+                      );
+                    }).toList(),
                   );
-                }).toList(),
+                },
               ),
               const Gap(20),
               _FiltersCard(
@@ -1373,6 +1424,85 @@ class _AdminReportsScreenState extends ConsumerState<AdminReportsScreen> {
       case _ReportType.aiDiagnostics:
         return 'Diagnósticos IA';
     }
+  }
+
+  IconData _reportTypeIcon(_ReportType type) {
+    return switch (type) {
+      _ReportType.users => Icons.group_outlined,
+      _ReportType.technicians => Icons.engineering_outlined,
+      _ReportType.requests => Icons.assignment_outlined,
+      _ReportType.ratings => Icons.star_outline_rounded,
+      _ReportType.operations => Icons.analytics_outlined,
+      _ReportType.aiDiagnostics => Icons.auto_awesome_outlined,
+    };
+  }
+}
+
+class _ReportTypeCard extends StatelessWidget {
+  final double width;
+  final String label;
+  final IconData icon;
+  final bool selected;
+  final VoidCallback onTap;
+
+  const _ReportTypeCard({
+    required this.width,
+    required this.label,
+    required this.icon,
+    required this.selected,
+    required this.onTap,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final tone = selected ? AppColors.primary : AppColors.textSecondary;
+    return SizedBox(
+      width: width,
+      child: Material(
+        color: selected
+            ? AppColors.primaryFixed.withValues(alpha: 0.65)
+            : AppColors.surfaceContainerLowest,
+        borderRadius: BorderRadius.circular(20),
+        child: InkWell(
+          onTap: onTap,
+          borderRadius: BorderRadius.circular(20),
+          child: AnimatedContainer(
+            duration: const Duration(milliseconds: 180),
+            constraints: const BoxConstraints(minHeight: 92),
+            padding: const EdgeInsets.all(14),
+            decoration: BoxDecoration(
+              borderRadius: BorderRadius.circular(20),
+              border: Border.all(
+                color: selected
+                    ? AppColors.primary.withValues(alpha: 0.45)
+                    : AppColors.surfaceContainerHigh,
+                width: selected ? 1.5 : 1,
+              ),
+            ),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Icon(icon, color: tone, size: 24),
+                const Gap(10),
+                Text(
+                  label,
+                  maxLines: 2,
+                  overflow: TextOverflow.ellipsis,
+                  style: TextStyle(
+                    color: selected
+                        ? AppColors.primaryContainer
+                        : AppColors.textPrimary,
+                    fontSize: 13,
+                    height: 1.2,
+                    fontWeight: FontWeight.w800,
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ),
+      ),
+    );
   }
 }
 
@@ -1738,6 +1868,8 @@ class _FilterDropdown extends StatelessWidget {
         const Gap(8),
         DropdownButtonFormField<String?>(
           initialValue: value,
+          isExpanded: true,
+          menuMaxHeight: 360,
           items: [
             const DropdownMenuItem<String?>(
               value: null,
@@ -1746,17 +1878,34 @@ class _FilterDropdown extends StatelessWidget {
             ...options.map(
               (option) => DropdownMenuItem<String?>(
                 value: option,
-                child: Text(option),
+                child: Text(
+                  option,
+                  maxLines: 2,
+                  overflow: TextOverflow.ellipsis,
+                ),
               ),
             ),
           ],
           onChanged: onChanged,
           decoration: InputDecoration(
             filled: true,
-            fillColor: AppColors.surfaceContainerLow,
+            fillColor: AppColors.surfaceContainerLowest,
+            contentPadding:
+                const EdgeInsets.symmetric(horizontal: 14, vertical: 14),
+            enabledBorder: OutlineInputBorder(
+              borderRadius: BorderRadius.circular(16),
+              borderSide:
+                  const BorderSide(color: AppColors.surfaceContainerHigh),
+            ),
+            focusedBorder: OutlineInputBorder(
+              borderRadius: BorderRadius.circular(16),
+              borderSide:
+                  const BorderSide(color: AppColors.primary, width: 1.5),
+            ),
             border: OutlineInputBorder(
               borderRadius: BorderRadius.circular(16),
-              borderSide: BorderSide.none,
+              borderSide:
+                  const BorderSide(color: AppColors.surfaceContainerHigh),
             ),
           ),
         ),
@@ -2014,6 +2163,10 @@ class _SummaryWrap extends StatelessWidget {
         return 'Usuarios por rol';
       case 'active_users':
         return 'Activos';
+      case 'pending_users':
+        return 'Pendientes';
+      case 'rejected_users':
+        return 'Rechazados';
       case 'inactive_users':
         return 'Inactivos';
       case 'blocked_users':

@@ -148,16 +148,9 @@ class _SplashScreenState extends ConsumerState<SplashScreen>
                       scale: _scaleAnim,
                       child: Column(
                         children: [
-                          const AppLogo(height: 132),
-                          const SizedBox(height: 16),
-                          const Text(
-                            'Asistencia automotriz al instante',
-                            style: TextStyle(
-                              fontSize: 18,
-                              fontWeight: FontWeight.w500,
-                              color: AppColors.secondary,
-                              letterSpacing: 0,
-                            ),
+                          const AppLogo(
+                            height: 132,
+                            variant: AppLogoVariant.withSloganLight,
                           ),
                         ],
                       ),

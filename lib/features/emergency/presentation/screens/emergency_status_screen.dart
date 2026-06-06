@@ -9,6 +9,7 @@ import 'package:url_launcher/url_launcher.dart';
 import '../../../../core/constants/app_colors.dart';
 import '../../../../core/constants/app_constants.dart';
 import '../../../../core/constants/emergency_match_policy.dart';
+import '../../../../core/constants/technician_specialties.dart';
 import '../../../../core/router/app_router.dart';
 import '../../../../core/utils/helpers.dart';
 import '../../../chat/presentation/widgets/chat_notification_bell.dart';
@@ -84,6 +85,39 @@ class _StatusBody extends ConsumerStatefulWidget {
 
 class _StatusBodyState extends ConsumerState<_StatusBody> {
   bool _ratingDialogShown = false;
+  bool _isExiting = false;
+
+  Future<void> _exitStatusScreen() async {
+    if (_isExiting) return;
+    final emergency = widget.emergency;
+    final isPendingSearch =
+        emergency.estado == AppConstants.statusPending &&
+        !emergency.hasTechnician;
+
+    if (!isPendingSearch) {
+      context.go(AppRoutes.driverHome);
+      return;
+    }
+
+    setState(() => _isExiting = true);
+    final cancelled = await ref
+        .read(emergencyNotifierProvider.notifier)
+        .cancelPendingEmergency(emergency.id);
+    if (!mounted) return;
+
+    if (cancelled) {
+      context.go(AppRoutes.driverHome);
+      return;
+    }
+
+    setState(() => _isExiting = false);
+    AppHelpers.showSnackBar(
+      context,
+      ref.read(emergencyNotifierProvider).error ??
+          'La solicitud ya no esta pendiente. Revisa su estado antes de salir.',
+      isError: true,
+    );
+  }
 
   Future<void> _openNotifications(Emergency emergency) async {
     await showNotificationCenterSheet(
@@ -289,9 +323,15 @@ class _StatusBodyState extends ConsumerState<_StatusBody> {
     final horizontal = AppResponsive.horizontalPadding(context);
     final topInset = MediaQuery.of(context).padding.top;
 
-    return Scaffold(
-      backgroundColor: AppColors.background,
-      body: Stack(
+    return PopScope(
+      canPop: false,
+      onPopInvokedWithResult: (didPop, _) {
+        if (didPop || !mounted) return;
+        _exitStatusScreen();
+      },
+      child: Scaffold(
+        backgroundColor: AppColors.background,
+        body: Stack(
         children: [
           const Positioned.fill(
             child: DecoratedBox(
@@ -331,7 +371,7 @@ class _StatusBodyState extends ConsumerState<_StatusBody> {
                           borderRadius: BorderRadius.circular(10),
                           child: InkWell(
                             borderRadius: BorderRadius.circular(10),
-                            onTap: () => context.pop(),
+                            onTap: _isExiting ? null : _exitStatusScreen,
                             child: const Padding(
                               padding: EdgeInsets.all(8),
                               child: Icon(Icons.arrow_back_ios_new,
@@ -454,7 +494,7 @@ class _StatusBodyState extends ConsumerState<_StatusBody> {
               onTap: (i) {
                 switch (i) {
                   case 0:
-                    context.go(AppRoutes.driverHome);
+                    _exitStatusScreen();
                   case 2:
                     if (emergency.hasTechnician) {
                       context.push(AppRoutes.driverChat, extra: emergency.id);
@@ -466,6 +506,7 @@ class _StatusBodyState extends ConsumerState<_StatusBody> {
             ),
           ),
         ],
+      ),
       ),
     );
   }
@@ -743,7 +784,9 @@ class _LiveMap extends StatelessWidget {
           FlutterMap(
             key: ValueKey(
               '${lat.toStringAsFixed(5)},${lng.toStringAsFixed(5)},'
-              '${tech?.lat.toStringAsFixed(5)},${tech?.lng.toStringAsFixed(5)}',
+              '${tech?.lat.toStringAsFixed(5)},${tech?.lng.toStringAsFixed(5)},'
+              '${destination?.latitude.toStringAsFixed(5)},${destination?.longitude.toStringAsFixed(5)},'
+              '${offerMarkers.length},${routePoints.length},${towRoutePoints.length}',
             ),
             options: MapOptions(
               initialCenter: center,
@@ -760,7 +803,9 @@ class _LiveMap extends StatelessWidget {
             ),
             children: [
               TileLayer(
-                urlTemplate: 'https://tile.openstreetmap.org/{z}/{x}/{y}.png',
+                urlTemplate: AppConstants.osmTileUrl,
+                userAgentPackageName: 'com.autoresq.app',
+                tileProvider: NetworkTileProvider(),
               ),
               if (routePoints.length >= 2)
                 PolylineLayer(
@@ -880,6 +925,17 @@ class _LiveMap extends StatelessWidget {
                         ),
                       ),
                     ),
+                ],
+              ),
+              RichAttributionWidget(
+                attributions: [
+                  TextSourceAttribution(
+                    'OpenStreetMap contributors',
+                    onTap: () => launchUrl(
+                      Uri.parse('https://www.openstreetmap.org/copyright'),
+                      mode: LaunchMode.externalApplication,
+                    ),
+                  ),
                 ],
               ),
             ],
@@ -1113,9 +1169,10 @@ class _TechnicianCard extends StatelessWidget {
     final rating = emergency.tecnicoRating;
     final ratingText =
         rating == null || rating <= 0 ? 'Sin calificacion' : rating.toStringAsFixed(1);
-    final specialty = emergency.tecnicoSpecialty?.trim().isNotEmpty == true
-        ? emergency.tecnicoSpecialty!.trim()
-        : emergency.pricingServiceName ?? 'Tecnico verificado';
+    final specialty = TechnicianSpecialties.labelForCode(
+      emergency.tecnicoSpecialty,
+      fallback: emergency.pricingServiceName ?? 'Técnico verificado',
+    );
     final etaText = route == null ? 'ETA' : '${route!.durationMinutes} min';
 
     return ClipRRect(
@@ -1402,7 +1459,7 @@ class _OfferSelectionCardState extends State<_OfferSelectionCard>
           message: 'No se pudieron cargar ofertas. Seguimos escuchando.',
         ),
         data: (offers) {
-          final pending = EmergencyMatchPolicy.visibleRanked<TechnicianOffer>(
+          final pending = EmergencyMatchPolicy.rankOffers<TechnicianOffer>(
             items: offers.where((offer) => offer.status == 'pendiente'),
             emergencyType: widget.emergencyType,
             distanceKm: (offer) => offer.distanceKm,
@@ -1440,7 +1497,9 @@ class _OfferSelectionCardState extends State<_OfferSelectionCard>
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
                         Text(
-                          '${pending.length} tecnico${pending.length == 1 ? '' : 's'} respondieron',
+                          pending.length == 1
+                              ? '1 tecnico respondio'
+                              : '${pending.length} tecnicos respondieron',
                           style: const TextStyle(
                             fontSize: 17,
                             fontWeight: FontWeight.w900,
@@ -1578,9 +1637,10 @@ class _TechnicianOfferTile extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final specialty = offer.specialty?.trim().isNotEmpty == true
-        ? offer.specialty!.trim()
-        : 'Tecnico verificado';
+    final specialty = TechnicianSpecialties.labelForCode(
+      offer.specialty,
+      fallback: 'Técnico verificado',
+    );
     final band = EmergencyMatchPolicy.bandFor(
       emergencyType: emergencyType,
       distanceKm: offer.distanceKm,

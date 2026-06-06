@@ -46,6 +46,8 @@ class _TechnicianHomeScreenState extends ConsumerState<TechnicianHomeScreen> {
       _pendingEmergenciesSubscription;
   ProviderSubscription<AsyncValue<Emergency?>>? _activeServiceSubscription;
   ProviderSubscription<AsyncValue<int>>? _unreadChatSubscription;
+  ProviderSubscription<AsyncValue<TechnicianStats>>?
+      _technicianStatsSubscription;
   Timer? _bannerDismissTimer;
   int _navIndex = 0;
   int _lastUnreadChatCount = 0;
@@ -61,18 +63,22 @@ class _TechnicianHomeScreenState extends ConsumerState<TechnicianHomeScreen> {
   @override
   void initState() {
     super.initState();
-    ref
-        .read(activeRoleProvider.notifier)
-        .switchTo(AppConstants.roleTechnician);
     _navIndex = widget.initialTab.clamp(0, 4);
     _pendingEmergenciesSubscription =
         ref.listenManual<AsyncValue<List<Emergency>>>(
       technicianPendingEmergenciesProvider,
       (previous, next) {
         if (!mounted) return;
-        final available = _isAvailable ??
-            ref.read(authNotifierProvider).value?.isAvailable ??
-            false;
+        final user = ref.read(authNotifierProvider).value ??
+            ref.read(authStateProvider).valueOrNull;
+        final liveAvailability = user == null
+            ? null
+            : ref
+                .read(technicianStatsProvider(user.id))
+                .valueOrNull
+                ?.isAvailable;
+        final available =
+            _isAvailable ?? liveAvailability ?? user?.isAvailable ?? false;
         next.whenData(
           (emergencies) => _handlePendingEmergencyUpdate(
             emergencies,
@@ -91,6 +97,16 @@ class _TechnicianHomeScreenState extends ConsumerState<TechnicianHomeScreen> {
       _handleUnreadChatCount,
       fireImmediately: true,
     );
+    final initialUser = ref.read(authNotifierProvider).value ??
+        ref.read(authStateProvider).valueOrNull;
+    if (initialUser != null) {
+      _technicianStatsSubscription =
+          ref.listenManual<AsyncValue<TechnicianStats>>(
+        technicianStatsProvider(initialUser.id),
+        _handleTechnicianStatsUpdate,
+        fireImmediately: true,
+      );
+    }
     WidgetsBinding.instance.addPostFrameCallback((_) async {
       if (!mounted) return;
       final user = ref.read(authNotifierProvider).value ??
@@ -116,7 +132,33 @@ class _TechnicianHomeScreenState extends ConsumerState<TechnicianHomeScreen> {
     _pendingEmergenciesSubscription?.close();
     _activeServiceSubscription?.close();
     _unreadChatSubscription?.close();
+    _technicianStatsSubscription?.close();
     super.dispose();
+  }
+
+  void _handleTechnicianStatsUpdate(
+    AsyncValue<TechnicianStats>? previous,
+    AsyncValue<TechnicianStats> next,
+  ) {
+    final stats = next.valueOrNull;
+    if (!mounted || stats == null) return;
+
+    final wasAvailable =
+        _isAvailable ?? previous?.valueOrNull?.isAvailable ?? false;
+    final isAvailable = stats.isAvailable;
+    if (_isAvailable != isAvailable) {
+      setState(() => _isAvailable = isAvailable);
+    }
+    if (wasAvailable || !isAvailable) return;
+
+    final pending =
+        ref.read(technicianPendingEmergenciesProvider).valueOrNull ??
+            const <Emergency>[];
+    if (pending.isEmpty) return;
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!mounted) return;
+      _showNewEmergencyBanner(pending);
+    });
   }
 
   void _handleActiveServiceUpdate(
@@ -1133,6 +1175,7 @@ class _TechnicianHomeScreenState extends ConsumerState<TechnicianHomeScreen> {
                 avatarUrl: user?.avatarUrl,
                 userName: technicianName,
                 specialty: specialty,
+                rating: stats?.rating ?? user?.rating ?? 0,
                 isAvailable: isAvailable,
                 isApproved: user?.isApproved ?? false,
                 pendingCount: pendingEmergencies.length,
@@ -1255,6 +1298,7 @@ class _TechnicianTopBar extends StatelessWidget {
   final String? avatarUrl;
   final String userName;
   final String specialty;
+  final double rating;
   final bool isAvailable;
   final bool isApproved;
   final int pendingCount;
@@ -1268,6 +1312,7 @@ class _TechnicianTopBar extends StatelessWidget {
     required this.avatarUrl,
     required this.userName,
     required this.specialty,
+    required this.rating,
     required this.isAvailable,
     required this.isApproved,
     required this.pendingCount,
@@ -1282,6 +1327,7 @@ class _TechnicianTopBar extends StatelessWidget {
     final isCompact = MediaQuery.of(context).size.width < 520;
     final statusColor = isApproved ? AppColors.success : AppColors.warning;
     final statusLabel = isApproved ? 'Aprobado' : 'Pendiente';
+    final ratingLabel = rating > 0 ? rating.toStringAsFixed(1) : 'Nuevo';
 
     return Container(
       padding: const EdgeInsets.fromLTRB(16, 10, 16, 10),
@@ -1388,47 +1434,34 @@ class _TechnicianTopBar extends StatelessWidget {
                       ),
                     ),
                     const SizedBox(height: 6),
-                    Row(
+                    Wrap(
+                      alignment: WrapAlignment.start,
+                      crossAxisAlignment: WrapCrossAlignment.center,
+                      spacing: isCompact ? 8 : 10,
+                      runSpacing: 6,
                       children: [
-                        const Icon(
-                          Icons.engineering_rounded,
-                          size: 14,
-                          color: AppColors.primary,
+                        _TopBarMetaItem(
+                          icon: Icons.engineering_rounded,
+                          iconColor: AppColors.primary,
+                          label: specialty,
+                          compact: isCompact,
                         ),
-                        const SizedBox(width: 4),
-                        Expanded(
-                          child: Text(
-                            specialty,
-                            maxLines: 1,
-                            overflow: TextOverflow.ellipsis,
-                            style: TextStyle(
-                              fontSize: isCompact ? 10 : 12,
-                              fontWeight: FontWeight.w600,
-                              color: AppColors.textSecondary,
-                            ),
-                          ),
+                        _TopBarMetaItem(
+                          dotColor: statusColor,
+                          label: statusLabel,
+                          compact: isCompact,
                         ),
-                        const SizedBox(width: 10),
-                        Container(
-                          width: 6,
-                          height: 6,
-                          decoration: BoxDecoration(
-                            color: statusColor,
-                            shape: BoxShape.circle,
-                          ),
+                        _TopBarMetaItem(
+                          icon: Icons.assignment_outlined,
+                          iconColor: AppColors.primary,
+                          label: '$pendingCount solicitudes',
+                          compact: isCompact,
                         ),
-                        const SizedBox(width: 6),
-                        Expanded(
-                          child: Text(
-                            '$statusLabel · $pendingCount solicitudes',
-                            maxLines: 1,
-                            overflow: TextOverflow.ellipsis,
-                            style: TextStyle(
-                              fontSize: isCompact ? 10 : 12,
-                              fontWeight: FontWeight.w600,
-                              color: AppColors.textSecondary,
-                            ),
-                          ),
+                        _TopBarMetaItem(
+                          icon: Icons.star_rounded,
+                          iconColor: AppColors.warning,
+                          label: ratingLabel,
+                          compact: isCompact,
                         ),
                       ],
                     ),
@@ -1482,6 +1515,55 @@ class _TechnicianTopBar extends StatelessWidget {
           ),
         ],
       ),
+    );
+  }
+}
+
+class _TopBarMetaItem extends StatelessWidget {
+  final IconData? icon;
+  final Color? iconColor;
+  final Color? dotColor;
+  final String label;
+  final bool compact;
+
+  const _TopBarMetaItem({
+    this.icon,
+    this.iconColor,
+    this.dotColor,
+    required this.label,
+    required this.compact,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final textStyle = TextStyle(
+      fontSize: compact ? 10 : 12,
+      fontWeight: FontWeight.w600,
+      color: AppColors.textSecondary,
+      height: 1.1,
+    );
+
+    return Row(
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        if (dotColor != null)
+          Container(
+            width: 6,
+            height: 6,
+            decoration: BoxDecoration(
+              color: dotColor,
+              shape: BoxShape.circle,
+            ),
+          )
+        else if (icon != null)
+          Icon(
+            icon,
+            size: compact ? 13 : 14,
+            color: iconColor ?? AppColors.primary,
+          ),
+        const SizedBox(width: 4),
+        Text(label, style: textStyle),
+      ],
     );
   }
 }

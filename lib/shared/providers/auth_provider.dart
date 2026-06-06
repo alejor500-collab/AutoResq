@@ -43,13 +43,16 @@ final currentUserProvider = StateProvider<AppUser?>((ref) => null);
 // ─── Auth Notifier ────────────────────────────────────────────────────────────
 class AuthNotifier extends StateNotifier<AsyncValue<AppUser?>> {
   final AuthRepository _repo;
+  int _operationVersion = 0;
 
   AuthNotifier(this._repo) : super(const AsyncValue.loading()) {
     _init();
   }
 
   Future<void> _init() async {
+    final operation = _operationVersion;
     final result = await _repo.getCurrentUser();
+    if (operation != _operationVersion) return;
     result.fold(
       (failure) => state = const AsyncValue.data(null),
       (user) => state = AsyncValue.data(user),
@@ -60,11 +63,13 @@ class AuthNotifier extends StateNotifier<AsyncValue<AppUser?>> {
     String? role,
     String? specialty,
   }) async {
+    final operation = ++_operationVersion;
     state = const AsyncValue.loading();
     final result = await _repo.loginWithGoogle(
       role: role,
       specialty: specialty,
     );
+    if (operation != _operationVersion) return false;
     return result.fold(
       (failure) {
         state = AsyncValue.error(failure.message, StackTrace.current);
@@ -78,8 +83,10 @@ class AuthNotifier extends StateNotifier<AsyncValue<AppUser?>> {
   }
 
   Future<bool> login({required String email, required String password}) async {
+    final operation = ++_operationVersion;
     state = const AsyncValue.loading();
     final result = await _repo.login(email: email, password: password);
+    if (operation != _operationVersion) return false;
     return result.fold(
       (failure) {
         state = AsyncValue.error(failure.message, StackTrace.current);
@@ -100,6 +107,7 @@ class AuthNotifier extends StateNotifier<AsyncValue<AppUser?>> {
     required String role,
     String? specialty,
   }) async {
+    final operation = ++_operationVersion;
     state = const AsyncValue.loading();
     final result = await _repo.register(
       email: email,
@@ -109,6 +117,7 @@ class AuthNotifier extends StateNotifier<AsyncValue<AppUser?>> {
       role: role,
       specialty: specialty,
     );
+    if (operation != _operationVersion) return false;
     return result.fold(
       (failure) {
         state = AsyncValue.error(failure.message, StackTrace.current);
@@ -122,6 +131,7 @@ class AuthNotifier extends StateNotifier<AsyncValue<AppUser?>> {
   }
 
   Future<void> logout() async {
+    ++_operationVersion;
     await _repo.logout();
     state = const AsyncValue.data(null);
   }

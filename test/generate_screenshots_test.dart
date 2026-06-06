@@ -1653,6 +1653,160 @@ void main() {
       adminState: adminState,
     );
   });
+
+  testWidgets('Flujo de grua muestra diagnostico antes y despues del destino',
+      (tester) async {
+    const webSize = Size(1366, 768);
+    await tester.binding.setSurfaceSize(webSize);
+    addTearDown(() => tester.binding.setSurfaceSize(null));
+
+    final dataSource = _FakeEmergencyRemoteDataSource(
+      currentUser: driverUser,
+      history: historyEmergencies,
+      analysisResolver: _towAnalysis,
+      quoteResolver: _towQuote,
+    );
+    await tester.pumpWidget(
+      _buildTestApp(
+        widget: const CreateEmergencyScreen(),
+        scopeKey: 'tow-flow-test',
+        user: driverUser,
+        mapLocation: mapLocation,
+        nearbyServices: nearbyServices,
+        dataSource: dataSource,
+        mediaSize: webSize,
+        theme: ThemeData(
+          outlinedButtonTheme: OutlinedButtonThemeData(
+            style: OutlinedButton.styleFrom(
+              minimumSize: const Size(double.infinity, 52),
+            ),
+          ),
+        ),
+      ),
+    );
+    await _stabilizeFrame(tester);
+    expect(tester.takeException(), isNull);
+
+    await _openDiagnosticStep(
+      tester,
+      description:
+          'Choque el carro y necesito grua para llevarlo al taller porque no rueda.',
+    );
+    await _stabilizeFrame(tester);
+    expect(tester.takeException(), isNull);
+
+    expect(find.text('Paso 3: Diagnóstico preliminar'), findsOneWidget);
+    expect(find.text('Diagnóstico generado'), findsOneWidget);
+    expect(find.text('Cuota referencial de grúa'), findsOneWidget);
+    expect(find.text('Elegir destino y calcular'), findsOneWidget);
+    expect(find.text('Publicar solicitud'), findsNothing);
+    final progressRect = tester.getRect(
+      find.byKey(const ValueKey('emergency-step-progress')),
+    );
+    final titleRect =
+        tester.getRect(find.text('Paso 3: Diagnóstico preliminar'));
+    final diagnosticRect = tester.getRect(find.text('Diagnóstico generado'));
+    expect(titleRect.top, greaterThan(progressRect.bottom));
+    expect(diagnosticRect.top, greaterThan(titleRect.bottom));
+    expect(diagnosticRect.top, lessThan(webSize.height));
+
+    await tester.tap(find.text('Elegir destino y calcular').last);
+    await _stabilizeFrame(tester);
+    expect(tester.takeException(), isNull);
+
+    expect(find.text('Seleccionar destino de traslado'), findsOneWidget);
+    expect(find.text('Usar esta ubicacion'), findsOneWidget);
+
+    await tester.tap(find.text('Usar esta ubicacion'));
+    await _stabilizeFrame(tester);
+    expect(tester.takeException(), isNull);
+
+    expect(find.text('Paso 3: Diagnóstico preliminar'), findsOneWidget);
+    expect(find.text('Diagnóstico generado'), findsOneWidget);
+    expect(find.text('\$35.00 aprox.'), findsWidgets);
+    expect(find.text('Publicar solicitud'), findsOneWidget);
+    expect(find.text('Elegir destino y calcular'), findsNothing);
+
+    final backButton = find.byIcon(Icons.arrow_back);
+    expect(backButton, findsOneWidget);
+    await tester.tap(backButton);
+    await _stabilizeFrame(tester);
+    expect(tester.takeException(), isNull);
+    expect(find.text('Paso 2: ¿Que sucede?'), findsOneWidget);
+
+    await tester.tap(find.byIcon(Icons.arrow_back));
+    await _stabilizeFrame(tester);
+    expect(tester.takeException(), isNull);
+    expect(find.text('Paso 1: Ubicacion'), findsOneWidget);
+  });
+
+  testWidgets('Oferta tardia llega al conductor y puede aceptarse',
+      (tester) async {
+    const webSize = Size(1366, 768);
+    await tester.binding.setSurfaceSize(webSize);
+    addTearDown(() => tester.binding.setSurfaceSize(null));
+
+    final offers = <String, List<TechnicianOffer>>{};
+    final history = <EmergencyModel>[pendingOffersEmergency];
+    final dataSource = _FakeEmergencyRemoteDataSource(
+      currentUser: driverUser,
+      history: history,
+      offersByEmergencyId: offers,
+    );
+    await tester.pumpWidget(
+      _buildTestApp(
+        widget: EmergencyStatusScreen(
+          emergencyId: pendingOffersEmergency.id,
+        ),
+        scopeKey: 'late-offer-flow-test',
+        user: driverUser,
+        mapLocation: mapLocation,
+        nearbyServices: nearbyServices,
+        dataSource: dataSource,
+        mediaSize: webSize,
+      ),
+    );
+    await _stabilizeFrame(tester);
+    expect(find.text('Esperando respuestas de tecnicos...'), findsOneWidget);
+    expect(tester.takeException(), isNull);
+
+    offers[pendingOffersEmergency.id] = [
+      TechnicianOffer(
+        id: 'late-offer',
+        emergencyId: pendingOffersEmergency.id,
+        technicianId: 'far-tow-profile',
+        technicianUserId: 'far-tow-user',
+        name: 'Gruas Rescate',
+        specialty: 'Grua / remolque',
+        rating: 4.9,
+        totalServices: 210,
+        distanceKm: 35,
+        etaMinutes: 48,
+        offeredAmount: 55,
+        status: 'pendiente',
+        createdAt: now,
+      ),
+    ];
+
+    await tester.pump(const Duration(seconds: 2));
+    await _stabilizeFrame(tester);
+    expect(find.text('Gruas Rescate'), findsOneWidget);
+    expect(find.text('1 tecnico respondio'), findsOneWidget);
+    expect(find.textContaining('55'), findsOneWidget);
+    expect(tester.takeException(), isNull);
+
+    await tester.ensureVisible(find.text('Elegir tecnico'));
+    await tester.pump(const Duration(milliseconds: 300));
+    await tester.tap(find.text('Elegir tecnico'));
+    await _stabilizeFrame(tester);
+    expect(dataSource.acceptedOfferId, 'late-offer');
+
+    await tester.pump(const Duration(seconds: 2));
+    await _stabilizeFrame(tester);
+    expect(find.text('Gruas Rescate'), findsWidgets);
+    expect(find.text('Elegir tecnico'), findsNothing);
+    expect(tester.takeException(), isNull);
+  });
 }
 
 Future<void> _captureScreen(
@@ -1754,6 +1908,8 @@ Widget _buildTestApp({
   AdminState? adminState,
   String? routePath,
   Object? routeExtra,
+  Size mediaSize = const Size(390, 844),
+  ThemeData? theme,
 }) {
   const statsUserId = 'tech-user-1';
   MediaQuery mediaWrapper(BuildContext context, Widget? child) {
@@ -1769,9 +1925,10 @@ Widget _buildTestApp({
   final child = routePath == null
       ? MaterialApp(
           debugShowCheckedModeBanner: false,
+          theme: theme,
           home: MediaQuery(
-            data: const MediaQueryData(
-              size: Size(390, 844),
+            data: MediaQueryData(
+              size: mediaSize,
               devicePixelRatio: 3,
               padding: EdgeInsets.only(top: 47, bottom: 34),
               viewPadding: EdgeInsets.only(top: 47, bottom: 34),
@@ -1781,6 +1938,7 @@ Widget _buildTestApp({
         )
       : MaterialApp.router(
           debugShowCheckedModeBanner: false,
+          theme: theme,
           routerConfig: GoRouter(
             initialLocation: routePath,
             initialExtra: routeExtra,
@@ -1930,6 +2088,17 @@ class _GoldenHttpClient implements HttpClient {
 
 class _GoldenHttpRequest implements HttpClientRequest {
   @override
+  int contentLength = 0;
+
+  @override
+  final HttpHeaders headers = _GoldenHttpHeaders();
+
+  @override
+  Future<void> addStream(Stream<List<int>> stream) async {
+    await stream.drain<void>();
+  }
+
+  @override
   bool followRedirects = true;
 
   @override
@@ -1959,6 +2128,9 @@ class _GoldenHttpResponse extends Stream<List<int>>
 
   @override
   bool get isRedirect => false;
+
+  @override
+  List<RedirectInfo> get redirects => const [];
 
   @override
   bool get persistentConnection => false;
@@ -1993,6 +2165,22 @@ class _GoldenHttpResponse extends Stream<List<int>>
 }
 
 class _GoldenHttpHeaders implements HttpHeaders {
+  final Map<String, List<String>> _values = {};
+
+  @override
+  void set(
+    String name,
+    Object value, {
+    bool preserveHeaderCase = false,
+  }) {
+    _values[name] = [value.toString()];
+  }
+
+  @override
+  void forEach(void Function(String name, List<String> values) action) {
+    _values.forEach(action);
+  }
+
   @override
   String? value(String name) {
     if (name.toLowerCase() == HttpHeaders.contentTypeHeader) {
@@ -2038,6 +2226,31 @@ EmergencyPriceQuote _towQuote(
   double originLng,
   LocationEntity? destination,
 ) {
+  if (destination != null) {
+    return EmergencyPriceQuote(
+      serviceCode: emergencyTypeCode,
+      serviceName: 'Grúa / remolque',
+      pricingType: 'distance_based',
+      pricingStatus: 'protected',
+      basePrice: 20,
+      includedKm: 5,
+      pricePerKm: 1.5,
+      originLat: originLat,
+      originLng: originLng,
+      destinationLat: destination.lat,
+      destinationLng: destination.lng,
+      towDistanceKm: 10,
+      estimatedTotal: 35,
+      protectedTotal: 35,
+      displayTitle: 'Cuota referencial de grúa',
+      displayMessage: '\$35.00 aprox.',
+      requiresDestination: true,
+      destinationRequiredMessage:
+          'Selecciona el destino del traslado para calcular la ruta.',
+      requiresUserApprovalForExtras: true,
+      isEstimate: true,
+    );
+  }
   return EmergencyPriceQuote(
     serviceCode: emergencyTypeCode,
     serviceName: 'Grúa / remolque',
@@ -2368,6 +2581,7 @@ class _FakeEmergencyRemoteDataSource implements EmergencyRemoteDataSource {
   final AppUser currentUser;
   final List<EmergencyModel> history;
   final Map<String, List<TechnicianOffer>> offersByEmergencyId;
+  String? acceptedOfferId;
   final EmergencyAiAnalysisModel Function(String description) analysisResolver;
   final EmergencyPriceQuote Function(
     String emergencyTypeCode,
@@ -2388,7 +2602,30 @@ class _FakeEmergencyRemoteDataSource implements EmergencyRemoteDataSource {
   }
 
   @override
-  Future<void> acceptTechnicianOffer(String offerId) async {}
+  Future<void> acceptTechnicianOffer(String offerId) async {
+    acceptedOfferId = offerId;
+    for (final entry in offersByEmergencyId.entries) {
+      final offer = entry.value.where((item) => item.id == offerId).firstOrNull;
+      if (offer == null) continue;
+      final emergencyIndex =
+          history.indexWhere((item) => item.id == offer.emergencyId);
+      if (emergencyIndex < 0) return;
+      history[emergencyIndex] = history[emergencyIndex].copyWith(
+        estado: AppConstants.statusInProgress,
+        tecnicoId: offer.technicianId,
+        tecnicoUsuarioId: offer.technicianUserId,
+        tecnicoNombre: offer.name,
+        tecnicoPhone: offer.phone,
+        tecnicoSpecialty: offer.specialty,
+        tecnicoRating: offer.rating,
+        asignacionId: 'assignment-$offerId',
+        asignacionEstado: AppConstants.assignAccepted,
+        asignacionFecha: DateTime.now(),
+        acceptedOfferAmount: offer.offeredAmount,
+      );
+      return;
+    }
+  }
 
   @override
   Future<void> assignTechnician(String emergencyId, String technicianUserId) async {}
@@ -2542,6 +2779,9 @@ class _FakeEmergencyRemoteDataSource implements EmergencyRemoteDataSource {
 
   @override
   Future<void> updateStatus(String id, String estado) async {}
+
+  @override
+  Future<bool> cancelPendingEmergency(String id) async => true;
 
   @override
   Future<List<String>> uploadEmergencyEvidencePhotos({

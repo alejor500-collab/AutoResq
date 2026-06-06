@@ -293,7 +293,11 @@ class _DrawerHeader extends StatelessWidget {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          const AppLogo(height: 38, width: 150),
+          const AppLogo(
+            height: 38,
+            width: 150,
+            variant: AppLogoVariant.wordmarkDark,
+          ),
           const SizedBox(height: 14),
           Row(
             children: [

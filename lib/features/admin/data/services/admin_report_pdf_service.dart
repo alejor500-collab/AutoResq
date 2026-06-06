@@ -104,7 +104,8 @@ class AdminReportPdfService {
 
   Future<pw.MemoryImage?> _loadLogoOrNull() async {
     try {
-      final data = await rootBundle.load('assets/images/autoresq_logo.png');
+      final data =
+          await rootBundle.load('assets/images/autoresq_wordmark_dark.png');
       return pw.MemoryImage(data.buffer.asUint8List());
     } catch (_) {
       return null;
@@ -149,9 +150,9 @@ class AdminReportPdfService {
         crossAxisAlignment: pw.CrossAxisAlignment.start,
         children: [
           pw.Container(
-            width: 62,
-            height: 62,
-            padding: const pw.EdgeInsets.all(8),
+            width: 150,
+            height: 54,
+            padding: const pw.EdgeInsets.all(6),
             decoration: pw.BoxDecoration(
               color: PdfColor.fromInt(0xFFF5F8FD),
               borderRadius: pw.BorderRadius.circular(16),
@@ -437,7 +438,10 @@ class AdminReportPdfService {
     final data = rows.map((row) {
       return columns.map((column) {
         final maxLength = column.flex <= 1.0 ? 24 : 42;
-        return _truncate(row[column.key], max: maxLength);
+        return _truncate(
+          _formatCellValue(column.key, row[column.key]),
+          max: maxLength,
+        );
       }).toList();
     }).toList();
 
@@ -508,7 +512,7 @@ class AdminReportPdfService {
           _PdfColumn('fecha_creacion', 'Creación', 1.1),
           _PdfColumn('fecha_aceptacion', 'Aceptación', 1.1),
           _PdfColumn('fecha_cierre', 'Cierre', 1.0),
-          _PdfColumn('tiempo_respuesta_minutos', 'Resp. min', 0.8),
+          _PdfColumn('tiempo_servicio_minutos', 'Duración', 0.8),
           _PdfColumn('ubicacion_zona', 'Zona', 1.1),
           _PdfColumn('cuota_referencial', 'Cuota', 0.8),
           _PdfColumn('metodo_pago', 'Pago', 0.9),
@@ -552,6 +556,23 @@ class AdminReportPdfService {
     if (compact.isEmpty) return '—';
     if (compact.length <= max) return compact;
     return '${compact.substring(0, max - 1)}…';
+  }
+
+  String _formatCellValue(String key, dynamic value) {
+    if (value == null) return '—';
+    if (key.startsWith('fecha_') || key == 'ultimo_acceso') {
+      final parsed = DateTime.tryParse(value.toString());
+      if (parsed != null) {
+        return DateFormat('dd/MM/yyyy HH:mm').format(parsed.toLocal());
+      }
+    }
+    if (key == 'tiempo_servicio_minutos' && value is num) {
+      final minutes = value.round();
+      final hours = minutes ~/ 60;
+      final remaining = minutes % 60;
+      return hours > 0 ? '${hours}h ${remaining}min' : '$remaining min';
+    }
+    return value.toString();
   }
 
   String _humanizeKey(String key) {

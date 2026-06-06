@@ -66,15 +66,17 @@ class EmergencyAiAnalysisModel {
     return EmergencyAiAnalysisModel(
       categoria: auxilioGeneral,
       tipoDanio: _truncate(
-        cleaned.isEmpty ? 'Problema vehicular por confirmar.' : cleaned,
-        90,
+        cleaned.isEmpty
+            ? 'La información disponible no permite identificar todavía el sistema afectado. Es necesaria una revisión en sitio para confirmar la causa y determinar si el vehículo puede circular de forma segura.'
+            : 'Lo descrito podría corresponder a una falla en uno de los sistemas del vehículo, pero aún no permite confirmar una causa específica. El técnico revisará en sitio los síntomas reportados: $shortDescription',
+        360,
       ),
       resumenTecnico:
-          'Conductor reporta: $shortDescription Confirmar sintomas en sitio, identificar el rol tecnico requerido y descartar traslado/remolque si el vehiculo no puede circular seguro.',
+          'Reportado por el conductor: $shortDescription Confirmar condición de arranque y marcha, testigos, ruidos, olores, humo, fugas, temperatura y momento de aparición. Inspeccionar primero los sistemas compatibles con los síntomas observables, descartar riesgos inmediatos y determinar si procede asistencia en sitio o traslado.',
       urgencia: urgenciaMedia,
       requiereGrua: false,
       recomendacion:
-          'Mantente en un lugar seguro y espera la revision inicial del tecnico.',
+          'Ubícate en un lugar seguro, activa las luces de emergencia y evita seguir conduciendo si notas humo, olor a combustible, temperatura alta, pérdida de frenos o ruidos fuertes. No manipules componentes calientes o eléctricos.',
       confidence: 0.25,
       isFallback: true,
     );

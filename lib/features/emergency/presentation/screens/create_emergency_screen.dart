@@ -49,6 +49,20 @@ class _CreateEmergencyScreenState extends ConsumerState<CreateEmergencyScreen> {
   bool _isPricingLoading = false;
   bool _isUploadingEvidence = false;
   String _paymentMethod = PaymentMethods.cash;
+  bool _isSelectingTowDestination = false;
+
+  void _handleBackAction() {
+    if (_currentStep > 0) {
+      _setStep(_currentStep - 1);
+      return;
+    }
+    context.go(AppRoutes.driverHome);
+  }
+
+  void _setStep(int step) {
+    if (!mounted) return;
+    setState(() => _currentStep = step.clamp(0, 2));
+  }
 
   @override
   void initState() {
@@ -189,14 +203,25 @@ class _CreateEmergencyScreenState extends ConsumerState<CreateEmergencyScreen> {
   }
 
   Future<void> _selectTowDestination() async {
-    final selected = await showLocationPickerSheet(
-      context,
-      title: 'Seleccionar destino de traslado',
-      initialLocation: _destinationLocation,
-    );
-    if (selected == null || !mounted) return;
-    setState(() => _destinationLocation = selected);
-    await _calculatePricingQuote();
+    if (_isSelectingTowDestination) return;
+    setState(() => _isSelectingTowDestination = true);
+    try {
+      final selected = await showLocationPickerSheet(
+        context,
+        title: 'Seleccionar destino de traslado',
+        initialLocation: _destinationLocation,
+      );
+      if (selected == null || !mounted) return;
+      setState(() {
+        _destinationLocation = selected;
+        _currentStep = 2;
+      });
+      await _calculatePricingQuote();
+    } finally {
+      if (mounted) {
+        setState(() => _isSelectingTowDestination = false);
+      }
+    }
   }
 
   Future<void> _createEmergency() async {
@@ -395,9 +420,15 @@ class _CreateEmergencyScreenState extends ConsumerState<CreateEmergencyScreen> {
     final horizontal = AppResponsive.horizontalPadding(context);
     final topInset = MediaQuery.of(context).padding.top;
 
-    return Scaffold(
-      backgroundColor: AppColors.background,
-      body: Stack(
+    return PopScope(
+      canPop: false,
+      onPopInvokedWithResult: (didPop, _) {
+        if (didPop || !mounted) return;
+        _handleBackAction();
+      },
+      child: Scaffold(
+        backgroundColor: AppColors.background,
+        body: Stack(
         children: [
           const Positioned.fill(
             child: DecoratedBox(
@@ -437,13 +468,7 @@ class _CreateEmergencyScreenState extends ConsumerState<CreateEmergencyScreen> {
                           height: 36,
                           child: IconButton(
                             padding: EdgeInsets.zero,
-                            onPressed: () {
-                              if (_currentStep > 0) {
-                                setState(() => _currentStep--);
-                              } else {
-                                context.pop();
-                              }
-                            },
+                            onPressed: _handleBackAction,
                             icon: Icon(
                               _currentStep > 0
                                   ? Icons.arrow_back
@@ -482,82 +507,88 @@ class _CreateEmergencyScreenState extends ConsumerState<CreateEmergencyScreen> {
             top: 64 + topInset,
             bottom: 0,
             child: SingleChildScrollView(
+              key: ValueKey('create-emergency-step-$_currentStep'),
               padding: EdgeInsets.fromLTRB(horizontal, 24, horizontal, 120),
               child: AppResponsiveContent(
+                maxWidth: _currentStep == 2 ? 1180 : null,
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                   // Progress Indicator
-                  _StepProgress(currentStep: _currentStep),
+                  _StepProgress(
+                    key: const ValueKey('emergency-step-progress'),
+                    currentStep: _currentStep,
+                  ),
                   const Gap(16),
 
-                  if (_currentStep != 2) ...[
-                    Text(
-                      _stepTitle,
-                      style: TextStyle(
-                        fontSize: AppResponsive.titleSize(context),
-                        fontWeight: FontWeight.w800,
-                        color: AppColors.onSurface,
-                        letterSpacing: 0,
-                        height: 1.2,
-                      ),
+                  Text(
+                    _stepTitle,
+                    style: TextStyle(
+                      fontSize: AppResponsive.titleSize(context),
+                      fontWeight: FontWeight.w800,
+                      color: AppColors.onSurface,
+                      letterSpacing: 0,
+                      height: 1.2,
                     ),
-                    const Gap(4),
-                    Text(
-                      _stepSubtitle,
-                      style: const TextStyle(
-                        fontSize: 14,
-                        color: AppColors.secondary,
-                        height: 1.5,
-                      ),
+                  ),
+                  const Gap(4),
+                  Text(
+                    _stepSubtitle,
+                    style: const TextStyle(
+                      fontSize: 14,
+                      color: AppColors.secondary,
+                      height: 1.5,
                     ),
-                    const Gap(24),
-                  ] else
-                    const Gap(18),
+                  ),
+                  const Gap(24),
 
                   // Step Content
-                  AppStepSwitcher(
-                    value: _currentStep,
-                    child: switch (_currentStep) {
-                      0 => _LocationStep(
-                          mapState: mapState,
-                          onEdit: _editEmergencyLocation,
-                        ),
-                      1 => _DescriptionStep(
-                          controller: _descCtrl,
-                          isAnalyzing: emergencyState.isAnalyzingAI,
-                          attachments: _attachments,
-                          onAttachmentsChanged: (photos) {
-                            setState(() {
-                              _attachments
-                                ..clear()
-                                ..addAll(photos);
-                              _evidencePhotoUrls = const [];
-                              if (_currentStep < 2) {
-                                _aiResult = null;
-                                _aiAnalysisAttempted = false;
-                              }
-                            });
+                  _currentStep == 2
+                      ? KeyedSubtree(
+                          key: ValueKey(_currentStep),
+                          child: _DiagnosticStep(
+                            result: _aiResult,
+                            pricingQuote: _pricingQuote,
+                            isPricingLoading: _isPricingLoading,
+                            origin: mapState.currentLocation,
+                            destination: _destinationLocation,
+                            onSelectDestination: _selectTowDestination,
+                            paymentMethod: _paymentMethod,
+                            onPaymentMethodChanged: (value) {
+                              setState(
+                                () => _paymentMethod =
+                                    PaymentMethods.normalize(value),
+                              );
+                            },
+                          ),
+                        )
+                      : AppStepSwitcher(
+                          value: _currentStep,
+                          child: switch (_currentStep) {
+                            0 => _LocationStep(
+                                mapState: mapState,
+                                onEdit: _editEmergencyLocation,
+                              ),
+                            1 => _DescriptionStep(
+                                controller: _descCtrl,
+                                isAnalyzing: emergencyState.isAnalyzingAI,
+                                attachments: _attachments,
+                                onAttachmentsChanged: (photos) {
+                                  setState(() {
+                                    _attachments
+                                      ..clear()
+                                      ..addAll(photos);
+                                    _evidencePhotoUrls = const [];
+                                    if (_currentStep < 2) {
+                                      _aiResult = null;
+                                      _aiAnalysisAttempted = false;
+                                    }
+                                  });
+                                },
+                              ),
+                            _ => const SizedBox.shrink(),
                           },
                         ),
-                      2 => _DiagnosticStep(
-                          result: _aiResult,
-                          pricingQuote: _pricingQuote,
-                          isPricingLoading: _isPricingLoading,
-                          origin: mapState.currentLocation,
-                          destination: _destinationLocation,
-                          onSelectDestination: _selectTowDestination,
-                          paymentMethod: _paymentMethod,
-                          onPaymentMethodChanged: (value) {
-                            setState(
-                              () => _paymentMethod =
-                                  PaymentMethods.normalize(value),
-                            );
-                          },
-                        ),
-                      _ => const SizedBox.shrink(),
-                    },
-                    ),
                   ],
                 ),
               ),
@@ -603,6 +634,7 @@ class _CreateEmergencyScreenState extends ConsumerState<CreateEmergencyScreen> {
           ),
         ],
       ),
+      ),
     );
   }
 
@@ -638,7 +670,7 @@ class _CreateEmergencyScreenState extends ConsumerState<CreateEmergencyScreen> {
         return _GradientActionButton(
           label: 'Continuar',
           icon: Icons.arrow_forward,
-          onPressed: () => setState(() => _currentStep = 1),
+          onPressed: () => _setStep(1),
         );
       case 1:
         return _GradientActionButton(
@@ -656,6 +688,41 @@ class _CreateEmergencyScreenState extends ConsumerState<CreateEmergencyScreen> {
       case 2:
         final needsDestination =
             _pricingQuote?.pricingStatus == 'pending_destination';
+        if (needsDestination) {
+          return SizedBox(
+            height: 56,
+            width: double.infinity,
+            child: FilledButton.icon(
+              onPressed: emergencyState.isLoading ||
+                      _isPricingLoading ||
+                      _isUploadingEvidence ||
+                      _isSelectingTowDestination
+                  ? null
+                  : _selectTowDestination,
+              style: FilledButton.styleFrom(
+                backgroundColor: AppColors.primary,
+                foregroundColor: Colors.white,
+                textStyle: const TextStyle(
+                  fontSize: 16,
+                  fontWeight: FontWeight.w700,
+                ),
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(9999),
+                ),
+              ),
+              icon: const Icon(Icons.map_outlined),
+              label: Text(
+                _isUploadingEvidence
+                    ? 'Subiendo fotos...'
+                    : _isPricingLoading
+                        ? 'Calculando tarifa...'
+                        : _isSelectingTowDestination
+                            ? 'Abriendo mapa...'
+                            : 'Elegir destino y calcular',
+              ),
+            ),
+          );
+        }
         return _GradientActionButton(
           label: _isUploadingEvidence
               ? 'Subiendo fotos...'
@@ -663,20 +730,16 @@ class _CreateEmergencyScreenState extends ConsumerState<CreateEmergencyScreen> {
               ? 'Calculando tarifa...'
               : emergencyState.isLoading
                   ? 'Enviando...'
-                  : needsDestination
-                      ? 'Seleccionar destino'
-                      : 'Publicar solicitud',
-          icon: needsDestination ? Icons.map_outlined : Icons.arrow_forward,
-          isEmergency: !needsDestination,
+                  : 'Publicar solicitud',
+          icon: Icons.arrow_forward,
+          isEmergency: true,
           isLoading:
               emergencyState.isLoading || _isPricingLoading || _isUploadingEvidence,
           onPressed: emergencyState.isLoading ||
                   _isPricingLoading ||
                   _isUploadingEvidence
               ? null
-              : needsDestination
-                  ? _selectTowDestination
-                  : _createEmergency,
+              : _createEmergency,
         );
       default:
         return const SizedBox.shrink();
@@ -689,7 +752,10 @@ class _CreateEmergencyScreenState extends ConsumerState<CreateEmergencyScreen> {
 class _StepProgress extends StatelessWidget {
   final int currentStep;
 
-  const _StepProgress({required this.currentStep});
+  const _StepProgress({
+    super.key,
+    required this.currentStep,
+  });
 
   @override
   Widget build(BuildContext context) {
@@ -1337,8 +1403,8 @@ class _ActionChip extends StatelessWidget {
                 color: AppColors.onSurface,
               ),
             ),
-          ],
-        ),
+        ],
+      ),
       ),
     );
   }
@@ -1385,189 +1451,159 @@ class _DiagnosticStep extends StatelessWidget {
     final categoryBandText = EmergencyMatchPolicy.isTowCategory(categoria)
         ? 'Radio inicial sugerido: 10 km'
         : 'Radio inicial sugerido: 5 km';
-
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        Padding(
-          padding: const EdgeInsets.symmetric(horizontal: 4),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Text(
-                failed ? 'Diagnóstico no disponible' : 'Diagnóstico generado',
-                style: TextStyle(
-                  fontSize: AppResponsive.titleSize(context) + 4,
-                  fontWeight: FontWeight.w900,
-                  color: AppColors.onSurface,
-                  height: 1.05,
-                ),
-              ),
-              const Gap(8),
-              Text(
-                failed
-                    ? 'Usaremos tu descripción original para publicar la solicitud.'
-                    : 'La IA organizó la información para ayudarte a solicitar la asistencia correcta.',
-                style: const TextStyle(
-                  fontSize: 14,
-                  color: AppColors.secondary,
-                  height: 1.45,
-                ),
-              ),
-            ],
-          ),
+    final summaryCard = Container(
+      decoration: BoxDecoration(
+        gradient: LinearGradient(
+          begin: Alignment.topLeft,
+          end: Alignment.bottomRight,
+          colors: [
+            AppColors.primary.withValues(alpha: 0.05),
+            Colors.white,
+          ],
         ),
-        const Gap(18),
-        Container(
-          decoration: BoxDecoration(
-            gradient: LinearGradient(
-              begin: Alignment.topLeft,
-              end: Alignment.bottomRight,
-              colors: [
-                AppColors.primary.withValues(alpha: 0.05),
-                Colors.white,
-              ],
-            ),
-            borderRadius: BorderRadius.circular(28),
-            border: Border.all(color: AppColors.primary.withValues(alpha: 0.10)),
-            boxShadow: [
-              BoxShadow(
-                color: AppColors.onSurface.withValues(alpha: 0.04),
-                blurRadius: 26,
-                offset: const Offset(0, 16),
-              ),
-            ],
+        borderRadius: BorderRadius.circular(28),
+        border: Border.all(color: AppColors.primary.withValues(alpha: 0.10)),
+        boxShadow: [
+          BoxShadow(
+            color: AppColors.onSurface.withValues(alpha: 0.04),
+            blurRadius: 26,
+            offset: const Offset(0, 16),
           ),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Padding(
-                padding: const EdgeInsets.fromLTRB(20, 20, 20, 18),
-                child: failed
-                    ? Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: const [
-                          _AnalysisHeroHeader(
-                            icon: Icons.psychology_alt_rounded,
-                            title: 'Diagnóstico por confirmar',
-                            subtitle:
-                                'La solicitud continuará con revisión técnica en sitio.',
-                          ),
-                        ],
-                      )
-                    : Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          _AnalysisHeroHeader(
-                            icon: categoryIcon,
-                            title: categoria,
-                            subtitle: categoryBandText,
-                            iconBackground: categoryForeground,
-                          ),
-                          const Gap(14),
-                          Wrap(
-                            spacing: 10,
-                            runSpacing: 10,
-                            children: [
-                              _AnalysisScoreBadge(
-                                label: 'Confianza IA',
-                                value: '$confidencePercent%',
-                                color: AppColors.primary,
-                              ),
-                              _AnalysisPill(
-                                icon: Icons.flag_outlined,
-                                label: _urgencyLabel(urgencia),
-                                foreground: _urgencyForeground(urgencia),
-                                background: _urgencyBackground(urgencia),
-                              ),
-                              _AnalysisPill(
-                                icon: requiereGrua
-                                    ? Icons.local_shipping_outlined
-                                    : Icons.directions_car_outlined,
-                                label: requiereGrua
-                                    ? 'Requiere grúa'
-                                    : 'Sin grúa inicial',
-                                foreground: AppColors.onSurface,
-                                background: AppColors.surfaceContainerLow,
-                              ),
-                            ],
-                          ),
-                        ],
-                      ),
-              ),
-              Container(
-                width: double.infinity,
-                padding: const EdgeInsets.fromLTRB(20, 0, 20, 18),
-                decoration: BoxDecoration(
-                  color: Colors.white.withValues(alpha: 0.72),
-                  borderRadius: const BorderRadius.vertical(
-                    bottom: Radius.circular(28),
-                  ),
-                  border: Border(
-                    top: BorderSide(
-                      color: AppColors.outlineVariant.withValues(alpha: 0.35),
-                    ),
-                  ),
-                ),
-                child: Column(
-                  children: [
-                    if (!failed) ...[
-                      const Gap(18),
-                      _AnalysisDetailRow(
-                        icon: Icons.warning_amber_rounded,
-                        title: 'Posible problema',
-                        body: tipoDanio,
-                      ),
-                      if (resumenTecnico.isNotEmpty)
-                        _AnalysisDetailRow(
-                          icon: Icons.handyman_outlined,
-                          title: 'Resumen técnico',
-                          body: resumenTecnico,
-                        ),
-                      if (recomendacion.isNotEmpty)
-                        _AnalysisDetailRow(
-                          icon: Icons.lightbulb_outline_rounded,
-                          title: 'Recomendación inicial',
-                          body: recomendacion,
-                        ),
-                    ] else ...[
-                      const Gap(18),
-                      const _AnalysisDetailRow(
-                        icon: Icons.info_outline_rounded,
-                        title: 'Continuaremos con tu solicitud',
-                        body:
-                            'Usaremos tu descripción original y un técnico validará el caso cuando llegue al sitio.',
-                        showDivider: false,
+        ],
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Padding(
+            padding: const EdgeInsets.fromLTRB(20, 20, 20, 18),
+            child: failed
+                ? Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: const [
+                      _AnalysisHeroHeader(
+                        icon: Icons.psychology_alt_rounded,
+                        title: 'Diagnóstico por confirmar',
+                        subtitle:
+                            'La solicitud continuará con revisión técnica en sitio.',
                       ),
                     ],
-                    const _AnalysisDetailRow(
-                      icon: Icons.timer_outlined,
-                      title: 'Tiempo estimado',
-                      body: '15 a 20 min',
-                    ),
-                    _AnalysisDetailRow(
-                      icon: Icons.payments_outlined,
-                      title: 'Rango referencial',
-                      body: pricingQuote?.displayMessage ??
-                          'Te mostraremos la tarifa estimada antes de publicar la solicitud.',
-                      showDivider: false,
-                    ),
-                    const Gap(8),
-                    Text(
-                      'Cualquier reparación, repuesto o costo adicional deberá aprobarse contigo antes de continuar.',
-                      style: TextStyle(
-                        fontSize: 12,
-                        height: 1.4,
-                        color: AppColors.secondary.withValues(alpha: 0.92),
+                  )
+                : Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      _AnalysisHeroHeader(
+                        icon: categoryIcon,
+                        title: categoria,
+                        subtitle: categoryBandText,
+                        iconBackground: categoryForeground,
                       ),
-                    ),
-                  ],
+                      const Gap(14),
+                      Wrap(
+                        spacing: 10,
+                        runSpacing: 10,
+                        children: [
+                          _AnalysisScoreBadge(
+                            label: 'Confianza IA',
+                            value: '$confidencePercent%',
+                            color: AppColors.primary,
+                          ),
+                          _AnalysisPill(
+                            icon: Icons.flag_outlined,
+                            label: _urgencyLabel(urgencia),
+                            foreground: _urgencyForeground(urgencia),
+                            background: _urgencyBackground(urgencia),
+                          ),
+                          _AnalysisPill(
+                            icon: requiereGrua
+                                ? Icons.local_shipping_outlined
+                                : Icons.directions_car_outlined,
+                            label: requiereGrua
+                                ? 'Requiere grúa'
+                                : 'Sin grúa inicial',
+                            foreground: AppColors.onSurface,
+                            background: AppColors.surfaceContainerLow,
+                          ),
+                        ],
+                      ),
+                    ],
+                  ),
+          ),
+          Container(
+            width: double.infinity,
+            padding: const EdgeInsets.fromLTRB(20, 0, 20, 18),
+            decoration: BoxDecoration(
+              color: Colors.white.withValues(alpha: 0.72),
+              borderRadius: const BorderRadius.vertical(
+                bottom: Radius.circular(28),
+              ),
+              border: Border(
+                top: BorderSide(
+                  color: AppColors.outlineVariant.withValues(alpha: 0.35),
                 ),
               ),
-            ],
+            ),
+            child: Column(
+              children: [
+                if (!failed) ...[
+                  const Gap(18),
+                  _AnalysisDetailRow(
+                    icon: Icons.warning_amber_rounded,
+                    title: 'Posible problema',
+                    body: tipoDanio,
+                  ),
+                  if (resumenTecnico.isNotEmpty)
+                    _AnalysisDetailRow(
+                      icon: Icons.handyman_outlined,
+                      title: 'Resumen técnico',
+                      body: resumenTecnico,
+                    ),
+                  if (recomendacion.isNotEmpty)
+                    _AnalysisDetailRow(
+                      icon: Icons.lightbulb_outline_rounded,
+                      title: 'Recomendación inicial',
+                      body: recomendacion,
+                    ),
+                ] else ...[
+                  const Gap(18),
+                  const _AnalysisDetailRow(
+                    icon: Icons.info_outline_rounded,
+                    title: 'Continuaremos con tu solicitud',
+                    body:
+                        'Usaremos tu descripción original y un técnico validará el caso cuando llegue al sitio.',
+                    showDivider: false,
+                  ),
+                ],
+                const _AnalysisDetailRow(
+                  icon: Icons.timer_outlined,
+                  title: 'Tiempo estimado',
+                  body: '15 a 20 min',
+                ),
+                _AnalysisDetailRow(
+                  icon: Icons.payments_outlined,
+                  title: 'Rango referencial',
+                  body: pricingQuote?.displayMessage ??
+                      'Te mostraremos la tarifa estimada antes de publicar la solicitud.',
+                  showDivider: false,
+                ),
+                const Gap(8),
+                Text(
+                  'Cualquier reparación, repuesto o costo adicional deberá aprobarse contigo antes de continuar.',
+                  style: TextStyle(
+                    fontSize: 12,
+                    height: 1.4,
+                    color: AppColors.secondary.withValues(alpha: 0.92),
+                  ),
+                ),
+              ],
+            ),
           ),
-        ),
-        const Gap(14),
+        ],
+      ),
+    );
+
+    final sidePanel = Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
         _PricingCard(
           quote: pricingQuote,
           isLoading: isPricingLoading,
@@ -1589,6 +1625,60 @@ class _DiagnosticStep extends StatelessWidget {
           onChanged: onPaymentMethodChanged,
         ),
       ],
+    );
+
+    return LayoutBuilder(
+      builder: (context, constraints) {
+        final isWide = constraints.maxWidth >= 980;
+        return Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 4),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    failed ? 'Diagnóstico no disponible' : 'Diagnóstico generado',
+                    style: TextStyle(
+                      fontSize: AppResponsive.titleSize(context) + 4,
+                      fontWeight: FontWeight.w900,
+                      color: AppColors.onSurface,
+                      height: 1.05,
+                    ),
+                  ),
+                  const Gap(8),
+                  Text(
+                    failed
+                        ? 'Usaremos tu descripción original para publicar la solicitud.'
+                        : 'La IA organizó la información para ayudarte a solicitar la asistencia correcta.',
+                    style: const TextStyle(
+                      fontSize: 14,
+                      color: AppColors.secondary,
+                      height: 1.45,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+            const Gap(18),
+            if (isWide)
+              Row(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Expanded(flex: 11, child: summaryCard),
+                  const Gap(20),
+                  Expanded(flex: 9, child: sidePanel),
+                ],
+              )
+            else ...[
+              summaryCard,
+              const Gap(14),
+              sidePanel,
+            ],
+          ],
+        );
+      },
     );
   }
 }
@@ -2003,17 +2093,22 @@ class _TowRoutePreview extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final originPoint = LatLng(
-      origin?.lat ?? AppConstants.defaultLat,
-      origin?.lng ?? AppConstants.defaultLng,
-    );
-    final destinationPoint = destination == null
-        ? null
-        : LatLng(destination!.lat, destination!.lng);
-    final points = [
-      originPoint,
-      if (destinationPoint != null) destinationPoint,
-    ];
+    final hasDestination = destination != null;
+    final distanceKm = hasDestination
+        ? const Distance().as(
+            LengthUnit.Kilometer,
+            LatLng(
+              origin?.lat ?? AppConstants.defaultLat,
+              origin?.lng ?? AppConstants.defaultLng,
+            ),
+            LatLng(destination!.lat, destination!.lng),
+          )
+        : null;
+    final distanceLabel = distanceKm == null
+        ? 'Destino pendiente'
+        : distanceKm < 1
+            ? '${(distanceKm * 1000).round()} m aprox.'
+            : '${distanceKm.toStringAsFixed(distanceKm >= 10 ? 0 : 1)} km aprox.';
 
     return Container(
       decoration: BoxDecoration(
@@ -2021,76 +2116,111 @@ class _TowRoutePreview extends StatelessWidget {
         borderRadius: BorderRadius.circular(16),
         border: Border.all(color: AppColors.emergency.withValues(alpha: 0.18)),
       ),
-      clipBehavior: Clip.antiAlias,
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          SizedBox(
-            height: AppResponsive.mapHeight(
-              context,
-              compact: 170,
-              regular: 210,
-              tablet: 250,
+          Container(
+            width: double.infinity,
+            padding: const EdgeInsets.fromLTRB(16, 16, 16, 14),
+            decoration: BoxDecoration(
+              gradient: LinearGradient(
+                begin: Alignment.topLeft,
+                end: Alignment.bottomRight,
+                colors: [
+                  AppColors.primary.withValues(alpha: 0.08),
+                  AppColors.emergency.withValues(alpha: 0.10),
+                ],
+              ),
+              borderRadius: const BorderRadius.vertical(
+                top: Radius.circular(16),
+              ),
             ),
-            child: FlutterMap(
-              key: ValueKey(
-                'tow-preview-${originPoint.latitude},${originPoint.longitude}-${destinationPoint?.latitude},${destinationPoint?.longitude}',
-              ),
-              options: MapOptions(
-                initialCenter: destinationPoint == null
-                    ? originPoint
-                    : LatLng(
-                        (originPoint.latitude + destinationPoint.latitude) / 2,
-                        (originPoint.longitude + destinationPoint.longitude) / 2,
-                      ),
-                initialZoom: destinationPoint == null ? 14 : 12,
-                initialCameraFit: points.length >= 2
-                    ? CameraFit.bounds(
-                        bounds: LatLngBounds.fromPoints(points),
-                        padding: const EdgeInsets.all(44),
-                      )
-                    : null,
-                interactionOptions: const InteractionOptions(
-                  flags: InteractiveFlag.pinchZoom | InteractiveFlag.drag,
-                ),
-              ),
+            child: Column(
               children: [
-                TileLayer(
-                  urlTemplate: AppConstants.osmTileUrl,
-                  userAgentPackageName: 'com.autoresq.app',
+                Row(
+                  children: [
+                    Expanded(
+                      child: _RouteEndpointChip(
+                        icon: Icons.my_location_rounded,
+                        color: AppColors.primary,
+                        label: 'Recogida',
+                        value: origin?.address ?? 'Ubicacion actual',
+                      ),
+                    ),
+                    const Padding(
+                      padding: EdgeInsets.symmetric(horizontal: 10),
+                      child: Icon(
+                        Icons.arrow_forward_rounded,
+                        color: AppColors.secondary,
+                        size: 18,
+                      ),
+                    ),
+                    Expanded(
+                      child: _RouteEndpointChip(
+                        icon: Icons.flag_rounded,
+                        color: AppColors.emergency,
+                        label: 'Destino',
+                        value: destination?.address ??
+                            'Selecciona a donde quieres trasladar el vehiculo',
+                      ),
+                    ),
+                  ],
                 ),
-                if (destinationPoint != null)
-                  PolylineLayer(
-                    polylines: [
-                      Polyline(
-                        points: points,
-                        color: AppColors.emergency.withValues(alpha: 0.62),
-                        strokeWidth: 3,
+                const Gap(14),
+                Container(
+                  width: double.infinity,
+                  padding: const EdgeInsets.all(14),
+                  decoration: BoxDecoration(
+                    color: Colors.white.withValues(alpha: 0.82),
+                    borderRadius: BorderRadius.circular(16),
+                    border: Border.all(
+                      color: AppColors.outlineVariant.withValues(alpha: 0.65),
+                    ),
+                  ),
+                  child: Row(
+                    children: [
+                      Container(
+                        width: 42,
+                        height: 42,
+                        decoration: BoxDecoration(
+                          color: AppColors.emergency.withValues(alpha: 0.10),
+                          borderRadius: BorderRadius.circular(14),
+                        ),
+                        child: const Icon(
+                          Icons.route_outlined,
+                          color: AppColors.emergency,
+                          size: 20,
+                        ),
+                      ),
+                      const Gap(12),
+                      Expanded(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text(
+                              hasDestination
+                                  ? 'Traslado estimado'
+                                  : 'Destino pendiente de confirmar',
+                              style: const TextStyle(
+                                fontSize: 12,
+                                fontWeight: FontWeight.w800,
+                                color: AppColors.secondary,
+                              ),
+                            ),
+                            const Gap(3),
+                            Text(
+                              distanceLabel,
+                              style: const TextStyle(
+                                fontSize: 16,
+                                fontWeight: FontWeight.w900,
+                                color: AppColors.onSurface,
+                              ),
+                            ),
+                          ],
+                        ),
                       ),
                     ],
                   ),
-                MarkerLayer(
-                  markers: [
-                    Marker(
-                      point: originPoint,
-                      width: 40,
-                      height: 40,
-                      child: _MapBubbleMarker(
-                        color: AppColors.primary,
-                        icon: Icons.my_location_rounded,
-                      ),
-                    ),
-                    if (destinationPoint != null)
-                      Marker(
-                        point: destinationPoint,
-                        width: 40,
-                        height: 40,
-                        child: _MapBubbleMarker(
-                          color: AppColors.emergency,
-                          icon: Icons.flag_rounded,
-                        ),
-                      ),
-                  ],
                 ),
               ],
             ),
@@ -2116,6 +2246,10 @@ class _TowRoutePreview extends StatelessWidget {
                 const Gap(10),
                 OutlinedButton(
                   onPressed: onSelectDestination,
+                  style: OutlinedButton.styleFrom(
+                    minimumSize: const Size(0, 44),
+                    padding: const EdgeInsets.symmetric(horizontal: 16),
+                  ),
                   child: Text(destination == null ? 'Destino' : 'Cambiar'),
                 ),
               ],
@@ -2127,31 +2261,74 @@ class _TowRoutePreview extends StatelessWidget {
   }
 }
 
-class _MapBubbleMarker extends StatelessWidget {
-  final Color color;
+class _RouteEndpointChip extends StatelessWidget {
   final IconData icon;
+  final Color color;
+  final String label;
+  final String value;
 
-  const _MapBubbleMarker({
-    required this.color,
+  const _RouteEndpointChip({
     required this.icon,
+    required this.color,
+    required this.label,
+    required this.value,
   });
 
   @override
   Widget build(BuildContext context) {
     return Container(
+      padding: const EdgeInsets.all(12),
       decoration: BoxDecoration(
-        color: color,
-        shape: BoxShape.circle,
-        border: Border.all(color: Colors.white, width: 3),
-        boxShadow: [
-          BoxShadow(
-            color: color.withValues(alpha: 0.35),
-            blurRadius: 12,
-            spreadRadius: 2,
+        color: Colors.white.withValues(alpha: 0.82),
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(
+          color: AppColors.outlineVariant.withValues(alpha: 0.55),
+        ),
+      ),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Container(
+            width: 30,
+            height: 30,
+            decoration: BoxDecoration(
+              color: color.withValues(alpha: 0.12),
+              borderRadius: BorderRadius.circular(10),
+            ),
+            child: Icon(icon, size: 16, color: color),
+          ),
+          const Gap(10),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  label,
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: const TextStyle(
+                    fontSize: 11,
+                    fontWeight: FontWeight.w800,
+                    color: AppColors.secondary,
+                  ),
+                ),
+                const Gap(3),
+                Text(
+                  value,
+                  maxLines: 3,
+                  overflow: TextOverflow.ellipsis,
+                  style: const TextStyle(
+                    fontSize: 12,
+                    fontWeight: FontWeight.w700,
+                    color: AppColors.onSurface,
+                    height: 1.35,
+                  ),
+                ),
+              ],
+            ),
           ),
         ],
       ),
-      child: Icon(icon, color: Colors.white, size: 18),
     );
   }
 }

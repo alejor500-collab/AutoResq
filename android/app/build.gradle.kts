@@ -20,8 +20,8 @@ android {
     }
 
     defaultConfig {
-        // TODO: Keep this package aligned with the Google Cloud Android OAuth
-        // client registered for SHA-1 E1:64:1C:37:48:C6:9C:75:DC:85:75:3F:B7:5B:D6:25:BA:65:95:85.
+        // Google Cloud Android OAuth must include this package and every signing SHA-1.
+        // Current local debug SHA-1: AD:AC:FF:A1:8B:21:7C:AA:12:4A:00:A6:1C:BA:B5:33:0B:77:C0:F5.
         applicationId = "com.autoresq.app"
         // You can update the following values to match your application needs.
         // For more information, see: https://flutter.dev/to/review-gradle-config.

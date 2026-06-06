@@ -103,4 +103,33 @@ abstract class EmergencyMatchPolicy {
 
     return visible.map((entry) => entry.item).toList();
   }
+
+  static List<T> rankOffers<T>({
+    required Iterable<T> items,
+    required String? emergencyType,
+    required double? Function(T item) distanceKm,
+    required double Function(T item) rating,
+  }) {
+    final ranked = items.map((item) {
+      final distance = distanceKm(item);
+      return (
+        item: item,
+        band: bandFor(emergencyType: emergencyType, distanceKm: distance),
+        distance: distance,
+      );
+    }).toList();
+
+    ranked.sort((a, b) {
+      final bandCompare = (a.band?.rank ?? 99).compareTo(b.band?.rank ?? 99);
+      if (bandCompare != 0) return bandCompare;
+
+      final ratingCompare = rating(b.item).compareTo(rating(a.item));
+      if (ratingCompare != 0) return ratingCompare;
+
+      return (a.distance ?? double.infinity)
+          .compareTo(b.distance ?? double.infinity);
+    });
+
+    return ranked.map((entry) => entry.item).toList();
+  }
 }

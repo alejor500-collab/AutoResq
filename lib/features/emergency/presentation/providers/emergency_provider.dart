@@ -507,6 +507,21 @@ class EmergencyNotifier extends StateNotifier<EmergencyState> {
     }
   }
 
+  Future<bool> cancelPendingEmergency(String emergencyId) async {
+    state = state.copyWith(isLoading: true, error: null);
+    try {
+      final cancelled = await _dataSource.cancelPendingEmergency(emergencyId);
+      state = state.copyWith(
+        isLoading: false,
+        clearActiveEmergency: cancelled,
+      );
+      return cancelled;
+    } catch (e) {
+      state = state.copyWith(isLoading: false, error: e.toString());
+      return false;
+    }
+  }
+
   Future<bool> completeTechnicianService({
     required String emergencyId,
     String? assignmentId,
@@ -593,13 +608,26 @@ final technicianOffersProvider =
     StreamProvider.family<List<TechnicianOffer>, String>((ref, emergencyId) {
   final ds = ref.read(emergencyDataSourceProvider);
   return (() async* {
-    yield (await ds.getTechnicianOffers(emergencyId))
-        .map(TechnicianOffer.fromJson)
-        .toList();
-    yield* ds.watchTechnicianOfferRows(emergencyId).asyncMap((_) async {
+    Future<List<TechnicianOffer>> fetchOffers() async {
       return (await ds.getTechnicianOffers(emergencyId))
           .map(TechnicianOffer.fromJson)
           .toList();
+    }
+
+    var lastOffers = const <TechnicianOffer>[];
+    try {
+      lastOffers = await fetchOffers();
+    } catch (_) {
+      // Keep listening; a transient RPC failure must not stop future offers.
+    }
+    yield lastOffers;
+    yield* Stream.periodic(const Duration(seconds: 2)).asyncMap((_) async {
+      try {
+        lastOffers = await fetchOffers();
+      } catch (_) {
+        // Preserve the last successful list and retry on the next tick.
+      }
+      return lastOffers;
     });
   })();
 });

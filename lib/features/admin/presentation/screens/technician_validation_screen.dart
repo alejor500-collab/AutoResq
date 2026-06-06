@@ -4,6 +4,7 @@ import 'package:go_router/go_router.dart';
 import 'package:gap/gap.dart';
 import '../../../../core/constants/app_colors.dart';
 import '../../../../core/constants/app_constants.dart';
+import '../../../../core/constants/technician_specialties.dart';
 import '../../../../core/router/app_router.dart';
 import '../../../../core/utils/helpers.dart';
 import '../../../../shared/widgets/app_button.dart';
@@ -374,7 +375,10 @@ class _TechCard extends StatelessWidget {
     final nombre = userData['nombre'] as String? ?? 'Técnico';
     final email = userData['email'] as String? ?? '';
     final telefono = userData['telefono'] as String? ?? '';
-    final especialidad = technician['especialidad'] as String? ?? '';
+    final especialidadCode = technician['especialidad'] as String? ?? '';
+    final especialidadLabel = TechnicianSpecialties.labelForCode(
+      especialidadCode,
+    );
     final urlCredencial = technician['url_credencial'] as String?;
 
     return Container(
@@ -415,9 +419,9 @@ class _TechCard extends StatelessWidget {
                         maxLines: 1,
                         overflow: TextOverflow.ellipsis,
                       ),
-                      if (especialidad.isNotEmpty)
+                      if (especialidadCode.isNotEmpty)
                         Text(
-                          especialidad,
+                          especialidadLabel,
                           style: TextStyle(
                             fontSize: 11,
                             color: AppColors.textSecondary,
@@ -454,12 +458,12 @@ class _TechCard extends StatelessWidget {
                     value: telefono,
                   ),
                 ],
-                if (especialidad.isNotEmpty) ...[
+                if (especialidadCode.isNotEmpty) ...[
                   const Gap(10),
                   _DetailRow(
                     icon: Icons.build_outlined,
                     label: 'Especialidad declarada',
-                    value: especialidad,
+                    value: especialidadLabel,
                   ),
                 ],
                 const Gap(10),

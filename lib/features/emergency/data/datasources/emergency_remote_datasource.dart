@@ -73,6 +73,7 @@ abstract class EmergencyRemoteDataSource {
   );
   Future<List<EmergencyModel>> getAllEmergencies();
   Future<void> updateStatus(String id, String estado);
+  Future<bool> cancelPendingEmergency(String id);
   Future<void> completeTechnicianService({
     required String emergencyId,
     String? assignmentId,
@@ -531,16 +532,11 @@ class EmergencyRemoteDataSourceImpl implements EmergencyRemoteDataSource {
 
   @override
   Future<List<EmergencyModel>> getPendingEmergencies() async {
-    final activeSince = DateTime.now()
-        .toUtc()
-        .subtract(const Duration(minutes: 30))
-        .toIso8601String();
     try {
       final data = await _client
           .from(AppConstants.tableEmergencias)
           .select(_selectWithJoins)
           .eq('estado', AppConstants.statusPending)
-          .gte('fecha', activeSince)
           .order('fecha', ascending: false);
       return (data as List)
           .map((e) => EmergencyModel.fromJson(e as Map<String, dynamic>))
@@ -551,7 +547,6 @@ class EmergencyRemoteDataSourceImpl implements EmergencyRemoteDataSource {
             .from(AppConstants.tableEmergencias)
             .select(_selectWithoutPriceSnapshots)
             .eq('estado', AppConstants.statusPending)
-            .gte('fecha', activeSince)
             .order('fecha', ascending: false);
         return (data as List)
             .map((e) => EmergencyModel.fromJson(e as Map<String, dynamic>))
@@ -574,22 +569,14 @@ class EmergencyRemoteDataSourceImpl implements EmergencyRemoteDataSource {
                 .where((emergency) => emergency.usuarioId != viewerUserId)
                 .toList(growable: false);
     final normalized = TechnicianSpecialties.normalizeCode(specialty);
-    final filtered = normalized == null || normalized.isEmpty
-        ? visibleToViewer
-        : () {
-            final matching = visibleToViewer.where((emergency) {
-              final type = emergency.aiEmergencyType ?? emergency.clasificacionIa;
-              return TechnicianSpecialties.matchesEmergencyType(
-                specialtyCode: normalized,
-                emergencyType: type,
-              );
-            }).toList();
-            return matching.isEmpty ? visibleToViewer : matching;
-          }();
+    if (visibleToViewer.isEmpty) return visibleToViewer;
 
-    if (filtered.isEmpty) return filtered;
-
-    if (viewerUserId == null || viewerUserId.isEmpty) return filtered;
+    if (viewerUserId == null || viewerUserId.isEmpty) {
+      return _sortPendingEmergenciesByPriority(
+        emergencies: visibleToViewer,
+        specialty: normalized,
+      );
+    }
 
     try {
       final technician = await _client
@@ -598,17 +585,22 @@ class EmergencyRemoteDataSourceImpl implements EmergencyRemoteDataSource {
           .eq('usuario_id', viewerUserId)
           .maybeSingle();
       final technicianId = technician?['id']?.toString();
-      if (technicianId == null || technicianId.isEmpty) return filtered;
+      if (technicianId == null || technicianId.isEmpty) {
+        return _sortPendingEmergenciesByPriority(
+          emergencies: visibleToViewer,
+          specialty: normalized,
+        );
+      }
 
-      final radiusFiltered = await _filterPendingEmergenciesByRadius(
-        emergencies: filtered,
+      final prioritized = await _rankPendingEmergenciesForTechnician(
+        emergencies: visibleToViewer,
         currentTechnicianId: technicianId,
         currentTechnicianLat: (technician?['ubicacion_lat'] as num?)?.toDouble(),
         currentTechnicianLng: (technician?['ubicacion_lng'] as num?)?.toDouble(),
         currentTechnicianRating:
             (technician?['calificacion_promedio'] as num?)?.toDouble() ?? 0,
+        specialty: normalized,
       );
-      if (radiusFiltered.isEmpty) return const [];
 
       final rows = await _client
           .from(AppConstants.tableTechnicianOffers)
@@ -616,7 +608,7 @@ class EmergencyRemoteDataSourceImpl implements EmergencyRemoteDataSource {
           .eq('tecnico_id', technicianId)
           .inFilter(
             'emergencia_id',
-            radiusFiltered.map((emergency) => emergency.id).toList(),
+            prioritized.map((emergency) => emergency.id).toList(),
           );
 
       final offersByEmergencyId = <String, Map<String, dynamic>>{};
@@ -627,7 +619,7 @@ class EmergencyRemoteDataSourceImpl implements EmergencyRemoteDataSource {
         offersByEmergencyId[emergencyId] = data;
       }
 
-      return radiusFiltered.map((emergency) {
+      return prioritized.map((emergency) {
         final offer = offersByEmergencyId[emergency.id];
         if (offer == null) return emergency;
         return emergency.copyWith(
@@ -636,16 +628,49 @@ class EmergencyRemoteDataSourceImpl implements EmergencyRemoteDataSource {
         );
       }).toList();
     } on PostgrestException {
-      return filtered;
+      return _sortPendingEmergenciesByPriority(
+        emergencies: visibleToViewer,
+        specialty: normalized,
+      );
     }
   }
 
-  Future<List<EmergencyModel>> _filterPendingEmergenciesByRadius({
+  Future<List<EmergencyModel>> _sortPendingEmergenciesByPriority({
+    required List<EmergencyModel> emergencies,
+    String? specialty,
+  }) async {
+    if (emergencies.length <= 1) return emergencies;
+
+    final normalizedSpecialty = TechnicianSpecialties.normalizeCode(specialty);
+    if (normalizedSpecialty == null || normalizedSpecialty.isEmpty) {
+      final sorted = [...emergencies];
+      sorted.sort((a, b) => b.fecha.compareTo(a.fecha));
+      return sorted;
+    }
+
+    final sorted = [...emergencies];
+    sorted.sort((a, b) {
+      final aMatch = TechnicianSpecialties.matchesEmergencyType(
+        specialtyCode: normalizedSpecialty,
+        emergencyType: a.aiEmergencyType ?? a.clasificacionIa,
+      );
+      final bMatch = TechnicianSpecialties.matchesEmergencyType(
+        specialtyCode: normalizedSpecialty,
+        emergencyType: b.aiEmergencyType ?? b.clasificacionIa,
+      );
+      if (aMatch != bMatch) return aMatch ? -1 : 1;
+      return b.fecha.compareTo(a.fecha);
+    });
+    return sorted;
+  }
+
+  Future<List<EmergencyModel>> _rankPendingEmergenciesForTechnician({
     required List<EmergencyModel> emergencies,
     required String currentTechnicianId,
     required double? currentTechnicianLat,
     required double? currentTechnicianLng,
     required double currentTechnicianRating,
+    required String? specialty,
   }) async {
     if (emergencies.isEmpty) return emergencies;
 
@@ -661,9 +686,21 @@ class EmergencyRemoteDataSourceImpl implements EmergencyRemoteDataSource {
           rating: currentTechnicianRating,
         );
 
-    final visible = <EmergencyModel>[];
+    final currentHasLocation = current.lat != null && current.lng != null;
+    if (!currentHasLocation) {
+      return _sortPendingEmergenciesByPriority(
+        emergencies: emergencies,
+        specialty: specialty,
+      );
+    }
+
+    final ranked = <({EmergencyModel emergency, int priorityRank, bool specialtyMatch})>[];
     for (final emergency in emergencies) {
       final emergencyType = emergency.aiEmergencyType ?? emergency.clasificacionIa;
+      final specialtyMatch = TechnicianSpecialties.matchesEmergencyType(
+        specialtyCode: specialty,
+        emergencyType: emergencyType,
+      );
       final compatibleTechnicians = technicians.values.where((technician) {
         if (technician.userId == emergency.usuarioId) return false;
         return TechnicianSpecialties.matchesEmergencyType(
@@ -687,57 +724,77 @@ class EmergencyRemoteDataSourceImpl implements EmergencyRemoteDataSource {
       final hasCurrentTechnician = rankedTechnicians.any(
         (technician) => technician.id == currentTechnicianId,
       );
+      var priorityRank = 9;
       if (hasCurrentTechnician) {
-        visible.add(emergency);
-        continue;
+        priorityRank = 0;
+      } else {
+        final currentDistance = _distanceKm(
+          emergency.lat,
+          emergency.lng,
+          current.lat,
+          current.lng,
+        );
+        if (currentDistance == null) {
+          priorityRank = 1;
+        } else {
+          final currentBand = EmergencyMatchPolicy.bandFor(
+            emergencyType: emergencyType,
+            distanceKm: currentDistance,
+          );
+          final hasNearbyOptions = rankedTechnicians.any((technician) {
+            final band = EmergencyMatchPolicy.bandFor(
+              emergencyType: emergencyType,
+              distanceKm: _distanceKm(
+                emergency.lat,
+                emergency.lng,
+                technician.lat,
+                technician.lng,
+              ),
+            );
+            return band?.isNearby == true;
+          });
+          if (currentBand != null) {
+            priorityRank = currentBand.isNearby || !hasNearbyOptions
+                ? currentBand.rank + 1
+                : currentBand.rank + 4;
+          } else {
+            priorityRank = hasNearbyOptions ? 8 : 3;
+          }
+        }
       }
 
-      final currentDistance = _distanceKm(
-        emergency.lat,
-        emergency.lng,
+      ranked.add((
+        emergency: emergency,
+        priorityRank: priorityRank,
+        specialtyMatch: specialtyMatch,
+      ));
+    }
+
+    ranked.sort((a, b) {
+      if (a.specialtyMatch != b.specialtyMatch) {
+        return a.specialtyMatch ? -1 : 1;
+      }
+      final rankCompare = a.priorityRank.compareTo(b.priorityRank);
+      if (rankCompare != 0) return rankCompare;
+      final aDistance = _distanceKm(
+        a.emergency.lat,
+        a.emergency.lng,
         current.lat,
         current.lng,
       );
-      final currentBand = EmergencyMatchPolicy.bandFor(
-        emergencyType: emergencyType,
-        distanceKm: currentDistance,
+      final bDistance = _distanceKm(
+        b.emergency.lat,
+        b.emergency.lng,
+        current.lat,
+        current.lng,
       );
-      final hasNearbyOptions = rankedTechnicians.any((technician) {
-        final band = EmergencyMatchPolicy.bandFor(
-          emergencyType: emergencyType,
-          distanceKm: _distanceKm(
-            emergency.lat,
-            emergency.lng,
-            technician.lat,
-            technician.lng,
-          ),
-        );
-        return band?.isNearby == true;
-      });
-
-      if (currentBand != null && (currentBand.isNearby || !hasNearbyOptions)) {
-        visible.add(emergency);
-      }
-    }
-
-    visible.sort((a, b) {
-      final aDistance = _distanceKm(a.lat, a.lng, current.lat, current.lng);
-      final bDistance = _distanceKm(b.lat, b.lng, current.lat, current.lng);
-      final aBand = EmergencyMatchPolicy.bandFor(
-        emergencyType: a.aiEmergencyType ?? a.clasificacionIa,
-        distanceKm: aDistance,
-      );
-      final bBand = EmergencyMatchPolicy.bandFor(
-        emergencyType: b.aiEmergencyType ?? b.clasificacionIa,
-        distanceKm: bDistance,
-      );
-      final bandCompare =
-          (aBand?.rank ?? 9).compareTo(bBand?.rank ?? 9);
-      if (bandCompare != 0) return bandCompare;
-      return b.fecha.compareTo(a.fecha);
+      final distanceCompare =
+          (aDistance ?? double.infinity).compareTo(bDistance ?? double.infinity);
+      if (distanceCompare != 0) return distanceCompare;
+      return b.emergency.fecha.compareTo(a.emergency.fecha);
     });
 
-    return visible;
+    return ranked.map((entry) => entry.emergency).toList();
   }
 
   Future<Map<String, _TechnicianMatchLocation>>
@@ -898,6 +955,22 @@ class EmergencyRemoteDataSourceImpl implements EmergencyRemoteDataSource {
       await _client
           .from(AppConstants.tableEmergencias)
           .update({'estado': estado}).eq('id', id);
+    } on PostgrestException catch (e) {
+      throw ServerException(message: e.message);
+    }
+  }
+
+  @override
+  Future<bool> cancelPendingEmergency(String id) async {
+    try {
+      final updated = await _client
+          .from(AppConstants.tableEmergencias)
+          .update({'estado': AppConstants.statusCancelled})
+          .eq('id', id)
+          .eq('estado', AppConstants.statusPending)
+          .select('id')
+          .maybeSingle();
+      return updated != null;
     } on PostgrestException catch (e) {
       throw ServerException(message: e.message);
     }

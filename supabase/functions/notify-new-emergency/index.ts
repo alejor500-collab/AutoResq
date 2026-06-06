@@ -133,7 +133,7 @@ Deno.serve(async (req: Request) => {
   const compatibleTechnicians = specialtyMatches.length > 0
     ? specialtyMatches
     : availableTechnicians;
-  const recipients = rankAndFilterRecipients({
+  let recipients = rankAndFilterRecipients({
     technicians: compatibleTechnicians,
     emergencyType,
     emergencyLat: location?.latitud ?? null,
@@ -141,7 +141,17 @@ Deno.serve(async (req: Request) => {
   });
 
   if (recipients.length === 0) {
-    return jsonResponse({ ok: true, recipients: 0, push: 'no_technicians_in_range' }, 200);
+    recipients = sortTechniciansByReachability({
+      technicians: compatibleTechnicians.length > 0
+        ? compatibleTechnicians
+        : availableTechnicians,
+      emergencyLat: location?.latitud ?? null,
+      emergencyLng: location?.longitud ?? null,
+    });
+  }
+
+  if (recipients.length === 0) {
+    return jsonResponse({ ok: true, recipients: 0, push: 'no_available_technicians' }, 200);
   }
 
   const { data: existingNotifications } = await supabase
@@ -299,9 +309,21 @@ function rankAndFilterRecipients({
     })
     .filter((entry) => entry.band !== null);
 
+  if (emergencyLat === null || emergencyLng === null) {
+    return annotated
+      .sort((a, b) =>
+        (b.technician.calificacion_promedio ?? 0) -
+        (a.technician.calificacion_promedio ?? 0)
+      )
+      .map((entry) => entry.technician);
+  }
+
   const hasNearby = annotated.some((entry) => entry.band!.rank <= 1);
   return annotated
-    .filter((entry) => entry.band!.rank <= 1 || !hasNearby)
+    .filter(
+      (entry) =>
+        entry.distanceKm === null || entry.band!.rank <= 1 || !hasNearby,
+    )
     .sort((a, b) => {
       const bandCompare = a.band!.rank - b.band!.rank;
       if (bandCompare !== 0) return bandCompare;
@@ -313,6 +335,37 @@ function rankAndFilterRecipients({
         (b.distanceKm ?? Number.POSITIVE_INFINITY);
     })
     .map((entry) => entry.technician);
+}
+
+function sortTechniciansByReachability({
+  technicians,
+  emergencyLat,
+  emergencyLng,
+}: {
+  technicians: TechnicianRow[];
+  emergencyLat: number | null;
+  emergencyLng: number | null;
+}): TechnicianRow[] {
+  return [...technicians].sort((a, b) => {
+    const ratingCompare =
+      (b.calificacion_promedio ?? 0) - (a.calificacion_promedio ?? 0);
+    if (ratingCompare !== 0) return ratingCompare;
+
+    const aDistance = distanceInKm(
+      emergencyLat,
+      emergencyLng,
+      a.ubicacion_lat,
+      a.ubicacion_lng,
+    );
+    const bDistance = distanceInKm(
+      emergencyLat,
+      emergencyLng,
+      b.ubicacion_lat,
+      b.ubicacion_lng,
+    );
+    return (aDistance ?? Number.POSITIVE_INFINITY) -
+      (bDistance ?? Number.POSITIVE_INFINITY);
+  });
 }
 
 function distanceBand(

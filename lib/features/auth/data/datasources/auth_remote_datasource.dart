@@ -1,5 +1,7 @@
 import 'dart:async';
-import 'package:flutter/foundation.dart' show kIsWeb;
+import 'package:flutter/foundation.dart'
+    show TargetPlatform, defaultTargetPlatform, kIsWeb;
+import 'package:google_sign_in/google_sign_in.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import '../../../../core/constants/app_constants.dart';
 import '../../../../core/constants/technician_specialties.dart';
@@ -31,6 +33,8 @@ abstract class AuthRemoteDataSource {
 class AuthRemoteDataSourceImpl implements AuthRemoteDataSource {
   final SupabaseClient _client;
   static const _googleRedirectTo = 'com.autoresq.app://login-callback';
+  static const _googleWebClientId =
+      '362021637892-ta4rii3kafr7l8p2en8khst5f9ipeik4.apps.googleusercontent.com';
 
   AuthRemoteDataSourceImpl(this._client);
 
@@ -62,6 +66,115 @@ class AuthRemoteDataSourceImpl implements AuthRemoteDataSource {
     throw const core_exceptions.AuthException(
       message: 'Selecciona una especialidad tecnica valida.',
     );
+  }
+
+  bool get _usesNativeGoogleSignIn =>
+      !kIsWeb && defaultTargetPlatform == TargetPlatform.android;
+
+  GoogleSignIn _buildGoogleSignIn() {
+    return GoogleSignIn(
+      scopes: const ['email', 'profile'],
+      serverClientId: _googleWebClientId,
+    );
+  }
+
+  Future<UserModel> _loginWithNativeGoogle({
+    String? role,
+    String? specialty,
+  }) async {
+    final googleSignIn = _buildGoogleSignIn();
+
+    // Revoke the cached account association so Android always shows its picker.
+    try {
+      await googleSignIn.disconnect();
+    } catch (_) {
+      await googleSignIn.signOut();
+    }
+    final googleUser = await googleSignIn.signIn();
+    if (googleUser == null) {
+      throw const core_exceptions.AuthException(
+        message: 'Inicio de sesion con Google cancelado.',
+      );
+    }
+
+    final googleAuth = await googleUser.authentication;
+    final idToken = googleAuth.idToken;
+    final accessToken = googleAuth.accessToken;
+    if (idToken == null || idToken.isEmpty) {
+      throw const core_exceptions.AuthException(
+        message: 'Google no devolvio un ID token valido.',
+      );
+    }
+    if (accessToken == null || accessToken.isEmpty) {
+      throw const core_exceptions.AuthException(
+        message: 'Google no devolvio un access token valido.',
+      );
+    }
+
+    final response = await _client.auth.signInWithIdToken(
+      provider: OAuthProvider.google,
+      idToken: idToken,
+      accessToken: accessToken,
+    );
+    final user = response.user ?? _client.auth.currentUser;
+    if (user == null) {
+      throw const core_exceptions.AuthException(
+        message: 'No se pudo completar el acceso con Google.',
+      );
+    }
+
+    return _ensureProfile(
+      user,
+      role: role,
+      specialty: specialty,
+    );
+  }
+
+  Future<UserModel> _loginWithBrowserGoogle({
+    String? role,
+    String? specialty,
+  }) async {
+    final completer = Completer<UserModel>();
+    late final StreamSubscription<AuthState> subscription;
+
+    subscription = _client.auth.onAuthStateChange.listen((event) async {
+      final user = event.session?.user;
+      if (user == null || completer.isCompleted) return;
+      try {
+        completer.complete(
+          await _ensureProfile(
+            user,
+            role: role,
+            specialty: specialty,
+          ),
+        );
+      } catch (error, stackTrace) {
+        completer.completeError(error, stackTrace);
+      }
+    });
+
+    try {
+      final launched = await _client.auth.signInWithOAuth(
+        OAuthProvider.google,
+        redirectTo: kIsWeb ? null : _googleRedirectTo,
+      );
+      if (!launched) {
+        throw const core_exceptions.AuthException(
+          message: 'No se pudo abrir Google para iniciar sesion.',
+        );
+      }
+
+      return await completer.future.timeout(
+        const Duration(minutes: 2),
+        onTimeout: () {
+          throw const core_exceptions.AuthException(
+            message: 'No se completo el inicio con Google. Intenta nuevamente.',
+          );
+        },
+      );
+    } finally {
+      await subscription.cancel();
+    }
   }
 
   String? _metadataString(User supabaseUser, List<String> keys) {
@@ -420,12 +533,6 @@ class AuthRemoteDataSourceImpl implements AuthRemoteDataSource {
     String? specialty,
   }) async {
     try {
-      if (kIsWeb) {
-        await _client.auth.signInWithOAuth(OAuthProvider.google);
-        return Completer<UserModel>().future;
-      }
-
-      // Android / iOS: Chrome Custom Tab → deep link → Supabase PKCE callback
       final existingUser = _client.auth.currentUser;
       if (existingUser != null) {
         return _ensureProfile(
@@ -435,49 +542,10 @@ class AuthRemoteDataSourceImpl implements AuthRemoteDataSource {
         );
       }
 
-      final completer = Completer<UserModel>();
-      late final StreamSubscription<AuthState> subscription;
-
-      subscription = _client.auth.onAuthStateChange.listen((event) async {
-        final user = event.session?.user;
-        if (user == null || completer.isCompleted) return;
-        try {
-          completer.complete(
-            await _ensureProfile(
-              user,
-              role: role,
-              specialty: specialty,
-            ),
-          );
-        } catch (error, stackTrace) {
-          completer.completeError(error, stackTrace);
-        }
-      });
-
-      try {
-        final launched = await _client.auth.signInWithOAuth(
-          OAuthProvider.google,
-          redirectTo: _googleRedirectTo,
-        );
-
-        if (!launched) {
-          throw const core_exceptions.AuthException(
-            message: 'No se pudo abrir Google para iniciar sesion.',
-          );
-        }
-
-        return await completer.future.timeout(
-          const Duration(minutes: 2),
-          onTimeout: () {
-            throw const core_exceptions.AuthException(
-              message:
-                  'No se completo el inicio con Google. Intenta nuevamente.',
-            );
-          },
-        );
-      } finally {
-        await subscription.cancel();
+      if (_usesNativeGoogleSignIn) {
+        return _loginWithNativeGoogle(role: role, specialty: specialty);
       }
+      return _loginWithBrowserGoogle(role: role, specialty: specialty);
     } on core_exceptions.AuthException {
       rethrow;
     } on AuthException catch (e) {
@@ -492,6 +560,13 @@ class AuthRemoteDataSourceImpl implements AuthRemoteDataSource {
 
   @override
   Future<void> logout() async {
+    if (_usesNativeGoogleSignIn) {
+      try {
+        await _buildGoogleSignIn().signOut();
+      } catch (_) {
+        // Supabase logout must still complete if Google session cleanup fails.
+      }
+    }
     await _client.auth.signOut();
   }
 
@@ -505,7 +580,8 @@ class AuthRemoteDataSourceImpl implements AuthRemoteDataSource {
     } catch (e) {
       if (_looksLikeNetworkError(e)) throw _networkException();
       throw const core_exceptions.AuthException(
-          message: 'No se pudo enviar el correo de recuperación');
+        message: 'No se pudo enviar el correo de recuperación',
+      );
     }
   }
 

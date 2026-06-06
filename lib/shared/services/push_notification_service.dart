@@ -64,7 +64,7 @@ class PushNotificationService {
     if (!isConfigured || _initialized) return;
     try {
       if (kDebugMode) {
-        OneSignal.Debug.setLogLevel(OSLogLevel.verbose);
+        OneSignal.Debug.setLogLevel(OSLogLevel.warn);
       }
       await OneSignal.initialize(_appId);
       _attachListeners();

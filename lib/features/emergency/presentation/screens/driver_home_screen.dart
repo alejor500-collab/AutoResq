@@ -8,7 +8,6 @@ import '../../../../core/constants/app_colors.dart';
 import '../../../../core/constants/app_constants.dart';
 import '../../../../core/router/app_router.dart';
 import '../../../../shared/providers/auth_provider.dart';
-import '../../../../shared/providers/role_provider.dart';
 import '../../../../shared/widgets/animated_pressable.dart';
 import '../../../../shared/widgets/app_drawer.dart';
 import '../../../../shared/widgets/in_app_message_notice.dart';
@@ -42,7 +41,6 @@ class _DriverHomeScreenState extends ConsumerState<DriverHomeScreen> {
   @override
   void initState() {
     super.initState();
-    ref.read(activeRoleProvider.notifier).switchTo(AppConstants.roleDriver);
     _unreadChatSubscription = ref.listenManual<AsyncValue<int>>(
       unreadChatCountProvider,
       _handleUnreadChatCount,
@@ -475,7 +473,7 @@ class _DriverHomeScreenState extends ConsumerState<DriverHomeScreen> {
     final screenSize = MediaQuery.of(context).size;
     final topInset = MediaQuery.of(context).padding.top;
     final firstName = user?.name.split(' ').first ?? 'Conductor';
-    final isCompact = screenSize.width < 360;
+    final isCompact = screenSize.width < 520;
     final isWide = screenSize.width >= 900;
 
     Future<void> recenterMap() async {
@@ -496,10 +494,10 @@ class _DriverHomeScreenState extends ConsumerState<DriverHomeScreen> {
           Container(
             color: Colors.white.withValues(alpha: 0.96),
             padding: EdgeInsets.fromLTRB(
-              isCompact ? 16 : 24,
-              topInset + (isCompact ? 10 : 18),
-              isCompact ? 16 : 24,
-              isCompact ? 12 : 18,
+              16,
+              topInset + 10,
+              16,
+              10,
             ),
             child: Row(
               children: [
@@ -508,39 +506,37 @@ class _DriverHomeScreenState extends ConsumerState<DriverHomeScreen> {
                   children: [
                     AnimatedPressable(
                       onTap: () => _scaffoldKey.currentState?.openDrawer(),
-                      borderRadius: BorderRadius.circular(20),
+                      borderRadius: BorderRadius.circular(999),
                       child: Container(
-                        width: isCompact ? 34 : 42,
-                        height: isCompact ? 52 : 64,
+                        width: isCompact ? 36 : 42,
+                        height: isCompact ? 36 : 42,
                         decoration: BoxDecoration(
-                          color: AppColors.surfaceContainerLow,
-                          borderRadius: BorderRadius.circular(20),
+                          shape: BoxShape.circle,
+                          gradient: LinearGradient(
+                            begin: Alignment.topLeft,
+                            end: Alignment.bottomRight,
+                            colors: [
+                              Colors.white,
+                              AppColors.surfaceContainerLow,
+                            ],
+                          ),
                           border: Border.all(
-                            color: AppColors.outline,
+                            color: AppColors.outline.withValues(alpha: 0.9),
                           ),
                           boxShadow: [
                             BoxShadow(
                               color: Colors.black.withValues(alpha: 0.04),
-                              blurRadius: 10,
-                              offset: const Offset(0, 4),
+                              blurRadius: 14,
+                              offset: const Offset(0, 5),
                             ),
                           ],
                         ),
-                        child: Column(
-                          mainAxisAlignment: MainAxisAlignment.center,
-                          children: const [
-                            Icon(
-                              Icons.menu_rounded,
-                              size: 18,
-                              color: AppColors.primary,
-                            ),
-                            SizedBox(height: 4),
-                            Icon(
-                              Icons.drag_handle_rounded,
-                              size: 16,
-                              color: AppColors.map,
-                            ),
-                          ],
+                        child: const Center(
+                          child: Icon(
+                            Icons.menu_rounded,
+                            size: 20,
+                            color: AppColors.primary,
+                          ),
                         ),
                       ),
                     ),
@@ -606,7 +602,7 @@ class _DriverHomeScreenState extends ConsumerState<DriverHomeScreen> {
                           Expanded(
                             child: Text(
                               mapState.isLoading
-                                  ? 'Obteniendo ubicaciÃ³n...'
+                                  ? 'Obteniendo ubicación...'
                                   : address,
                               maxLines: 1,
                               overflow: TextOverflow.ellipsis,
@@ -672,7 +668,7 @@ class _DriverHomeScreenState extends ConsumerState<DriverHomeScreen> {
                             constraints: const BoxConstraints(maxWidth: 1120),
                             child: _DriverBottomSheet(
                           address: mapState.isLoading
-                              ? 'Obteniendo ubicaciÃ³n...'
+                              ? 'Obteniendo ubicación...'
                               : address,
                           onEmergencyTap: _openCreateEmergency,
                           nearestCard: _buildNearestServiceCard(lat, lng),
@@ -951,7 +947,7 @@ class _MapSection extends ConsumerWidget {
           ),
           Positioned(
             right: isWide ? 24 : (isCompact ? 14 : 24),
-            bottom: isWide ? 208 : 18,
+            bottom: isWide ? 208 : 34,
             child: Column(
               children: [
                 _MapControlButton(

@@ -13,32 +13,51 @@ Future<LocationEntity?> showLocationPickerSheet(
   LocationEntity? initialLocation,
   String title = 'Seleccionar ubicacion',
 }) {
-  return showModalBottomSheet<LocationEntity>(
-    context: context,
-    useRootNavigator: true,
-    isScrollControlled: true,
-    backgroundColor: Colors.transparent,
-    builder: (_) => _LocationPickerSheet(
-      initialLocation: initialLocation,
-      title: title,
+  return Navigator.of(context).push<LocationEntity>(
+    PageRouteBuilder<LocationEntity>(
+      transitionDuration: const Duration(milliseconds: 280),
+      reverseTransitionDuration: const Duration(milliseconds: 220),
+      opaque: false,
+      barrierColor: Colors.black.withValues(alpha: 0.16),
+      pageBuilder: (_, __, ___) => _LocationPickerScreen(
+        initialLocation: initialLocation,
+        title: title,
+      ),
+      transitionsBuilder: (context, animation, secondaryAnimation, child) {
+        final curved = CurvedAnimation(
+          parent: animation,
+          curve: Curves.easeOutCubic,
+          reverseCurve: Curves.easeInCubic,
+        );
+        return FadeTransition(
+          opacity: curved,
+          child: SlideTransition(
+            position: Tween<Offset>(
+              begin: const Offset(0, 0.03),
+              end: Offset.zero,
+            ).animate(curved),
+            child: child,
+          ),
+        );
+      },
     ),
   );
 }
 
-class _LocationPickerSheet extends StatefulWidget {
+class _LocationPickerScreen extends StatefulWidget {
   final LocationEntity? initialLocation;
   final String title;
 
-  const _LocationPickerSheet({
+  const _LocationPickerScreen({
     required this.initialLocation,
     required this.title,
   });
 
   @override
-  State<_LocationPickerSheet> createState() => _LocationPickerSheetState();
+  State<_LocationPickerScreen> createState() => _LocationPickerScreenState();
 }
 
-class _LocationPickerSheetState extends State<_LocationPickerSheet> {
+class _LocationPickerScreenState extends State<_LocationPickerScreen> {
   final _mapController = MapController();
   late LatLng _selected;
   String? _address;
@@ -124,147 +143,260 @@ class _LocationPickerSheetState extends State<_LocationPickerSheet> {
   Widget build(BuildContext context) {
     final mediaQuery = MediaQuery.of(context);
     final bottomInset = mediaQuery.viewInsets.bottom;
-    return SafeArea(
-      top: false,
-      child: Container(
-        height: mediaQuery.size.height * 0.9,
-        decoration: const BoxDecoration(
-          color: AppColors.surfaceContainerLowest,
-          borderRadius: BorderRadius.vertical(top: Radius.circular(28)),
-        ),
-        clipBehavior: Clip.antiAlias,
-        child: Column(
-          children: [
-            Padding(
-              padding: const EdgeInsets.fromLTRB(20, 10, 12, 10),
-              child: Column(
-                children: [
-                  Container(
-                    width: 44,
-                    height: 4,
-                    decoration: BoxDecoration(
-                      color: AppColors.outlineVariant,
-                      borderRadius: BorderRadius.circular(999),
-                    ),
-                  ),
-                  const SizedBox(height: 12),
-                  Row(
+    return PopScope(
+      canPop: true,
+      child: Scaffold(
+        backgroundColor: const Color(0xFFF4F7FC),
+        body: SafeArea(
+          child: LayoutBuilder(
+            builder: (context, constraints) {
+              final isWide = constraints.maxWidth >= 1100;
+              final horizontalPadding = isWide ? 32.0 : 18.0;
+
+              final mapCard = _PickerSurface(
+                child: ClipRRect(
+                  borderRadius: BorderRadius.circular(28),
+                  child: Stack(
                     children: [
-                      Expanded(
-                        child: Text(
-                          widget.title,
-                          maxLines: 2,
-                          overflow: TextOverflow.ellipsis,
-                          style: const TextStyle(
-                            fontSize: 20,
-                            fontWeight: FontWeight.w900,
-                            color: AppColors.textPrimary,
-                            height: 1.15,
+                      Positioned.fill(
+                        child: MouseRegion(
+                          cursor: SystemMouseCursors.click,
+                          child: FlutterMap(
+                            mapController: _mapController,
+                            options: MapOptions(
+                              initialCenter: _selected,
+                              initialZoom:
+                                  widget.initialLocation == null ? 7 : 15,
+                              interactionOptions: const InteractionOptions(
+                                flags: InteractiveFlag.all,
+                              ),
+                              onTap: (_, point) {
+                                setState(() => _selected = point);
+                                _resolveAddress();
+                              },
+                            ),
+                            children: [
+                              TileLayer(
+                                urlTemplate: AppConstants.osmTileUrl,
+                                userAgentPackageName: 'com.autoresq.app',
+                                tileProvider: NetworkTileProvider(),
+                              ),
+                              MarkerLayer(
+                                markers: [
+                                  Marker(
+                                    point: _selected,
+                                    width: 52,
+                                    height: 52,
+                                    child: TweenAnimationBuilder<double>(
+                                      tween: Tween(begin: 0.96, end: 1),
+                                      duration: const Duration(
+                                        milliseconds: 220,
+                                      ),
+                                      curve: Curves.easeOutBack,
+                                      builder: (context, scale, child) {
+                                        return Transform.scale(
+                                          scale: scale,
+                                          child: child,
+                                        );
+                                      },
+                                      child: Container(
+                                        decoration: BoxDecoration(
+                                          color: AppColors.primary,
+                                          shape: BoxShape.circle,
+                                          border: Border.all(
+                                            color: Colors.white,
+                                            width: 3,
+                                          ),
+                                          boxShadow: [
+                                            BoxShadow(
+                                              color: AppColors.primary
+                                                  .withValues(alpha: 0.35),
+                                              blurRadius: 14,
+                                              spreadRadius: 2,
+                                            ),
+                                          ],
+                                        ),
+                                        child: const Icon(
+                                          Icons.location_pin,
+                                          color: Colors.white,
+                                          size: 28,
+                                        ),
+                                      ),
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            ],
                           ),
                         ),
                       ),
-                      IconButton.filledTonal(
-                        tooltip: 'Cerrar',
-                        onPressed: () => Navigator.pop(context),
-                        icon: const Icon(Icons.close_rounded),
+                      Positioned(
+                        left: 16,
+                        right: 80,
+                        top: 16,
+                        child: _MapInstructionBanner(
+                          text: 'Toca el mapa para ajustar el punto exacto.',
+                        ),
+                      ),
+                      Positioned(
+                        right: 16,
+                        bottom: 16,
+                        child: FloatingActionButton.small(
+                          heroTag: 'location-picker-current',
+                          backgroundColor: Colors.white,
+                          foregroundColor: AppColors.primary,
+                          onPressed: _isLocating ? null : _useCurrentLocation,
+                          child: _isLocating
+                              ? const SizedBox(
+                                  width: 18,
+                                  height: 18,
+                                  child: CircularProgressIndicator(
+                                    strokeWidth: 2,
+                                  ),
+                                )
+                              : const Icon(Icons.my_location_rounded),
+                        ),
                       ),
                     ],
                   ),
-                ],
-              ),
-            ),
-            Expanded(
-              child: Stack(
-                children: [
-                  FlutterMap(
-                  mapController: _mapController,
-                  options: MapOptions(
-                    initialCenter: _selected,
-                    initialZoom: widget.initialLocation == null ? 7 : 15,
-                    onTap: (_, point) {
-                      setState(() => _selected = point);
-                      _resolveAddress();
-                    },
+                ),
+              );
+
+              final summaryCard = _PickerSurface(
+                child: Padding(
+                  padding: const EdgeInsets.all(18),
+                  child: _SelectedLocationSummary(
+                    address: _isResolving
+                        ? 'Resolviendo direccion...'
+                        : (_address ?? 'Ubicacion seleccionada en Ecuador'),
+                    isResolving: _isResolving,
+                    onConfirm: _confirm,
                   ),
-                  children: [
-                    TileLayer(
-                      urlTemplate: AppConstants.osmTileUrl,
-                      userAgentPackageName: 'com.autoresq.app',
+                ),
+              );
+
+              return Center(
+                child: ConstrainedBox(
+                  constraints: const BoxConstraints(maxWidth: 1280),
+                  child: Padding(
+                    padding: EdgeInsets.fromLTRB(
+                      horizontalPadding,
+                      18,
+                      horizontalPadding,
+                      18 + bottomInset,
                     ),
-                    MarkerLayer(
-                      markers: [
-                        Marker(
-                          point: _selected,
-                          width: 52,
-                          height: 52,
-                          child: Container(
-                            decoration: BoxDecoration(
-                              color: AppColors.primary,
-                              shape: BoxShape.circle,
-                              border: Border.all(
-                                color: Colors.white,
-                                width: 3,
-                              ),
-                              boxShadow: [
-                                BoxShadow(
-                                  color: AppColors.primary.withValues(alpha: 0.35),
-                                  blurRadius: 14,
-                                  spreadRadius: 2,
+                    child: Column(
+                      children: [
+                        _PickerHeader(
+                          title: widget.title,
+                          onClose: () => Navigator.pop(context),
+                        ),
+                        const SizedBox(height: 18),
+                        Expanded(
+                          child: isWide
+                              ? Row(
+                                  crossAxisAlignment: CrossAxisAlignment.stretch,
+                                  children: [
+                                    Expanded(flex: 7, child: mapCard),
+                                    const SizedBox(width: 20),
+                                    Expanded(
+                                      flex: 4,
+                                      child: Align(
+                                        alignment: Alignment.topCenter,
+                                        child: summaryCard,
+                                      ),
+                                    ),
+                                  ],
+                                )
+                              : Column(
+                                  children: [
+                                    Expanded(child: mapCard),
+                                    const SizedBox(height: 18),
+                                    summaryCard,
+                                  ],
                                 ),
-                              ],
-                            ),
-                            child: const Icon(
-                              Icons.location_pin,
-                              color: Colors.white,
-                              size: 28,
-                            ),
-                          ),
                         ),
                       ],
                     ),
-                  ],
+                  ),
                 ),
-                  Positioned(
-                    left: 16,
-                    right: 78,
-                    top: 14,
-                    child: _MapInstructionBanner(
-                      text: 'Toca el mapa para ajustar el punto exacto.',
-                    ),
-                  ),
-                  Positioned(
-                    right: 16,
-                    bottom: 16,
-                    child: FloatingActionButton.small(
-                    heroTag: 'location-picker-current',
-                    backgroundColor: Colors.white,
-                    foregroundColor: AppColors.primary,
-                    onPressed: _isLocating ? null : _useCurrentLocation,
-                    child: _isLocating
-                        ? const SizedBox(
-                            width: 18,
-                            height: 18,
-                            child: CircularProgressIndicator(strokeWidth: 2),
-                          )
-                        : const Icon(Icons.my_location_rounded),
-                    ),
-                  ),
-                ],
-              ),
-            ),
-            Padding(
-              padding: EdgeInsets.fromLTRB(20, 16, 20, 20 + bottomInset),
-              child: _SelectedLocationSummary(
-                address: _isResolving
-                    ? 'Resolviendo direccion...'
-                    : (_address ?? 'Ubicacion seleccionada en Ecuador'),
-                isResolving: _isResolving,
-                onConfirm: _confirm,
-              ),
-            ),
-          ],
+              );
+            },
+          ),
         ),
       ),
+    );
+  }
+}
+
+class _PickerHeader extends StatelessWidget {
+  final String title;
+  final VoidCallback onClose;
+
+  const _PickerHeader({
+    required this.title,
+    required this.onClose,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return _PickerSurface(
+      padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 14),
+      child: Row(
+        children: [
+          Expanded(
+            child: Text(
+              title,
+              maxLines: 2,
+              overflow: TextOverflow.ellipsis,
+              style: const TextStyle(
+                fontSize: 22,
+                fontWeight: FontWeight.w900,
+                color: AppColors.textPrimary,
+                height: 1.1,
+              ),
+            ),
+          ),
+          const SizedBox(width: 12),
+          IconButton.filledTonal(
+            tooltip: 'Cerrar',
+            onPressed: onClose,
+            icon: const Icon(Icons.close_rounded),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _PickerSurface extends StatelessWidget {
+  final Widget child;
+  final EdgeInsetsGeometry? padding;
+
+  const _PickerSurface({
+    required this.child,
+    this.padding,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final content = padding == null ? child : Padding(padding: padding!, child: child);
+    return DecoratedBox(
+      decoration: BoxDecoration(
+        color: AppColors.surfaceContainerLowest,
+        borderRadius: BorderRadius.circular(28),
+        border: Border.all(
+          color: AppColors.outlineVariant.withValues(alpha: 0.9),
+        ),
+        boxShadow: [
+          BoxShadow(
+            color: AppColors.onSurface.withValues(alpha: 0.08),
+            blurRadius: 24,
+            offset: const Offset(0, 14),
+          ),
+        ],
+      ),
+      child: content,
     );
   }
 }
@@ -334,21 +466,20 @@ class _SelectedLocationSummary extends StatelessWidget {
   Widget build(BuildContext context) {
     return Container(
       width: double.infinity,
-      padding: const EdgeInsets.all(14),
       decoration: BoxDecoration(
         color: AppColors.surfaceContainerLow,
-        borderRadius: BorderRadius.circular(20),
+        borderRadius: BorderRadius.circular(24),
         border: Border.all(color: AppColors.outlineVariant),
       ),
+      padding: const EdgeInsets.all(16),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
+        mainAxisSize: MainAxisSize.min,
+        children: [
           Row(
             children: [
               Icon(
-                isResolving
-                    ? Icons.sync_rounded
-                    : Icons.location_on_outlined,
+                isResolving ? Icons.sync_rounded : Icons.location_on_outlined,
                 size: 18,
                 color: isResolving ? AppColors.warning : AppColors.primary,
               ),
@@ -369,21 +500,27 @@ class _SelectedLocationSummary extends StatelessWidget {
             ],
           ),
           const SizedBox(height: 8),
-          Text(
-            address,
-            maxLines: 3,
-            overflow: TextOverflow.ellipsis,
-            style: const TextStyle(
-              fontSize: 15,
-              fontWeight: FontWeight.w700,
-              color: AppColors.textPrimary,
-              height: 1.35,
+          AnimatedSwitcher(
+            duration: const Duration(milliseconds: 180),
+            switchInCurve: Curves.easeOutCubic,
+            switchOutCurve: Curves.easeInCubic,
+            child: Text(
+              address,
+              key: ValueKey(address),
+              maxLines: 4,
+              overflow: TextOverflow.ellipsis,
+              style: const TextStyle(
+                fontSize: 15,
+                fontWeight: FontWeight.w700,
+                color: AppColors.textPrimary,
+                height: 1.35,
+              ),
             ),
           ),
-          const SizedBox(height: 14),
+          const SizedBox(height: 16),
           SizedBox(
             width: double.infinity,
-            height: 50,
+            height: 52,
             child: ElevatedButton(
               onPressed: onConfirm,
               style: ElevatedButton.styleFrom(
