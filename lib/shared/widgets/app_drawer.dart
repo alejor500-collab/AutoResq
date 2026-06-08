@@ -10,7 +10,6 @@ import '../../features/profile/presentation/providers/vehicle_provider.dart';
 import '../providers/auth_provider.dart';
 import '../providers/role_provider.dart';
 import '../providers/tecnico_status_provider.dart';
-import 'app_logo.dart';
 import 'technician_request_sheet.dart';
 
 class AppDrawer extends ConsumerWidget {
@@ -293,10 +292,13 @@ class _DrawerHeader extends StatelessWidget {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          const AppLogo(
-            height: 38,
-            width: 150,
-            variant: AppLogoVariant.wordmarkDark,
+          Image.asset(
+            'assets/images/autoresq_logo_light-Photoroom.png',
+            height: 54,
+            width: 210,
+            fit: BoxFit.contain,
+            alignment: Alignment.centerLeft,
+            filterQuality: FilterQuality.high,
           ),
           const SizedBox(height: 14),
           Row(

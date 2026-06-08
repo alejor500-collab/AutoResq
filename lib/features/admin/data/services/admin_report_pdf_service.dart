@@ -388,7 +388,8 @@ class AdminReportPdfService {
                 ),
                 decoration: pw.BoxDecoration(
                   color: PdfColor.fromInt(0xFFF1F5FB),
-                  borderRadius: pw.BorderRadius.circular(999),
+                  // Large pill radii can overflow when rendered by PDF viewers.
+                  borderRadius: pw.BorderRadius.circular(8),
                 ),
                 child: pw.Text(
                   '${_humanizeKey(entry.key)}: ${_filterValue(entry.value)}',

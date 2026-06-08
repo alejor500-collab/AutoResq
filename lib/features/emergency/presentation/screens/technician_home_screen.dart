@@ -1346,179 +1346,176 @@ class _TechnicianTopBar extends StatelessWidget {
           ),
         ],
       ),
-      child: Stack(
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
-          Padding(
-            padding: EdgeInsets.only(bottom: isCompact ? 34 : 32),
-            child: Row(
-              children: [
-                Row(
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    AnimatedPressable(
-                      onTap: onMenuTap,
-                      borderRadius: BorderRadius.circular(999),
-                      child: Container(
-                        width: isCompact ? 36 : 42,
-                        height: isCompact ? 36 : 42,
-                        decoration: BoxDecoration(
-                          color: Colors.white,
-                          shape: BoxShape.circle,
-                          border: Border.all(
-                            color: AppColors.outline,
-                          ),
-                          boxShadow: [
-                            BoxShadow(
-                              color: Colors.black.withValues(alpha: 0.04),
-                              blurRadius: 12,
-                              offset: const Offset(0, 4),
-                            ),
-                          ],
+          Row(
+            children: [
+              Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  AnimatedPressable(
+                    onTap: onMenuTap,
+                    borderRadius: BorderRadius.circular(999),
+                    child: Container(
+                      width: isCompact ? 36 : 42,
+                      height: isCompact ? 36 : 42,
+                      decoration: BoxDecoration(
+                        color: Colors.white,
+                        shape: BoxShape.circle,
+                        border: Border.all(
+                          color: AppColors.outline,
                         ),
-                        child: const Icon(
-                          Icons.menu_rounded,
-                          size: 20,
-                          color: AppColors.primary,
-                        ),
-                      ),
-                    ),
-                    SizedBox(width: isCompact ? 8 : 10),
-                    GestureDetector(
-                      onTap: onAvatarTap,
-                      child: Container(
-                        width: isCompact ? 44 : 58,
-                        height: isCompact ? 44 : 58,
-                        padding: const EdgeInsets.all(3),
-                        decoration: BoxDecoration(
-                          shape: BoxShape.circle,
-                          color: Colors.white,
-                          boxShadow: [
-                            BoxShadow(
-                              color: Colors.black.withValues(alpha: 0.08),
-                              blurRadius: 14,
-                              offset: const Offset(0, 4),
-                            ),
-                          ],
-                        ),
-                        child: UserAvatar(
-                          imageUrl: avatarUrl,
-                          name: userName,
-                          radius: isCompact ? 18 : 24,
-                        ),
-                      ),
-                    ),
-                  ],
-                ),
-                SizedBox(width: isCompact ? 12 : 18),
-                Expanded(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text(
-                        'BIENVENIDO',
-                        style: TextStyle(
-                          fontSize: isCompact ? 10 : 14,
-                          fontWeight: FontWeight.w700,
-                          letterSpacing: isCompact ? 1 : 1.5,
-                          color: AppColors.primary,
-                        ),
-                      ),
-                      const SizedBox(height: 2),
-                      Text(
-                        'Hola, $userName',
-                        maxLines: 1,
-                        overflow: TextOverflow.ellipsis,
-                        style: TextStyle(
-                          fontSize: isCompact ? 22 : 29,
-                          fontWeight: FontWeight.w800,
-                          color: AppColors.textPrimary,
-                          height: 1.05,
-                        ),
-                      ),
-                      const SizedBox(height: 6),
-                      Wrap(
-                        alignment: WrapAlignment.start,
-                        crossAxisAlignment: WrapCrossAlignment.center,
-                        spacing: isCompact ? 8 : 10,
-                        runSpacing: 6,
-                        children: [
-                          _TopBarMetaItem(
-                            icon: Icons.engineering_rounded,
-                            iconColor: AppColors.primary,
-                            label: specialty,
-                            compact: isCompact,
-                          ),
-                          _TopBarMetaItem(
-                            dotColor: statusColor,
-                            label: statusLabel,
-                            compact: isCompact,
-                          ),
-                          _TopBarMetaItem(
-                            icon: Icons.assignment_outlined,
-                            iconColor: AppColors.primary,
-                            label: '$pendingCount solicitudes',
-                            compact: isCompact,
-                          ),
-                          _TopBarMetaItem(
-                            icon: Icons.star_rounded,
-                            iconColor: AppColors.warning,
-                            label: ratingLabel,
-                            compact: isCompact,
+                        boxShadow: [
+                          BoxShadow(
+                            color: Colors.black.withValues(alpha: 0.04),
+                            blurRadius: 12,
+                            offset: const Offset(0, 4),
                           ),
                         ],
                       ),
-                    ],
-                  ),
-                ),
-                Container(
-                  width: isCompact ? 44 : 58,
-                  height: isCompact ? 44 : 58,
-                  decoration: BoxDecoration(
-                    color: Colors.white,
-                    shape: BoxShape.circle,
-                    boxShadow: [
-                      BoxShadow(
-                        color: Colors.black.withValues(alpha: 0.08),
-                        blurRadius: 14,
-                        offset: const Offset(0, 4),
+                      child: const Icon(
+                        Icons.menu_rounded,
+                        size: 20,
+                        color: AppColors.primary,
                       ),
-                    ],
+                    ),
                   ),
-                  child: Stack(
-                    clipBehavior: Clip.none,
-                    children: [
-                      Center(
-                        child: IconButton(
-                          onPressed: onNotificationsTap,
-                          icon: const Icon(
-                            Icons.notifications_none_rounded,
-                            color: AppColors.textPrimary,
-                            size: 22,
+                  SizedBox(width: isCompact ? 8 : 10),
+                  GestureDetector(
+                    onTap: onAvatarTap,
+                    child: Container(
+                      width: isCompact ? 44 : 58,
+                      height: isCompact ? 44 : 58,
+                      padding: const EdgeInsets.all(3),
+                      decoration: BoxDecoration(
+                        shape: BoxShape.circle,
+                        color: Colors.white,
+                        boxShadow: [
+                          BoxShadow(
+                            color: Colors.black.withValues(alpha: 0.08),
+                            blurRadius: 14,
+                            offset: const Offset(0, 4),
+                          ),
+                        ],
+                      ),
+                      child: UserAvatar(
+                        imageUrl: avatarUrl,
+                        name: userName,
+                        radius: isCompact ? 18 : 24,
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+              SizedBox(width: isCompact ? 12 : 18),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      'BIENVENIDO',
+                      style: TextStyle(
+                        fontSize: isCompact ? 10 : 14,
+                        fontWeight: FontWeight.w700,
+                        letterSpacing: isCompact ? 1 : 1.5,
+                        color: AppColors.primary,
+                      ),
+                    ),
+                    const SizedBox(height: 2),
+                    Text(
+                      'Hola, $userName',
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: TextStyle(
+                        fontSize: isCompact ? 22 : 29,
+                        fontWeight: FontWeight.w800,
+                        color: AppColors.textPrimary,
+                        height: 1.05,
+                      ),
+                    ),
+                    const SizedBox(height: 6),
+                    Wrap(
+                      alignment: WrapAlignment.start,
+                      crossAxisAlignment: WrapCrossAlignment.center,
+                      spacing: isCompact ? 8 : 10,
+                      runSpacing: 6,
+                      children: [
+                        _TopBarMetaItem(
+                          icon: Icons.engineering_rounded,
+                          iconColor: AppColors.primary,
+                          label: specialty,
+                          compact: isCompact,
+                        ),
+                        _TopBarMetaItem(
+                          dotColor: statusColor,
+                          label: statusLabel,
+                          compact: isCompact,
+                        ),
+                        _TopBarMetaItem(
+                          icon: Icons.assignment_outlined,
+                          iconColor: AppColors.primary,
+                          label: '$pendingCount solicitudes',
+                          compact: isCompact,
+                        ),
+                        _TopBarMetaItem(
+                          icon: Icons.star_rounded,
+                          iconColor: AppColors.warning,
+                          label: ratingLabel,
+                          compact: isCompact,
+                        ),
+                      ],
+                    ),
+                  ],
+                ),
+              ),
+              Container(
+                width: isCompact ? 44 : 58,
+                height: isCompact ? 44 : 58,
+                decoration: BoxDecoration(
+                  color: Colors.white,
+                  shape: BoxShape.circle,
+                  boxShadow: [
+                    BoxShadow(
+                      color: Colors.black.withValues(alpha: 0.08),
+                      blurRadius: 14,
+                      offset: const Offset(0, 4),
+                    ),
+                  ],
+                ),
+                child: Stack(
+                  clipBehavior: Clip.none,
+                  children: [
+                    Center(
+                      child: IconButton(
+                        onPressed: onNotificationsTap,
+                        icon: const Icon(
+                          Icons.notifications_none_rounded,
+                          color: AppColors.textPrimary,
+                          size: 22,
+                        ),
+                      ),
+                    ),
+                    if (unreadCount > 0)
+                      Positioned(
+                        top: 11,
+                        right: 11,
+                        child: Container(
+                          width: 10,
+                          height: 10,
+                          decoration: const BoxDecoration(
+                            color: AppColors.assistance,
+                            shape: BoxShape.circle,
                           ),
                         ),
                       ),
-                      if (unreadCount > 0)
-                        Positioned(
-                          top: 11,
-                          right: 11,
-                          child: Container(
-                            width: 10,
-                            height: 10,
-                            decoration: const BoxDecoration(
-                              color: AppColors.assistance,
-                              shape: BoxShape.circle,
-                            ),
-                          ),
-                        ),
-                    ],
-                  ),
+                  ],
                 ),
-              ],
-            ),
+              ),
+            ],
           ),
-          Positioned(
-            right: 0,
-            bottom: 0,
+          Align(
+            alignment: Alignment.centerRight,
             child: _TopBarAvailabilitySwitch(
               isAvailable: isAvailable,
               isApproved: isApproved,
@@ -1547,55 +1544,21 @@ class _TopBarAvailabilitySwitch extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final color = isAvailable ? AppColors.success : AppColors.textSecondary;
     final label = isAvailable ? 'Disponible' : 'No disponible';
 
     return Semantics(
       label: 'Cambiar disponibilidad',
       value: label,
-      child: AnimatedContainer(
-        duration: AppConstants.animFast,
-        padding: EdgeInsets.fromLTRB(compact ? 9 : 10, 4, 4, 4),
-        decoration: BoxDecoration(
-          color: color.withValues(alpha: isAvailable ? 0.12 : 0.08),
-          borderRadius: BorderRadius.circular(999),
-          border: Border.all(color: color.withValues(alpha: 0.32)),
-        ),
-        child: Row(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            Container(
-              width: 7,
-              height: 7,
-              decoration: BoxDecoration(
-                color: color,
-                shape: BoxShape.circle,
-              ),
-            ),
-            const SizedBox(width: 6),
-            Text(
-              compact ? (isAvailable ? 'Disp.' : 'No disp.') : label,
-              style: TextStyle(
-                fontSize: compact ? 10 : 11,
-                fontWeight: FontWeight.w800,
-                color: color,
-                height: 1,
-              ),
-            ),
-            Transform.scale(
-              scale: compact ? 0.72 : 0.78,
-              child: Switch.adaptive(
-                value: isAvailable,
-                onChanged: isApproved ? onChanged : null,
-                activeThumbColor: AppColors.success,
-                activeTrackColor: AppColors.success.withValues(alpha: 0.36),
-                inactiveThumbColor: AppColors.textSecondary,
-                inactiveTrackColor:
-                    AppColors.textSecondary.withValues(alpha: 0.22),
-                materialTapTargetSize: MaterialTapTargetSize.shrinkWrap,
-              ),
-            ),
-          ],
+      child: Transform.scale(
+        scale: compact ? 0.78 : 0.84,
+        child: Switch.adaptive(
+          value: isAvailable,
+          onChanged: isApproved ? onChanged : null,
+          activeThumbColor: AppColors.success,
+          activeTrackColor: AppColors.success.withValues(alpha: 0.36),
+          inactiveThumbColor: AppColors.textSecondary,
+          inactiveTrackColor: AppColors.textSecondary.withValues(alpha: 0.22),
+          materialTapTargetSize: MaterialTapTargetSize.shrinkWrap,
         ),
       ),
     );
