@@ -1346,174 +1346,257 @@ class _TechnicianTopBar extends StatelessWidget {
           ),
         ],
       ),
-      child: Column(
+      child: Stack(
         children: [
-          Row(
-            children: [
-              Row(
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  AnimatedPressable(
-                    onTap: onMenuTap,
-                    borderRadius: BorderRadius.circular(999),
-                    child: Container(
-                      width: isCompact ? 36 : 42,
-                      height: isCompact ? 36 : 42,
-                      decoration: BoxDecoration(
-                        color: Colors.white,
-                        shape: BoxShape.circle,
-                        border: Border.all(
-                          color: AppColors.outline,
-                        ),
-                        boxShadow: [
-                          BoxShadow(
-                            color: Colors.black.withValues(alpha: 0.04),
-                            blurRadius: 12,
-                            offset: const Offset(0, 4),
-                          ),
-                        ],
-                      ),
-                      child: const Icon(
-                        Icons.menu_rounded,
-                        size: 20,
-                        color: AppColors.primary,
-                      ),
-                    ),
-                  ),
-                  SizedBox(width: isCompact ? 8 : 10),
-                  GestureDetector(
-                    onTap: onAvatarTap,
-                    child: Container(
-                      width: isCompact ? 44 : 58,
-                      height: isCompact ? 44 : 58,
-                      padding: const EdgeInsets.all(3),
-                      decoration: BoxDecoration(
-                        shape: BoxShape.circle,
-                        color: Colors.white,
-                        boxShadow: [
-                          BoxShadow(
-                            color: Colors.black.withValues(alpha: 0.08),
-                            blurRadius: 14,
-                            offset: const Offset(0, 4),
-                          ),
-                        ],
-                      ),
-                      child: UserAvatar(
-                        imageUrl: avatarUrl,
-                        name: userName,
-                        radius: isCompact ? 18 : 24,
-                      ),
-                    ),
-                  ),
-                ],
-              ),
-              SizedBox(width: isCompact ? 12 : 18),
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
+          Padding(
+            padding: EdgeInsets.only(bottom: isCompact ? 34 : 32),
+            child: Row(
+              children: [
+                Row(
+                  mainAxisSize: MainAxisSize.min,
                   children: [
-                    Text(
-                      'BIENVENIDO',
-                      style: TextStyle(
-                        fontSize: isCompact ? 10 : 14,
-                        fontWeight: FontWeight.w700,
-                        letterSpacing: isCompact ? 1 : 1.5,
-                        color: AppColors.primary,
+                    AnimatedPressable(
+                      onTap: onMenuTap,
+                      borderRadius: BorderRadius.circular(999),
+                      child: Container(
+                        width: isCompact ? 36 : 42,
+                        height: isCompact ? 36 : 42,
+                        decoration: BoxDecoration(
+                          color: Colors.white,
+                          shape: BoxShape.circle,
+                          border: Border.all(
+                            color: AppColors.outline,
+                          ),
+                          boxShadow: [
+                            BoxShadow(
+                              color: Colors.black.withValues(alpha: 0.04),
+                              blurRadius: 12,
+                              offset: const Offset(0, 4),
+                            ),
+                          ],
+                        ),
+                        child: const Icon(
+                          Icons.menu_rounded,
+                          size: 20,
+                          color: AppColors.primary,
+                        ),
                       ),
                     ),
-                    const SizedBox(height: 2),
-                    Text(
-                      'Hola, $userName',
-                      maxLines: 1,
-                      overflow: TextOverflow.ellipsis,
-                      style: TextStyle(
-                        fontSize: isCompact ? 22 : 29,
-                        fontWeight: FontWeight.w800,
-                        color: AppColors.textPrimary,
-                        height: 1.05,
+                    SizedBox(width: isCompact ? 8 : 10),
+                    GestureDetector(
+                      onTap: onAvatarTap,
+                      child: Container(
+                        width: isCompact ? 44 : 58,
+                        height: isCompact ? 44 : 58,
+                        padding: const EdgeInsets.all(3),
+                        decoration: BoxDecoration(
+                          shape: BoxShape.circle,
+                          color: Colors.white,
+                          boxShadow: [
+                            BoxShadow(
+                              color: Colors.black.withValues(alpha: 0.08),
+                              blurRadius: 14,
+                              offset: const Offset(0, 4),
+                            ),
+                          ],
+                        ),
+                        child: UserAvatar(
+                          imageUrl: avatarUrl,
+                          name: userName,
+                          radius: isCompact ? 18 : 24,
+                        ),
                       ),
-                    ),
-                    const SizedBox(height: 6),
-                    Wrap(
-                      alignment: WrapAlignment.start,
-                      crossAxisAlignment: WrapCrossAlignment.center,
-                      spacing: isCompact ? 8 : 10,
-                      runSpacing: 6,
-                      children: [
-                        _TopBarMetaItem(
-                          icon: Icons.engineering_rounded,
-                          iconColor: AppColors.primary,
-                          label: specialty,
-                          compact: isCompact,
-                        ),
-                        _TopBarMetaItem(
-                          dotColor: statusColor,
-                          label: statusLabel,
-                          compact: isCompact,
-                        ),
-                        _TopBarMetaItem(
-                          icon: Icons.assignment_outlined,
-                          iconColor: AppColors.primary,
-                          label: '$pendingCount solicitudes',
-                          compact: isCompact,
-                        ),
-                        _TopBarMetaItem(
-                          icon: Icons.star_rounded,
-                          iconColor: AppColors.warning,
-                          label: ratingLabel,
-                          compact: isCompact,
-                        ),
-                      ],
                     ),
                   ],
                 ),
-              ),
-              Container(
-                width: isCompact ? 44 : 58,
-                height: isCompact ? 44 : 58,
-                decoration: BoxDecoration(
-                  color: Colors.white,
-                  shape: BoxShape.circle,
-                  boxShadow: [
-                    BoxShadow(
-                      color: Colors.black.withValues(alpha: 0.08),
-                      blurRadius: 14,
-                      offset: const Offset(0, 4),
-                    ),
-                  ],
-                ),
-                child: Stack(
-                  clipBehavior: Clip.none,
-                  children: [
-                    Center(
-                      child: IconButton(
-                        onPressed: onNotificationsTap,
-                        icon: const Icon(
-                          Icons.notifications_none_rounded,
+                SizedBox(width: isCompact ? 12 : 18),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        'BIENVENIDO',
+                        style: TextStyle(
+                          fontSize: isCompact ? 10 : 14,
+                          fontWeight: FontWeight.w700,
+                          letterSpacing: isCompact ? 1 : 1.5,
+                          color: AppColors.primary,
+                        ),
+                      ),
+                      const SizedBox(height: 2),
+                      Text(
+                        'Hola, $userName',
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                        style: TextStyle(
+                          fontSize: isCompact ? 22 : 29,
+                          fontWeight: FontWeight.w800,
                           color: AppColors.textPrimary,
-                          size: 22,
+                          height: 1.05,
                         ),
                       ),
-                    ),
-                    if (unreadCount > 0)
-                      Positioned(
-                        top: 11,
-                        right: 11,
-                        child: Container(
-                          width: 10,
-                          height: 10,
-                          decoration: const BoxDecoration(
-                            color: AppColors.assistance,
-                            shape: BoxShape.circle,
+                      const SizedBox(height: 6),
+                      Wrap(
+                        alignment: WrapAlignment.start,
+                        crossAxisAlignment: WrapCrossAlignment.center,
+                        spacing: isCompact ? 8 : 10,
+                        runSpacing: 6,
+                        children: [
+                          _TopBarMetaItem(
+                            icon: Icons.engineering_rounded,
+                            iconColor: AppColors.primary,
+                            label: specialty,
+                            compact: isCompact,
+                          ),
+                          _TopBarMetaItem(
+                            dotColor: statusColor,
+                            label: statusLabel,
+                            compact: isCompact,
+                          ),
+                          _TopBarMetaItem(
+                            icon: Icons.assignment_outlined,
+                            iconColor: AppColors.primary,
+                            label: '$pendingCount solicitudes',
+                            compact: isCompact,
+                          ),
+                          _TopBarMetaItem(
+                            icon: Icons.star_rounded,
+                            iconColor: AppColors.warning,
+                            label: ratingLabel,
+                            compact: isCompact,
+                          ),
+                        ],
+                      ),
+                    ],
+                  ),
+                ),
+                Container(
+                  width: isCompact ? 44 : 58,
+                  height: isCompact ? 44 : 58,
+                  decoration: BoxDecoration(
+                    color: Colors.white,
+                    shape: BoxShape.circle,
+                    boxShadow: [
+                      BoxShadow(
+                        color: Colors.black.withValues(alpha: 0.08),
+                        blurRadius: 14,
+                        offset: const Offset(0, 4),
+                      ),
+                    ],
+                  ),
+                  child: Stack(
+                    clipBehavior: Clip.none,
+                    children: [
+                      Center(
+                        child: IconButton(
+                          onPressed: onNotificationsTap,
+                          icon: const Icon(
+                            Icons.notifications_none_rounded,
+                            color: AppColors.textPrimary,
+                            size: 22,
                           ),
                         ),
                       ),
-                  ],
+                      if (unreadCount > 0)
+                        Positioned(
+                          top: 11,
+                          right: 11,
+                          child: Container(
+                            width: 10,
+                            height: 10,
+                            decoration: const BoxDecoration(
+                              color: AppColors.assistance,
+                              shape: BoxShape.circle,
+                            ),
+                          ),
+                        ),
+                    ],
+                  ),
                 ),
-              ),
-            ],
+              ],
+            ),
+          ),
+          Positioned(
+            right: 0,
+            bottom: 0,
+            child: _TopBarAvailabilitySwitch(
+              isAvailable: isAvailable,
+              isApproved: isApproved,
+              onChanged: onAvailabilityChanged,
+              compact: isCompact,
+            ),
           ),
         ],
+      ),
+    );
+  }
+}
+
+class _TopBarAvailabilitySwitch extends StatelessWidget {
+  final bool isAvailable;
+  final bool isApproved;
+  final ValueChanged<bool> onChanged;
+  final bool compact;
+
+  const _TopBarAvailabilitySwitch({
+    required this.isAvailable,
+    required this.isApproved,
+    required this.onChanged,
+    required this.compact,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final color = isAvailable ? AppColors.success : AppColors.textSecondary;
+    final label = isAvailable ? 'Disponible' : 'No disponible';
+
+    return Semantics(
+      label: 'Cambiar disponibilidad',
+      value: label,
+      child: AnimatedContainer(
+        duration: AppConstants.animFast,
+        padding: EdgeInsets.fromLTRB(compact ? 9 : 10, 4, 4, 4),
+        decoration: BoxDecoration(
+          color: color.withValues(alpha: isAvailable ? 0.12 : 0.08),
+          borderRadius: BorderRadius.circular(999),
+          border: Border.all(color: color.withValues(alpha: 0.32)),
+        ),
+        child: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Container(
+              width: 7,
+              height: 7,
+              decoration: BoxDecoration(
+                color: color,
+                shape: BoxShape.circle,
+              ),
+            ),
+            const SizedBox(width: 6),
+            Text(
+              compact ? (isAvailable ? 'Disp.' : 'No disp.') : label,
+              style: TextStyle(
+                fontSize: compact ? 10 : 11,
+                fontWeight: FontWeight.w800,
+                color: color,
+                height: 1,
+              ),
+            ),
+            Transform.scale(
+              scale: compact ? 0.72 : 0.78,
+              child: Switch.adaptive(
+                value: isAvailable,
+                onChanged: isApproved ? onChanged : null,
+                activeThumbColor: AppColors.success,
+                activeTrackColor: AppColors.success.withValues(alpha: 0.36),
+                inactiveThumbColor: AppColors.textSecondary,
+                inactiveTrackColor:
+                    AppColors.textSecondary.withValues(alpha: 0.22),
+                materialTapTargetSize: MaterialTapTargetSize.shrinkWrap,
+              ),
+            ),
+          ],
+        ),
       ),
     );
   }
@@ -1793,24 +1876,19 @@ class _TechnicianBottomNav extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final isCompact = MediaQuery.of(context).size.width < 520;
+
     return SafeArea(
       top: false,
+      minimum: const EdgeInsets.fromLTRB(12, 0, 12, 10),
       child: Container(
-        padding: const EdgeInsets.fromLTRB(18, 10, 18, 16),
+        padding: EdgeInsets.symmetric(
+          horizontal: isCompact ? 4 : 8,
+          vertical: isCompact ? 4 : 8,
+        ),
         decoration: BoxDecoration(
-          color: Colors.white.withValues(alpha: 0.98),
-          border: Border(
-            top: BorderSide(
-              color: AppColors.outline.withValues(alpha: 0.7),
-            ),
-          ),
-          boxShadow: [
-            BoxShadow(
-              color: Colors.black.withValues(alpha: 0.05),
-              blurRadius: 18,
-              offset: const Offset(0, -6),
-            ),
-          ],
+          color: AppColors.surfaceContainerLow,
+          borderRadius: BorderRadius.circular(isCompact ? 24 : 34),
         ),
         child: Row(
           children: [
@@ -1818,7 +1896,9 @@ class _TechnicianBottomNav extends StatelessWidget {
               child: _TechnicianNavItem(
                 label: 'History',
                 icon: Icons.receipt_long_outlined,
+                activeIcon: Icons.receipt_long_rounded,
                 active: currentIndex == 0,
+                compact: isCompact,
                 onTap: () => onTap(0),
               ),
             ),
@@ -1826,8 +1906,10 @@ class _TechnicianBottomNav extends StatelessWidget {
               child: _TechnicianNavItem(
                 label: 'Chat',
                 icon: Icons.chat_bubble_outline_rounded,
+                activeIcon: Icons.chat_bubble_rounded,
                 active: currentIndex == 3,
                 badgeCount: unreadCount,
+                compact: isCompact,
                 onTap: () => onTap(3),
               ),
             ),
@@ -1835,7 +1917,9 @@ class _TechnicianBottomNav extends StatelessWidget {
               child: _TechnicianNavItem(
                 label: 'Home',
                 icon: Icons.location_on_outlined,
+                activeIcon: Icons.location_on_rounded,
                 active: currentIndex == 2,
+                compact: isCompact,
                 onTap: () => onTap(2),
               ),
             ),
@@ -1843,7 +1927,9 @@ class _TechnicianBottomNav extends StatelessWidget {
               child: _TechnicianNavItem(
                 label: 'Profile',
                 icon: Icons.person_outline_rounded,
+                activeIcon: Icons.person_rounded,
                 active: false,
+                compact: isCompact,
                 onTap: () => onTap(4),
               ),
             ),
@@ -1857,66 +1943,68 @@ class _TechnicianBottomNav extends StatelessWidget {
 class _TechnicianNavItem extends StatelessWidget {
   final String label;
   final IconData icon;
+  final IconData activeIcon;
   final bool active;
+  final bool compact;
   final int badgeCount;
   final VoidCallback onTap;
 
   const _TechnicianNavItem({
     required this.label,
     required this.icon,
+    required this.activeIcon,
     required this.active,
+    required this.compact,
     required this.onTap,
     this.badgeCount = 0,
   });
 
   @override
   Widget build(BuildContext context) {
-    final color = active ? AppColors.primary : AppColors.secondary;
-    return InkWell(
+    return AnimatedPressable(
       onTap: onTap,
-      borderRadius: BorderRadius.circular(26),
-      child: Padding(
-        padding: const EdgeInsets.symmetric(vertical: 2),
+      borderRadius: BorderRadius.circular(28),
+      child: AnimatedContainer(
+        duration: const Duration(milliseconds: 220),
+        curve: Curves.easeOutCubic,
+        padding: EdgeInsets.symmetric(vertical: compact ? 5 : 8),
+        decoration: BoxDecoration(
+          color: active ? AppColors.primary : Colors.transparent,
+          borderRadius: BorderRadius.circular(compact ? 20 : 28),
+        ),
         child: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
             Stack(
               clipBehavior: Clip.none,
               children: [
-                AnimatedContainer(
-                  duration: const Duration(milliseconds: 220),
-                  width: 64,
-                  height: 46,
-                  decoration: BoxDecoration(
-                    color: active
-                        ? AppColors.primary.withValues(alpha: 0.72)
-                        : Colors.transparent,
-                    borderRadius: BorderRadius.circular(18),
-                  ),
-                  child: Icon(icon, color: color, size: 28),
+                Icon(
+                  active ? activeIcon : icon,
+                  size: compact ? 18 : 24,
+                  color: active ? Colors.white : AppColors.primary,
                 ),
                 if (badgeCount > 0)
                   Positioned(
-                    top: 2,
-                    right: 4,
+                    top: -4,
+                    right: -6,
                     child: Container(
-                      width: 10,
-                      height: 10,
+                      width: 9,
+                      height: 9,
                       decoration: const BoxDecoration(
                         color: AppColors.assistance,
                         shape: BoxShape.circle,
                       ),
                     ),
-                  ),
+                ),
               ],
             ),
-            const Gap(6),
+            SizedBox(height: compact ? 2 : 4),
             Text(
               label,
               style: TextStyle(
-                fontSize: 16,
-                fontWeight: active ? FontWeight.w900 : FontWeight.w500,
-                color: color,
+                fontSize: compact ? 8 : 11,
+                fontWeight: FontWeight.w700,
+                color: active ? Colors.white : AppColors.primary,
               ),
             ),
           ],

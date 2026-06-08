@@ -1,6 +1,7 @@
 import 'dart:async';
 import 'package:flutter/foundation.dart'
     show TargetPlatform, defaultTargetPlatform, kIsWeb;
+import 'package:flutter/services.dart' show PlatformException;
 import 'package:google_sign_in/google_sign_in.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import '../../../../core/constants/app_constants.dart';
@@ -84,12 +85,8 @@ class AuthRemoteDataSourceImpl implements AuthRemoteDataSource {
   }) async {
     final googleSignIn = _buildGoogleSignIn();
 
-    // Revoke the cached account association so Android always shows its picker.
-    try {
-      await googleSignIn.disconnect();
-    } catch (_) {
-      await googleSignIn.signOut();
-    }
+    // Start an interactive flow without revoking the OAuth client authorization.
+    await googleSignIn.signOut();
     final googleUser = await googleSignIn.signIn();
     if (googleUser == null) {
       throw const core_exceptions.AuthException(
@@ -521,6 +518,19 @@ class AuthRemoteDataSourceImpl implements AuthRemoteDataSource {
       throw core_exceptions.AuthException(message: e.message);
     } on PostgrestException catch (e) {
       throw core_exceptions.ServerException(message: e.message);
+    } on PlatformException catch (e) {
+      final details = '${e.code} ${e.message} ${e.details}'.toLowerCase();
+      if (details.contains('sign_in_failed') &&
+          (details.contains('apiexception: 10') ||
+              details.contains('developer_error'))) {
+        throw const core_exceptions.AuthException(
+          message:
+              'Google rechazó la configuración Android. Verifica el paquete, la huella SHA-1 y que los clientes Android y Web pertenezcan al mismo proyecto de Google Cloud.',
+        );
+      }
+      throw core_exceptions.AuthException(
+        message: e.message ?? 'No se pudo iniciar sesión con Google.',
+      );
     } catch (e) {
       if (_looksLikeNetworkError(e)) throw _networkException();
       throw core_exceptions.ServerException(message: e.toString());

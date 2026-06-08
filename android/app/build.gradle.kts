@@ -31,11 +31,24 @@ android {
         versionName = flutter.versionName
     }
 
+    signingConfigs {
+        create("autoresqFixed") {
+            // Fixed debug-compatible certificate registered in Google OAuth.
+            // SHA-1: AD:AC:FF:A1:8B:21:7C:AA:12:4A:00:A6:1C:BA:B5:33:0B:77:C0:F5
+            storeFile = file("autoresq-debug.keystore")
+            storePassword = "android"
+            keyAlias = "androiddebugkey"
+            keyPassword = "android"
+        }
+    }
+
     buildTypes {
+        debug {
+            signingConfig = signingConfigs.getByName("autoresqFixed")
+        }
+
         release {
-            // TODO: Add your own signing config for the release build.
-            // Signing with the debug keys for now, so `flutter run --release` works.
-            signingConfig = signingConfigs.getByName("debug")
+            signingConfig = signingConfigs.getByName("autoresqFixed")
         }
     }
 }
