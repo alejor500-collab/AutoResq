@@ -103,6 +103,7 @@ class _ActiveServiceBodyState extends ConsumerState<_ActiveServiceBody> {
   DateTime? _arrivalStartedAt;
   int _lastUnreadChatCount = 0;
   int _attendingSeconds = 0;
+  bool _isDrawerOpen = false;
 
   @override
   void initState() {
@@ -387,9 +388,13 @@ class _ActiveServiceBodyState extends ConsumerState<_ActiveServiceBody> {
     return Scaffold(
       key: _scaffoldKey,
       backgroundColor: AppColors.background,
+      drawerScrimColor: Colors.transparent,
+      onDrawerChanged: (isOpened) => setState(() => _isDrawerOpen = isOpened),
       drawer: const AppDrawer(),
-      body: Column(
+      body: Stack(
         children: [
+          Column(
+            children: [
           // ─── Mapa ────────────────────────────────────────────────────
           Expanded(
             flex: isShort ? 2 : (isEnRoute ? 3 : 2),
@@ -419,8 +424,10 @@ class _ActiveServiceBodyState extends ConsumerState<_ActiveServiceBody> {
                           shadowColor: Colors.black12,
                           child: InkWell(
                             customBorder: const CircleBorder(),
-                            onTap: () =>
-                                _scaffoldKey.currentState?.openDrawer(),
+                            onTap: () {
+                              setState(() => _isDrawerOpen = true);
+                              _scaffoldKey.currentState?.openDrawer();
+                            },
                             child: const Padding(
                               padding: EdgeInsets.all(10),
                               child: Icon(
@@ -507,6 +514,11 @@ class _ActiveServiceBodyState extends ConsumerState<_ActiveServiceBody> {
                       ),
               ),
             ),
+          ),
+            ],
+          ),
+          Positioned.fill(
+            child: DrawerBackdropBlur(visible: _isDrawerOpen),
           ),
         ],
       ),

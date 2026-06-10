@@ -329,7 +329,12 @@ class EmergencyModel extends Emergency {
 
   static bool _isCurrentAssignment(String? status) {
     return switch (status) {
-      'aceptada' || 'en_ruta' || 'atendiendo' || 'finalizada' => true,
+      'aceptada' ||
+      'en_ruta' ||
+      'atendiendo' ||
+      'finalizada' ||
+      'rechazada' =>
+        true,
       _ => false,
     };
   }

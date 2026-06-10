@@ -126,6 +126,163 @@ class AppBottomNavBar extends StatelessWidget {
   }
 }
 
+class RoleHomeBottomNavBar extends StatelessWidget {
+  final int currentIndex;
+  final ValueChanged<int> onTap;
+  final bool isTechnician;
+  final int unreadCount;
+
+  const RoleHomeBottomNavBar({
+    super.key,
+    required this.currentIndex,
+    required this.onTap,
+    required this.isTechnician,
+    this.unreadCount = 0,
+  });
+
+  static const _driverItems = [
+    _RoleNavItem(
+      'Historial',
+      Icons.history_rounded,
+      Icons.history_rounded,
+    ),
+    _RoleNavItem(
+      'Chat',
+      Icons.chat_bubble_outline_rounded,
+      Icons.chat_bubble_rounded,
+      showsUnreadBadge: true,
+    ),
+    _RoleNavItem('Inicio', Icons.home_outlined, Icons.home_rounded),
+    _RoleNavItem(
+      'Servicios',
+      Icons.storefront_outlined,
+      Icons.storefront_rounded,
+    ),
+    _RoleNavItem(
+      'Perfil',
+      Icons.person_outline_rounded,
+      Icons.person_rounded,
+    ),
+  ];
+
+  static const _technicianItems = [
+    _RoleNavItem(
+      'Historial',
+      Icons.receipt_long_outlined,
+      Icons.receipt_long_rounded,
+    ),
+    _RoleNavItem(
+      'Chat',
+      Icons.chat_bubble_outline_rounded,
+      Icons.chat_bubble_rounded,
+      showsUnreadBadge: true,
+    ),
+    _RoleNavItem(
+      'Inicio',
+      Icons.location_on_outlined,
+      Icons.location_on_rounded,
+    ),
+    _RoleNavItem(
+      'Perfil',
+      Icons.person_outline_rounded,
+      Icons.person_rounded,
+    ),
+  ];
+
+  @override
+  Widget build(BuildContext context) {
+    final isCompact = MediaQuery.of(context).size.width < 520;
+    final items = isTechnician ? _technicianItems : _driverItems;
+
+    return SafeArea(
+      top: false,
+      minimum: const EdgeInsets.fromLTRB(12, 0, 12, 10),
+      child: Container(
+        padding: EdgeInsets.symmetric(
+          horizontal: isCompact ? 4 : 8,
+          vertical: isCompact ? 4 : 8,
+        ),
+        decoration: BoxDecoration(
+          color: AppColors.surfaceContainerLow,
+          borderRadius: BorderRadius.circular(isCompact ? 24 : 34),
+        ),
+        child: Row(
+          children: List.generate(items.length, (index) {
+            final item = items[index];
+            final active = currentIndex == index;
+            return Expanded(
+              child: AnimatedPressable(
+                onTap: () => onTap(index),
+                borderRadius: BorderRadius.circular(28),
+                child: AnimatedContainer(
+                  duration: const Duration(milliseconds: 220),
+                  curve: Curves.easeOutCubic,
+                  padding: EdgeInsets.symmetric(vertical: isCompact ? 5 : 8),
+                  decoration: BoxDecoration(
+                    color: active ? AppColors.primary : Colors.transparent,
+                    borderRadius: BorderRadius.circular(isCompact ? 20 : 28),
+                  ),
+                  child: Column(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Stack(
+                        clipBehavior: Clip.none,
+                        children: [
+                          Icon(
+                            active ? item.activeIcon : item.icon,
+                            size: isCompact ? 18 : 24,
+                            color:
+                                active ? Colors.white : AppColors.primary,
+                          ),
+                          if (item.showsUnreadBadge && unreadCount > 0)
+                            const Positioned(
+                              top: -4,
+                              right: -6,
+                              child: DecoratedBox(
+                                decoration: BoxDecoration(
+                                  color: AppColors.assistance,
+                                  shape: BoxShape.circle,
+                                ),
+                                child: SizedBox(width: 9, height: 9),
+                              ),
+                            ),
+                        ],
+                      ),
+                      SizedBox(height: isCompact ? 2 : 4),
+                      Text(
+                        item.label,
+                        style: TextStyle(
+                          fontSize: isCompact ? 8 : 11,
+                          fontWeight: FontWeight.w700,
+                          color: active ? Colors.white : AppColors.primary,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+            );
+          }),
+        ),
+      ),
+    );
+  }
+}
+
+class _RoleNavItem {
+  final String label;
+  final IconData icon;
+  final IconData activeIcon;
+  final bool showsUnreadBadge;
+
+  const _RoleNavItem(
+    this.label,
+    this.icon,
+    this.activeIcon, {
+    this.showsUnreadBadge = false,
+  });
+}
+
 class _NavItem {
   final IconData icon;
   final IconData activeIcon;

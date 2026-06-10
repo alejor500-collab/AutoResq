@@ -22,7 +22,12 @@ import '../../domain/entities/emergency_entity.dart';
 import '../providers/emergency_provider.dart';
 
 class DriverHomeScreen extends ConsumerStatefulWidget {
-  const DriverHomeScreen({super.key});
+  final int initialTab;
+
+  const DriverHomeScreen({
+    super.key,
+    this.initialTab = 2,
+  });
 
   @override
   ConsumerState<DriverHomeScreen> createState() => _DriverHomeScreenState();
@@ -32,23 +37,32 @@ class _DriverHomeScreenState extends ConsumerState<DriverHomeScreen> {
   final _scaffoldKey = GlobalKey<ScaffoldState>();
   final _mapController = MapController();
   final _scrollController = ScrollController();
-  int _navIndex = 1;
+  late int _navIndex;
   ProviderSubscription<AsyncValue<int>>? _unreadChatSubscription;
   int _lastUnreadChatCount = 0;
   bool _activeWarningShown = false;
   bool _pendingRatingWarningShown = false;
+  bool _isDrawerOpen = false;
 
   @override
   void initState() {
     super.initState();
+    _navIndex = widget.initialTab;
     _unreadChatSubscription = ref.listenManual<AsyncValue<int>>(
       unreadChatCountProvider,
       _handleUnreadChatCount,
       fireImmediately: true,
     );
-    WidgetsBinding.instance.addPostFrameCallback((_) {
-      ref.read(mapNotifierProvider.notifier).getCurrentLocation();
+    WidgetsBinding.instance.addPostFrameCallback((_) async {
+      await ref.read(mapNotifierProvider.notifier).getCurrentLocation();
       _restoreActiveEmergency();
+      if (!mounted || widget.initialTab != 3) return;
+      final location = ref.read(mapNotifierProvider).currentLocation;
+      await _openNearbyServicesSheet(
+        lat: location?.lat ?? AppConstants.defaultLat,
+        lng: location?.lng ?? AppConstants.defaultLng,
+      );
+      if (mounted) setState(() => _navIndex = 2);
     });
   }
 
@@ -218,7 +232,11 @@ class _DriverHomeScreenState extends ConsumerState<DriverHomeScreen> {
         context.push(AppRoutes.emergencyHistory);
         return;
       case 1:
-        if (mounted) setState(() => _navIndex = 1);
+        setState(() => _navIndex = 1);
+        context.push(AppRoutes.driverChatHistory);
+        return;
+      case 2:
+        if (mounted) setState(() => _navIndex = 2);
         if (_scrollController.hasClients) {
           await _scrollController.animateTo(
             0,
@@ -227,13 +245,13 @@ class _DriverHomeScreenState extends ConsumerState<DriverHomeScreen> {
           );
         }
         return;
-      case 2:
-        if (mounted) setState(() => _navIndex = 2);
-        await _openNearbyServicesSheet(lat: lat, lng: lng);
-        if (mounted) setState(() => _navIndex = 1);
-        return;
       case 3:
-        setState(() => _navIndex = 3);
+        if (mounted) setState(() => _navIndex = 3);
+        await _openNearbyServicesSheet(lat: lat, lng: lng);
+        if (mounted) setState(() => _navIndex = 2);
+        return;
+      case 4:
+        setState(() => _navIndex = 4);
         context.push(AppRoutes.profile);
         return;
     }
@@ -488,10 +506,14 @@ class _DriverHomeScreenState extends ConsumerState<DriverHomeScreen> {
     return Scaffold(
       key: _scaffoldKey,
       backgroundColor: AppColors.background,
+      drawerScrimColor: Colors.transparent,
+      onDrawerChanged: (isOpened) => setState(() => _isDrawerOpen = isOpened),
       drawer: const AppDrawer(),
-      body: Column(
+      body: Stack(
         children: [
-          Container(
+          Column(
+            children: [
+              Container(
             color: Colors.white.withValues(alpha: 0.96),
             padding: EdgeInsets.fromLTRB(
               16,
@@ -505,7 +527,10 @@ class _DriverHomeScreenState extends ConsumerState<DriverHomeScreen> {
                   mainAxisSize: MainAxisSize.min,
                   children: [
                     AnimatedPressable(
-                      onTap: () => _scaffoldKey.currentState?.openDrawer(),
+                      onTap: () {
+                        setState(() => _isDrawerOpen = true);
+                        _scaffoldKey.currentState?.openDrawer();
+                      },
                       borderRadius: BorderRadius.circular(999),
                       child: Container(
                         width: isCompact ? 36 : 42,
@@ -639,8 +664,8 @@ class _DriverHomeScreenState extends ConsumerState<DriverHomeScreen> {
                 ),
               ],
             ),
-          ),
-          Expanded(
+              ),
+              Expanded(
             child: isWide
                 ? Stack(
                     children: [
@@ -733,6 +758,11 @@ class _DriverHomeScreenState extends ConsumerState<DriverHomeScreen> {
                 ),
               ],
             ),
+              ),
+            ],
+          ),
+          Positioned.fill(
+            child: DrawerBackdropBlur(visible: _isDrawerOpen),
           ),
         ],
       ),
@@ -1395,10 +1425,12 @@ class _DriverBottomNav extends StatelessWidget {
   Widget build(BuildContext context) {
     final isCompact = MediaQuery.of(context).size.width < 520;
     const items = [
-      _NavItem('History', Icons.history_rounded, Icons.history_rounded),
-      _NavItem('Home', Icons.home_outlined, Icons.home_rounded),
+      _NavItem('Historial', Icons.history_rounded, Icons.history_rounded),
+      _NavItem('Chat', Icons.chat_bubble_outline_rounded,
+          Icons.chat_bubble_rounded),
+      _NavItem('Inicio', Icons.home_outlined, Icons.home_rounded),
       _NavItem('Servicios', Icons.storefront_outlined, Icons.storefront_rounded),
-      _NavItem('Profile', Icons.person_outline_rounded,
+      _NavItem('Perfil', Icons.person_outline_rounded,
           Icons.person_rounded),
     ];
 

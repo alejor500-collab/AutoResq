@@ -1,3 +1,6 @@
+import 'dart:async';
+import 'dart:ui' as ui;
+
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
@@ -33,104 +36,138 @@ class AppDrawer extends ConsumerWidget {
       shape: const RoundedRectangleBorder(
         borderRadius: BorderRadius.horizontal(right: Radius.circular(28)),
       ),
-      child: SafeArea(
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            _DrawerHeader(
-              name: user?.name ?? 'Usuario',
-              email: user?.email ?? '',
-              roleLabel: _roleLabel(activeRole),
-            ),
-            Expanded(
-              child: ListView(
-                padding: const EdgeInsets.only(bottom: 8),
-                children: [
-                  const _SectionLabel('NAVEGACION'),
-                  if (isAdmin)
-                    ..._adminItems(context)
-                  else if (isTechnicianMode)
-                    ..._technicianItems(context)
-                  else
-                    ..._driverItems(context),
-                  const _SectionDivider(),
-                  const _SectionLabel('MI CUENTA'),
-                  _DrawerItem(
-                    icon: Icons.person_outline,
-                    label: 'Mi Perfil',
-                    onTap: () {
-                      Navigator.of(context).pop();
-                      context.push(AppRoutes.profile);
-                    },
-                  ),
-                  _DrawerItem(
-                    icon: Icons.edit_outlined,
-                    label: 'Editar Informacion',
-                    onTap: () {
-                      Navigator.of(context).pop();
-                      context.push(AppRoutes.editProfile);
-                    },
-                  ),
-                  if (isDriverMode)
+      child: _DrawerEntranceMotion(
+        child: SafeArea(
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              _DrawerHeader(
+                name: user?.name ?? 'Usuario',
+                email: user?.email ?? '',
+                roleLabel: _roleLabel(activeRole),
+              ),
+              Expanded(
+                child: ListView(
+                  padding: const EdgeInsets.only(bottom: 8),
+                  children: [
+                    const _SectionLabel('NAVEGACION'),
+                    if (isAdmin)
+                      ..._adminItems(context)
+                    else if (isTechnicianMode)
+                      ..._technicianItems(context)
+                    else
+                      ..._driverItems(context),
+                    if (isDriverMode) ...[
+                      const _SectionDivider(),
+                      const _SectionLabel('EMERGENCIAS'),
+                      _DrawerItem(
+                        icon: Icons.report_problem_outlined,
+                        label: 'Nueva Emergencia',
+                        color: AppColors.primary,
+                        onTap: () {
+                          final router = GoRouter.of(context);
+                          Navigator.of(context).pop();
+                          router.push(AppRoutes.createEmergency);
+                        },
+                      ),
+                    ] else if (isTechnicianMode) ...[
+                      const _SectionDivider(),
+                      const _SectionLabel('GESTION TECNICA'),
+                      _DrawerItem(
+                        icon: Icons.assignment_outlined,
+                        label: 'Solicitudes Disponibles',
+                        subtitle: 'Emergencias pendientes cerca de ti',
+                        onTap: () {
+                          final router = GoRouter.of(context);
+                          Navigator.of(context).pop();
+                          router.pushReplacement(
+                            AppRoutes.technicianHome,
+                            extra: 1,
+                          );
+                        },
+                      ),
+                    ],
+                    const _SectionDivider(),
+                    const _SectionLabel('MI CUENTA'),
                     _DrawerItem(
-                      icon: Icons.directions_car_outlined,
-                      label:
-                          vehicle != null ? vehicle.displayName : 'Agregar Vehiculo',
-                      subtitle: vehicle?.displaySub,
+                      icon: Icons.person_outline,
+                      label: 'Mi Perfil',
                       onTap: () {
                         Navigator.of(context).pop();
-                        context.push(AppRoutes.editVehicle);
+                        context.push(AppRoutes.profile);
                       },
                     ),
-                  if (!isAdmin) ...[
-                    const _SectionDivider(),
-                    const _SectionLabel('MODO DE USO'),
-                    if (user?.role == AppConstants.roleTechnician)
-                      _RoleSwitchItem(
-                        activeRole: activeRole,
+                    _DrawerItem(
+                      icon: Icons.edit_outlined,
+                      label: 'Editar Informacion',
+                      onTap: () {
+                        Navigator.of(context).pop();
+                        context.push(AppRoutes.editProfile);
+                      },
+                    ),
+                    if (isDriverMode)
+                      _DrawerItem(
+                        icon: Icons.directions_car_outlined,
+                        label: vehicle != null
+                            ? vehicle.displayName
+                            : 'Agregar Vehiculo',
+                        subtitle: vehicle?.displaySub,
                         onTap: () {
                           Navigator.of(context).pop();
-                          final nextRole = activeRole == AppConstants.roleDriver
-                              ? AppConstants.roleTechnician
-                              : AppConstants.roleDriver;
-                          ref.read(activeRoleProvider.notifier).switchTo(nextRole);
-                          context.go(nextRole == AppConstants.roleDriver
-                              ? AppRoutes.driverHome
-                              : AppRoutes.technicianHome);
+                          context.push(AppRoutes.editVehicle);
                         },
-                      )
-                    else if (tecnicoStatus != null)
-                      _TechnicianRequestStatus(
-                        status: tecnicoStatus,
-                        onRequest: () =>
-                            _showTecnicoRequestSheet(context, ref, user!.id),
-                        onSwitch: () =>
-                            _switchToTechnician(context, ref, user!.id),
                       ),
+                    if (!isAdmin) ...[
+                      const _SectionDivider(),
+                      const _SectionLabel('MODO DE USO'),
+                      if (user?.role == AppConstants.roleTechnician)
+                        _RoleSwitchItem(
+                          activeRole: activeRole,
+                          onTap: () async {
+                            final nextRole =
+                                activeRole == AppConstants.roleDriver
+                                    ? AppConstants.roleTechnician
+                                    : AppConstants.roleDriver;
+                            await _switchActiveRoleWithTransition(
+                              context,
+                              ref,
+                              nextRole,
+                            );
+                          },
+                        )
+                      else if (tecnicoStatus != null)
+                        _TechnicianRequestStatus(
+                          status: tecnicoStatus,
+                          onRequest: () =>
+                              _showTecnicoRequestSheet(context, ref, user!.id),
+                          onSwitch: () =>
+                              _switchToTechnician(context, ref, user!.id),
+                        ),
+                    ],
                   ],
-                ],
-              ),
-            ),
-            const _SectionDivider(),
-            Padding(
-              padding: const EdgeInsets.fromLTRB(24, 8, 24, 4),
-              child: Text(
-                'AutoResQ v1.0.0',
-                style: TextStyle(
-                  fontSize: 11,
-                  color: AppColors.secondary.withValues(alpha: 0.5),
                 ),
               ),
-            ),
-            _DrawerItem(
-              icon: Icons.logout,
-              label: 'Cerrar Sesion',
-              color: AppColors.error,
-              dense: true,
-              onTap: () => _confirmLogout(context, ref),
-            ),
-            const SizedBox(height: 8),
-          ],
+              const _SectionDivider(),
+              Padding(
+                padding: const EdgeInsets.fromLTRB(24, 8, 24, 4),
+                child: Text(
+                  'AutoResQ v1.0.0',
+                  style: TextStyle(
+                    fontSize: 11,
+                    color: AppColors.secondary.withValues(alpha: 0.5),
+                  ),
+                ),
+              ),
+              _DrawerItem(
+                icon: Icons.logout,
+                label: 'Cerrar Sesion',
+                color: AppColors.error,
+                dense: true,
+                onTap: () => _confirmLogout(context, ref),
+              ),
+              const SizedBox(height: 8),
+            ],
+          ),
         ),
       ),
     );
@@ -139,25 +176,40 @@ class AppDrawer extends ConsumerWidget {
   List<Widget> _driverItems(BuildContext context) {
     return [
       _DrawerItem(
-        icon: Icons.home_outlined,
-        label: 'Inicio',
-        onTap: () => Navigator.of(context).pop(),
-      ),
-      _DrawerItem(
         icon: Icons.history_outlined,
-        label: 'Historial de Emergencias',
+        label: 'Historial',
         onTap: () {
+          final router = GoRouter.of(context);
           Navigator.of(context).pop();
-          context.push(AppRoutes.emergencyHistory);
+          router.push(AppRoutes.emergencyHistory);
         },
       ),
       _DrawerItem(
-        icon: Icons.report_problem_outlined,
-        label: 'Nueva Emergencia',
-        color: AppColors.primary,
+        icon: Icons.chat_bubble_outline_rounded,
+        label: 'Chat',
         onTap: () {
+          final router = GoRouter.of(context);
           Navigator.of(context).pop();
-          context.push(AppRoutes.createEmergency);
+          router.push(AppRoutes.driverChatHistory);
+        },
+      ),
+      _DrawerItem(
+        icon: Icons.home_outlined,
+        label: 'Inicio',
+        onTap: () {
+          final router = GoRouter.of(context);
+          Navigator.of(context).pop();
+          router.pushReplacement(AppRoutes.driverHome);
+        },
+      ),
+      _DrawerItem(
+        icon: Icons.storefront_outlined,
+        label: 'Servicios',
+        subtitle: 'Talleres, gasolineras y apoyo cercano',
+        onTap: () {
+          final router = GoRouter.of(context);
+          Navigator.of(context).pop();
+          router.pushReplacement(AppRoutes.driverHome, extra: 3);
         },
       ),
     ];
@@ -166,37 +218,30 @@ class AppDrawer extends ConsumerWidget {
   List<Widget> _technicianItems(BuildContext context) {
     return [
       _DrawerItem(
-        icon: Icons.home_outlined,
-        label: 'Panel Tecnico',
+        icon: Icons.receipt_long_outlined,
+        label: 'Historial',
         onTap: () {
+          final router = GoRouter.of(context);
           Navigator.of(context).pop();
-          context.go(AppRoutes.technicianHome);
+          router.pushReplacement(AppRoutes.technicianHome, extra: 0);
         },
       ),
       _DrawerItem(
-        icon: Icons.assignment_outlined,
-        label: 'Solicitudes Disponibles',
-        subtitle: 'Emergencias pendientes cerca de ti',
+        icon: Icons.chat_bubble_outline_rounded,
+        label: 'Chat',
         onTap: () {
+          final router = GoRouter.of(context);
           Navigator.of(context).pop();
-          context.go(AppRoutes.technicianHome);
+          router.pushReplacement(AppRoutes.technicianHome, extra: 3);
         },
       ),
       _DrawerItem(
-        icon: Icons.history_outlined,
-        label: 'Historial de Servicios',
+        icon: Icons.location_on_outlined,
+        label: 'Inicio',
         onTap: () {
+          final router = GoRouter.of(context);
           Navigator.of(context).pop();
-          context.push(AppRoutes.emergencyHistory);
-        },
-      ),
-      _DrawerItem(
-        icon: Icons.map_outlined,
-        label: 'Servicios Cercanos',
-        subtitle: 'Talleres, gasolineras y apoyo cercano',
-        onTap: () {
-          Navigator.of(context).pop();
-          context.go(AppRoutes.technicianHome);
+          router.pushReplacement(AppRoutes.technicianHome, extra: 2);
         },
       ),
     ];
@@ -259,6 +304,35 @@ class AppDrawer extends ConsumerWidget {
       default:
         return 'Conductor';
     }
+  }
+}
+
+class _DrawerEntranceMotion extends StatelessWidget {
+  final Widget child;
+
+  const _DrawerEntranceMotion({required this.child});
+
+  @override
+  Widget build(BuildContext context) {
+    return TweenAnimationBuilder<double>(
+      tween: Tween(begin: 0, end: 1),
+      duration: const Duration(milliseconds: 320),
+      curve: Curves.easeOutCubic,
+      child: child,
+      builder: (context, value, child) {
+        return Opacity(
+          opacity: value,
+          child: Transform.translate(
+            offset: Offset(-18 * (1 - value), 0),
+            child: Transform.scale(
+              scale: 0.985 + (0.015 * value),
+              alignment: Alignment.centerLeft,
+              child: child,
+            ),
+          ),
+        );
+      },
+    );
   }
 }
 
@@ -494,6 +568,71 @@ class _DrawerItem extends StatelessWidget {
   }
 }
 
+class DrawerBackdropBlur extends StatelessWidget {
+  final bool visible;
+
+  const DrawerBackdropBlur({
+    super.key,
+    required this.visible,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return IgnorePointer(
+      child: AnimatedOpacity(
+        opacity: visible ? 1 : 0,
+        duration: const Duration(milliseconds: 220),
+        curve: Curves.easeOutCubic,
+        child: BackdropFilter(
+          filter: ui.ImageFilter.blur(
+            sigmaX: visible ? 8 : 0,
+            sigmaY: visible ? 8 : 0,
+          ),
+          child: Container(
+            decoration: BoxDecoration(
+              gradient: LinearGradient(
+                begin: Alignment.topLeft,
+                end: Alignment.bottomRight,
+                colors: [
+                  AppColors.textPrimary.withValues(alpha: 0.10),
+                  AppColors.primary.withValues(alpha: 0.08),
+                  Colors.white.withValues(alpha: 0.12),
+                ],
+              ),
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+Future<void> _switchActiveRoleWithTransition(
+  BuildContext context,
+  WidgetRef ref,
+  String nextRole,
+) async {
+  final router = GoRouter.of(context);
+  final drawerNavigator = Navigator.of(context);
+  final overlay = Overlay.of(context, rootOverlay: true);
+  final activeRoleNotifier = ref.read(activeRoleProvider.notifier);
+  if (drawerNavigator.canPop()) {
+    drawerNavigator.pop();
+  }
+  await Future<void>.delayed(const Duration(milliseconds: 140));
+
+  await showRoleSwitchTransition(
+    overlay,
+    nextRole,
+    onMidpoint: () {
+      activeRoleNotifier.switchTo(nextRole);
+      router.go(nextRole == AppConstants.roleDriver
+          ? AppRoutes.driverHome
+          : AppRoutes.technicianHome);
+    },
+  );
+}
+
 class _RoleSwitchItem extends StatelessWidget {
   final String? activeRole;
   final VoidCallback onTap;
@@ -657,20 +796,339 @@ void _showTecnicoRequestSheet(
   });
 }
 
-void _switchToTechnician(BuildContext context, WidgetRef ref, String userId) {
-  Navigator.of(context).pop();
+Future<void> _switchToTechnician(
+  BuildContext context,
+  WidgetRef ref,
+  String userId,
+) async {
+  final router = GoRouter.of(context);
+  final drawerNavigator = Navigator.of(context);
+  final overlay = Overlay.of(context, rootOverlay: true);
   final user = ref.read(authNotifierProvider).value;
   if (user == null) return;
-  final updated = user.copyWith(role: AppConstants.roleTechnician);
-  ref.read(authNotifierProvider.notifier).refreshUser(updated);
-  ref.read(activeRoleProvider.notifier).switchTo(AppConstants.roleTechnician);
-  ref
-      .read(supabaseClientProvider)
-      .from(AppConstants.tableUsuarios)
-      .update({'rol': AppConstants.roleTechnician})
-      .eq('id', userId)
-      .then((_) {}, onError: (_) {});
-  context.go(AppRoutes.technicianHome);
+  final authNotifier = ref.read(authNotifierProvider.notifier);
+  final activeRoleNotifier = ref.read(activeRoleProvider.notifier);
+  final supabase = ref.read(supabaseClientProvider);
+  if (drawerNavigator.canPop()) {
+    drawerNavigator.pop();
+  }
+  await Future<void>.delayed(const Duration(milliseconds: 140));
+
+  await showRoleSwitchTransition(
+    overlay,
+    AppConstants.roleTechnician,
+    onMidpoint: () {
+      final updated = user.copyWith(role: AppConstants.roleTechnician);
+      authNotifier.refreshUser(updated);
+      activeRoleNotifier.switchTo(AppConstants.roleTechnician);
+      supabase
+          .from(AppConstants.tableUsuarios)
+          .update({'rol': AppConstants.roleTechnician})
+          .eq('id', userId)
+          .then((_) {}, onError: (_) {});
+      router.go(AppRoutes.technicianHome);
+    },
+  );
+}
+
+Future<void> showRoleSwitchTransition(
+  OverlayState overlay,
+  String nextRole, {
+  required FutureOr<void> Function() onMidpoint,
+}) async {
+  final toTechnician = nextRole == AppConstants.roleTechnician;
+  final completed = Completer<void>();
+  Timer? failsafe;
+  late final OverlayEntry entry;
+  entry = OverlayEntry(
+    builder: (_) => _RoleSwitchTransitionOverlay(
+      toTechnician: toTechnician,
+      onMidpoint: onMidpoint,
+      onFinished: () {
+        failsafe?.cancel();
+        if (entry.mounted) {
+          entry.remove();
+        }
+        if (!completed.isCompleted) completed.complete();
+      },
+    ),
+  );
+  overlay.insert(entry);
+  failsafe = Timer(const Duration(seconds: 3), () {
+    if (entry.mounted) {
+      entry.remove();
+    }
+    if (!completed.isCompleted) completed.complete();
+  });
+  await completed.future;
+}
+
+class _RoleSwitchTransitionOverlay extends StatefulWidget {
+  final bool toTechnician;
+  final FutureOr<void> Function() onMidpoint;
+  final VoidCallback onFinished;
+
+  const _RoleSwitchTransitionOverlay({
+    required this.toTechnician,
+    required this.onMidpoint,
+    required this.onFinished,
+  });
+
+  @override
+  State<_RoleSwitchTransitionOverlay> createState() =>
+      _RoleSwitchTransitionOverlayState();
+}
+
+class _RoleSwitchTransitionOverlayState
+    extends State<_RoleSwitchTransitionOverlay>
+    with SingleTickerProviderStateMixin {
+  late final AnimationController _controller;
+  late final Animation<double> _opacity;
+  bool _midpointCalled = false;
+
+  @override
+  void initState() {
+    super.initState();
+    _controller = AnimationController(
+      vsync: this,
+      duration: const Duration(milliseconds: 380),
+      reverseDuration: const Duration(milliseconds: 360),
+    );
+    _opacity = CurvedAnimation(
+      parent: _controller,
+      curve: Curves.easeOutCubic,
+      reverseCurve: Curves.easeInCubic,
+    );
+    _run();
+  }
+
+  Future<void> _run() async {
+    try {
+      await Future<void>.delayed(const Duration(milliseconds: 24));
+      if (!mounted) return;
+      await _controller.forward();
+      await Future<void>.delayed(const Duration(milliseconds: 120));
+      if (!_midpointCalled) {
+        _midpointCalled = true;
+        await Future<void>.sync(widget.onMidpoint);
+        await WidgetsBinding.instance.endOfFrame;
+        await WidgetsBinding.instance.endOfFrame;
+      }
+      await Future<void>.delayed(const Duration(milliseconds: 280));
+    } finally {
+      if (mounted) {
+        try {
+          await _controller.reverse();
+        } finally {
+          widget.onFinished();
+        }
+      }
+    }
+  }
+
+  @override
+  void dispose() {
+    _controller.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Material(
+      color: Colors.transparent,
+      child: FadeTransition(
+        opacity: _opacity,
+        child: BackdropFilter(
+          filter: ui.ImageFilter.blur(sigmaX: 14, sigmaY: 14),
+          child: Container(
+            width: double.infinity,
+            height: double.infinity,
+            decoration: BoxDecoration(
+              gradient: LinearGradient(
+                begin: Alignment.topLeft,
+                end: Alignment.bottomRight,
+                colors: [
+                  Colors.white.withValues(alpha: 0.72),
+                  AppColors.primary.withValues(alpha: 0.22),
+                  AppColors.tertiary.withValues(alpha: 0.18),
+                ],
+              ),
+            ),
+            child: Center(
+              child: TweenAnimationBuilder<double>(
+                tween: Tween(begin: 0.9, end: 1),
+                duration: const Duration(milliseconds: 380),
+                curve: Curves.easeOutBack,
+                builder: (context, scale, child) {
+                  return Transform.scale(scale: scale, child: child);
+                },
+                child: _RoleSwitchTransitionCard(
+                  toTechnician: widget.toTechnician,
+                ),
+              ),
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+class _RoleSwitchTransitionCard extends StatefulWidget {
+  final bool toTechnician;
+
+  const _RoleSwitchTransitionCard({required this.toTechnician});
+
+  @override
+  State<_RoleSwitchTransitionCard> createState() =>
+      _RoleSwitchTransitionCardState();
+}
+
+class _RoleSwitchTransitionCardState extends State<_RoleSwitchTransitionCard> {
+  bool _active = false;
+
+  @override
+  void initState() {
+    super.initState();
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (mounted) setState(() => _active = true);
+    });
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final fromIcon = widget.toTechnician
+        ? Icons.directions_car_rounded
+        : Icons.engineering_rounded;
+    final toIcon = widget.toTechnician
+        ? Icons.engineering_rounded
+        : Icons.directions_car_rounded;
+    final title =
+        widget.toTechnician ? 'Modo tecnico activado' : 'Modo conductor activo';
+    final subtitle = widget.toTechnician
+        ? 'Preparando solicitudes y disponibilidad'
+        : 'Volviendo al mapa del conductor';
+
+    return Material(
+      color: Colors.transparent,
+      child: Container(
+        width: 286,
+        padding: const EdgeInsets.fromLTRB(22, 22, 22, 20),
+        decoration: BoxDecoration(
+          color: Colors.white,
+          borderRadius: BorderRadius.circular(28),
+          boxShadow: [
+            BoxShadow(
+              color: AppColors.primary.withValues(alpha: 0.22),
+              blurRadius: 34,
+              offset: const Offset(0, 18),
+            ),
+          ],
+        ),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            SizedBox(
+              height: 82,
+              child: Stack(
+                alignment: Alignment.center,
+                children: [
+                  AnimatedContainer(
+                    duration: const Duration(milliseconds: 520),
+                    curve: Curves.easeOutCubic,
+                    width: _active ? 180 : 92,
+                    height: 50,
+                    decoration: BoxDecoration(
+                      gradient: AppColors.primaryGradient,
+                      borderRadius: BorderRadius.circular(999),
+                    ),
+                  ),
+                  AnimatedPositioned(
+                    duration: const Duration(milliseconds: 520),
+                    curve: Curves.easeOutBack,
+                    left: _active ? 44 : 94,
+                    child: _RoleSwitchIconBubble(
+                      icon: fromIcon,
+                      selected: !_active,
+                    ),
+                  ),
+                  AnimatedPositioned(
+                    duration: const Duration(milliseconds: 520),
+                    curve: Curves.easeOutBack,
+                    right: _active ? 44 : 94,
+                    child: _RoleSwitchIconBubble(
+                      icon: toIcon,
+                      selected: _active,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+            const SizedBox(height: 10),
+            AnimatedDefaultTextStyle(
+              duration: const Duration(milliseconds: 220),
+              style: TextStyle(
+                fontSize: _active ? 18 : 16,
+                fontWeight: FontWeight.w900,
+                color: AppColors.textPrimary,
+              ),
+              child: Text(title, textAlign: TextAlign.center),
+            ),
+            const SizedBox(height: 6),
+            Text(
+              subtitle,
+              textAlign: TextAlign.center,
+              style: TextStyle(
+                fontSize: 12,
+                fontWeight: FontWeight.w600,
+                color: AppColors.secondary.withValues(alpha: 0.78),
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+class _RoleSwitchIconBubble extends StatelessWidget {
+  final IconData icon;
+  final bool selected;
+
+  const _RoleSwitchIconBubble({
+    required this.icon,
+    required this.selected,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return AnimatedScale(
+      duration: const Duration(milliseconds: 240),
+      curve: Curves.easeOutCubic,
+      scale: selected ? 1.08 : 0.92,
+      child: AnimatedContainer(
+        duration: const Duration(milliseconds: 240),
+        width: 54,
+        height: 54,
+        decoration: BoxDecoration(
+          color: selected ? Colors.white : Colors.white.withValues(alpha: 0.74),
+          shape: BoxShape.circle,
+          boxShadow: [
+            BoxShadow(
+              color: Colors.black.withValues(alpha: selected ? 0.16 : 0.06),
+              blurRadius: selected ? 18 : 8,
+              offset: const Offset(0, 8),
+            ),
+          ],
+        ),
+        child: Icon(
+          icon,
+          color: selected ? AppColors.primary : AppColors.secondary,
+          size: 26,
+        ),
+      ),
+    );
+  }
 }
 
 Future<void> _confirmLogout(BuildContext context, WidgetRef ref) async {

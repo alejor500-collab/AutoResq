@@ -54,6 +54,7 @@ class _TechnicianHomeScreenState extends ConsumerState<TechnicianHomeScreen> {
   bool? _isAvailable;
   bool _activeWarningShown = false;
   bool _isShowingIncomingRequest = false;
+  bool _isDrawerOpen = false;
   String? _autoOpenedActiveServiceId;
   bool _pendingEmergencyFeedSeeded = false;
   final Set<String> _knownPendingEmergencyIds = <String>{};
@@ -1157,6 +1158,8 @@ class _TechnicianHomeScreenState extends ConsumerState<TechnicianHomeScreen> {
     return Scaffold(
       key: _scaffoldKey,
       drawer: const AppDrawer(),
+      drawerScrimColor: Colors.transparent,
+      onDrawerChanged: (isOpened) => setState(() => _isDrawerOpen = isOpened),
       backgroundColor: AppColors.background,
       bottomNavigationBar: _TechnicianBottomNav(
         currentIndex: _navIndex,
@@ -1176,13 +1179,14 @@ class _TechnicianHomeScreenState extends ConsumerState<TechnicianHomeScreen> {
                 userName: technicianName,
                 specialty: specialty,
                 rating: stats?.rating ?? user?.rating ?? 0,
-                isAvailable: isAvailable,
                 isApproved: user?.isApproved ?? false,
                 pendingCount: pendingEmergencies.length,
-                onMenuTap: () => _scaffoldKey.currentState?.openDrawer(),
+                onMenuTap: () {
+                  setState(() => _isDrawerOpen = true);
+                  _scaffoldKey.currentState?.openDrawer();
+                },
                 onNotificationsTap: _openNotifications,
                 onAvatarTap: () => context.push(AppRoutes.profile),
-                onAvailabilityChanged: _toggleAvailability,
               ),
               Expanded(
                 child: switch (_navIndex) {
@@ -1207,6 +1211,7 @@ class _TechnicianHomeScreenState extends ConsumerState<TechnicianHomeScreen> {
                       ),
                       sheet: _TechnicianStatusSheet(
                         isAvailable: isAvailable,
+                        isApproved: user?.isApproved ?? false,
                         pendingCount: pendingEmergencies.length,
                         activeEmergency: activeEmergency,
                         onOpenActiveService: activeEmergency == null
@@ -1216,6 +1221,7 @@ class _TechnicianHomeScreenState extends ConsumerState<TechnicianHomeScreen> {
                                   extra: activeEmergency.id,
                                 ),
                         onViewRequests: () => setState(() => _navIndex = 1),
+                        onAvailabilityChanged: _toggleAvailability,
                       ),
                     ),
                   3 => _buildTechnicianChatHistoryView(
@@ -1251,6 +1257,9 @@ class _TechnicianHomeScreenState extends ConsumerState<TechnicianHomeScreen> {
                 },
               ),
             ),
+          Positioned.fill(
+            child: DrawerBackdropBlur(visible: _isDrawerOpen),
+          ),
         ],
       ),
     );
@@ -1299,13 +1308,11 @@ class _TechnicianTopBar extends StatelessWidget {
   final String userName;
   final String specialty;
   final double rating;
-  final bool isAvailable;
   final bool isApproved;
   final int pendingCount;
   final VoidCallback onMenuTap;
   final VoidCallback onNotificationsTap;
   final VoidCallback onAvatarTap;
-  final ValueChanged<bool> onAvailabilityChanged;
 
   const _TechnicianTopBar({
     required this.unreadCount,
@@ -1313,13 +1320,11 @@ class _TechnicianTopBar extends StatelessWidget {
     required this.userName,
     required this.specialty,
     required this.rating,
-    required this.isAvailable,
     required this.isApproved,
     required this.pendingCount,
     required this.onMenuTap,
     required this.onNotificationsTap,
     required this.onAvatarTap,
-    required this.onAvailabilityChanged,
   });
 
   @override
@@ -1514,52 +1519,7 @@ class _TechnicianTopBar extends StatelessWidget {
               ),
             ],
           ),
-          Align(
-            alignment: Alignment.centerRight,
-            child: _TopBarAvailabilitySwitch(
-              isAvailable: isAvailable,
-              isApproved: isApproved,
-              onChanged: onAvailabilityChanged,
-              compact: isCompact,
-            ),
-          ),
         ],
-      ),
-    );
-  }
-}
-
-class _TopBarAvailabilitySwitch extends StatelessWidget {
-  final bool isAvailable;
-  final bool isApproved;
-  final ValueChanged<bool> onChanged;
-  final bool compact;
-
-  const _TopBarAvailabilitySwitch({
-    required this.isAvailable,
-    required this.isApproved,
-    required this.onChanged,
-    required this.compact,
-  });
-
-  @override
-  Widget build(BuildContext context) {
-    final label = isAvailable ? 'Disponible' : 'No disponible';
-
-    return Semantics(
-      label: 'Cambiar disponibilidad',
-      value: label,
-      child: Transform.scale(
-        scale: compact ? 0.78 : 0.84,
-        child: Switch.adaptive(
-          value: isAvailable,
-          onChanged: isApproved ? onChanged : null,
-          activeThumbColor: AppColors.success,
-          activeTrackColor: AppColors.success.withValues(alpha: 0.36),
-          inactiveThumbColor: AppColors.textSecondary,
-          inactiveTrackColor: AppColors.textSecondary.withValues(alpha: 0.22),
-          materialTapTargetSize: MaterialTapTargetSize.shrinkWrap,
-        ),
       ),
     );
   }
@@ -1616,17 +1576,21 @@ class _TopBarMetaItem extends StatelessWidget {
 
 class _TechnicianStatusSheet extends StatelessWidget {
   final bool isAvailable;
+  final bool isApproved;
   final int pendingCount;
   final Emergency? activeEmergency;
   final VoidCallback? onOpenActiveService;
   final VoidCallback onViewRequests;
+  final ValueChanged<bool> onAvailabilityChanged;
 
   const _TechnicianStatusSheet({
     required this.isAvailable,
+    required this.isApproved,
     required this.pendingCount,
     required this.activeEmergency,
     required this.onOpenActiveService,
     required this.onViewRequests,
+    required this.onAvailabilityChanged,
   });
 
   @override
@@ -1684,6 +1648,11 @@ class _TechnicianStatusSheet extends StatelessWidget {
                           : AppColors.textSecondary,
                     ),
                   ),
+                ),
+                _AvailabilityActionButton(
+                  isAvailable: isAvailable,
+                  enabled: isApproved,
+                  onPressed: () => onAvailabilityChanged(!isAvailable),
                 ),
               ],
             ),
@@ -1826,6 +1795,57 @@ class _StatusIconBubble extends StatelessWidget {
   }
 }
 
+class _AvailabilityActionButton extends StatelessWidget {
+  final bool isAvailable;
+  final bool enabled;
+  final VoidCallback onPressed;
+
+  const _AvailabilityActionButton({
+    required this.isAvailable,
+    required this.enabled,
+    required this.onPressed,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final color = isAvailable ? AppColors.textSecondary : AppColors.success;
+    final label = isAvailable ? 'Pausar' : 'Activar';
+    final icon = isAvailable
+        ? Icons.pause_circle_outline_rounded
+        : Icons.play_circle_outline_rounded;
+
+    return Semantics(
+      button: true,
+      label: isAvailable
+          ? 'Cambiar disponibilidad a no disponible'
+          : 'Cambiar disponibilidad a disponible',
+      child: OutlinedButton.icon(
+        onPressed: enabled ? onPressed : null,
+        icon: Icon(icon, size: 17),
+        label: Text(label),
+        style: OutlinedButton.styleFrom(
+          foregroundColor: color,
+          disabledForegroundColor: AppColors.textHint,
+          minimumSize: const Size(92, 40),
+          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+          side: BorderSide(
+            color: enabled
+                ? color.withValues(alpha: 0.42)
+                : AppColors.outline.withValues(alpha: 0.7),
+          ),
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(999),
+          ),
+          textStyle: const TextStyle(
+            fontSize: 12,
+            fontWeight: FontWeight.w900,
+          ),
+        ),
+      ),
+    );
+  }
+}
+
 class _TechnicianBottomNav extends StatelessWidget {
   final int currentIndex;
   final int unreadCount;
@@ -1857,7 +1877,7 @@ class _TechnicianBottomNav extends StatelessWidget {
           children: [
             Expanded(
               child: _TechnicianNavItem(
-                label: 'History',
+                label: 'Historial',
                 icon: Icons.receipt_long_outlined,
                 activeIcon: Icons.receipt_long_rounded,
                 active: currentIndex == 0,
@@ -1878,7 +1898,7 @@ class _TechnicianBottomNav extends StatelessWidget {
             ),
             Expanded(
               child: _TechnicianNavItem(
-                label: 'Home',
+                label: 'Inicio',
                 icon: Icons.location_on_outlined,
                 activeIcon: Icons.location_on_rounded,
                 active: currentIndex == 2,
@@ -1888,7 +1908,7 @@ class _TechnicianBottomNav extends StatelessWidget {
             ),
             Expanded(
               child: _TechnicianNavItem(
-                label: 'Profile',
+                label: 'Perfil',
                 icon: Icons.person_outline_rounded,
                 activeIcon: Icons.person_rounded,
                 active: false,

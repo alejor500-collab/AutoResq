@@ -221,7 +221,10 @@ final appRouterProvider = Provider<GoRouter>((ref) {
       // ─── Driver ────────────────────────────────────────────────────────
       GoRoute(
         path: AppRoutes.driverHome,
-        builder: (context, state) => const DriverHomeScreen(),
+        builder: (context, state) {
+          final initialTab = state.extra as int?;
+          return DriverHomeScreen(initialTab: initialTab ?? 2);
+        },
       ),
       GoRoute(
         path: AppRoutes.createEmergency,

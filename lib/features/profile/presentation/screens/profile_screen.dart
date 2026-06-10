@@ -11,8 +11,10 @@ import '../../../../features/auth/domain/entities/user_entity.dart';
 import '../../../../shared/providers/auth_provider.dart';
 import '../../../../shared/providers/role_provider.dart';
 import '../../../../shared/providers/tecnico_status_provider.dart';
+import '../../../../shared/widgets/app_drawer.dart';
 import '../../../../shared/widgets/bottom_nav_bar.dart';
 import '../../../../shared/widgets/technician_request_sheet.dart';
+import '../../../chat/presentation/providers/chat_provider.dart';
 import '../providers/vehicle_provider.dart';
 
 class ProfileServiceStats {
@@ -127,9 +129,12 @@ class ProfileScreen extends ConsumerWidget {
     final authState = ref.watch(authNotifierProvider);
     final user = authState.value;
     final activeRole = ref.watch(activeRoleProvider);
-    final isTechnicianMode = activeRole == AppConstants.roleTechnician &&
+    final effectiveRole = activeRole ?? user?.role;
+    final isTechnicianMode = effectiveRole == AppConstants.roleTechnician &&
         user?.isTechnician == true &&
         user?.isApproved == true;
+    final unreadChatCount =
+        ref.watch(unreadChatCountProvider).valueOrNull ?? 0;
 
     if (user == null) {
       return const Scaffold(
@@ -228,7 +233,7 @@ class ProfileScreen extends ConsumerWidget {
               child: Column(
                 children: [
                   // Profile Hero
-                  _ProfileHero(user: user, activeRole: activeRole),
+                  _ProfileHero(user: user, activeRole: effectiveRole),
                   const Gap(40),
 
                   // Stats Grid (Bento)
@@ -291,9 +296,10 @@ class ProfileScreen extends ConsumerWidget {
             bottom: 0,
             left: 0,
             right: 0,
-            child: AppBottomNavBar(
-              currentIndex: isTechnicianMode ? 4 : 3,
+            child: RoleHomeBottomNavBar(
+              currentIndex: isTechnicianMode ? 3 : 4,
               isTechnician: isTechnicianMode,
+              unreadCount: unreadChatCount,
               onTap: (i) {
                 if (isTechnicianMode) {
                   switch (i) {
@@ -301,29 +307,29 @@ class ProfileScreen extends ConsumerWidget {
                       context.go(AppRoutes.technicianHome, extra: 0);
                       break;
                     case 1:
-                      context.go(AppRoutes.technicianHome, extra: 1);
+                      context.go(AppRoutes.technicianHome, extra: 3);
                       break;
                     case 2:
                       context.go(AppRoutes.technicianHome, extra: 2);
                       break;
                     case 3:
-                      context.go(AppRoutes.technicianHome, extra: 3);
-                      break;
-                    case 4:
                       break;
                   }
                 } else {
                   switch (i) {
                     case 0:
-                      context.go(AppRoutes.driverHome);
-                      break;
-                    case 1:
                       context.go(AppRoutes.emergencyHistory);
                       break;
-                    case 2:
+                    case 1:
                       context.go(AppRoutes.driverChatHistory);
                       break;
+                    case 2:
+                      context.go(AppRoutes.driverHome);
+                      break;
                     case 3:
+                      context.go(AppRoutes.driverHome, extra: 3);
+                      break;
+                    case 4:
                       break;
                   }
                 }
@@ -957,14 +963,11 @@ class _TechnicianModeItem extends ConsumerWidget {
             : 'Cambiar a modo Técnico',
         trailing: Icons.sync_alt,
         isProminent: true,
-        onTap: () {
+        onTap: () async {
           final newRole = goingToDriver
               ? AppConstants.roleDriver
               : AppConstants.roleTechnician;
-          ref.read(activeRoleProvider.notifier).switchTo(newRole);
-          context.go(newRole == AppConstants.roleDriver
-              ? AppRoutes.driverHome
-              : AppRoutes.technicianHome);
+          await _switchRoleWithTransition(context, ref, newRole);
         },
       );
     }
@@ -993,12 +996,11 @@ class _TechnicianModeItem extends ConsumerWidget {
             label: 'Cambiar a modo Técnico',
             trailing: Icons.sync_alt,
             isProminent: true,
-            onTap: () {
-              ref
-                  .read(activeRoleProvider.notifier)
-                  .switchTo(AppConstants.roleTechnician);
-              context.go(AppRoutes.technicianHome);
-            },
+            onTap: () async => _switchRoleWithTransition(
+              context,
+              ref,
+              AppConstants.roleTechnician,
+            ),
           );
         }
         if (status.pendiente) {
@@ -1033,6 +1035,27 @@ class _TechnicianModeItem extends ConsumerWidget {
         context.go(AppRoutes.driverHome);
       }
     });
+  }
+
+  Future<void> _switchRoleWithTransition(
+    BuildContext context,
+    WidgetRef ref,
+    String nextRole,
+  ) async {
+    final overlay = Overlay.of(context, rootOverlay: true);
+    final router = GoRouter.of(context);
+    final activeRoleNotifier = ref.read(activeRoleProvider.notifier);
+
+    await showRoleSwitchTransition(
+      overlay,
+      nextRole,
+      onMidpoint: () {
+        activeRoleNotifier.switchTo(nextRole);
+        router.go(nextRole == AppConstants.roleDriver
+            ? AppRoutes.driverHome
+            : AppRoutes.technicianHome);
+      },
+    );
   }
 }
 

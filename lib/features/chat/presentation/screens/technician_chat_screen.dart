@@ -82,12 +82,15 @@ class _TechnicianChatScreenState extends ConsumerState<TechnicianChatScreen> {
     final emergencyAsync = ref.watch(watchEmergencyProvider(widget.emergencyId));
     final emergency = emergencyAsync.valueOrNull;
     final driverName = emergency?.driverName ?? 'Conductor';
-    final serviceName =
-        emergency?.pricingServiceName ?? emergency?.clasificacionIa ?? 'Online';
     final isClosed = emergency?.estado == AppConstants.statusCompleted ||
         emergency?.estado == AppConstants.statusCancelled ||
         emergency?.asignacionEstado == AppConstants.assignFinished ||
         emergency?.asignacionEstado == AppConstants.assignRejected;
+    final serviceName =
+        emergency?.pricingServiceName ?? emergency?.clasificacionIa ?? 'Chat';
+    final chatStatusText = isClosed ? 'Solo lectura' : 'Servicio activo';
+    final chatStatusColor =
+        isClosed ? AppColors.secondary : AppColors.success;
 
     return Scaffold(
       backgroundColor: AppColors.background,
@@ -140,7 +143,7 @@ class _TechnicianChatScreenState extends ConsumerState<TechnicianChatScreen> {
                                 width: 12,
                                 height: 12,
                                 decoration: BoxDecoration(
-                                  color: AppColors.success,
+                                  color: chatStatusColor,
                                   shape: BoxShape.circle,
                                   border:
                                       Border.all(color: Colors.white, width: 2),
@@ -167,7 +170,7 @@ class _TechnicianChatScreenState extends ConsumerState<TechnicianChatScreen> {
                                 ),
                               ),
                               Text(
-                                '$serviceName • Online',
+                                '$serviceName - $chatStatusText',
                                 maxLines: 1,
                                 overflow: TextOverflow.ellipsis,
                                 style: const TextStyle(
