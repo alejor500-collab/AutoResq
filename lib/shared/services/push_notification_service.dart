@@ -54,6 +54,7 @@ class PushNotificationService {
 
   static bool _initialized = false;
   static bool _listenersAttached = false;
+  static bool _permissionRequested = false;
   static String? _syncedUserId;
   static PushNotificationOpenHandler? _openHandler;
   static PushNotificationRoute? _pendingRoute;
@@ -68,10 +69,20 @@ class PushNotificationService {
       }
       await OneSignal.initialize(_appId);
       _attachListeners();
-      await OneSignal.Notifications.requestPermission(false);
+      await requestPermission();
       _initialized = true;
     } catch (error) {
       debugPrint('[AutoResQ] OneSignal init skipped: $error');
+    }
+  }
+
+  static Future<void> requestPermission() async {
+    if (!isConfigured || _permissionRequested) return;
+    try {
+      _permissionRequested = true;
+      await OneSignal.Notifications.requestPermission(true);
+    } catch (error) {
+      debugPrint('[AutoResQ] OneSignal permission skipped: $error');
     }
   }
 
@@ -118,6 +129,7 @@ class PushNotificationService {
       if (_syncedUserId == user.id) return;
       OneSignal.login(user.id);
       _syncedUserId = user.id;
+      await requestPermission();
     } catch (error) {
       debugPrint('[AutoResQ] OneSignal user sync skipped: $error');
     }

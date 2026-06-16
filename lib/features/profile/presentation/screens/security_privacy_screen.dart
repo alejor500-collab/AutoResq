@@ -5,6 +5,7 @@ import 'package:go_router/go_router.dart';
 
 import '../../../../core/constants/app_colors.dart';
 import '../../../../core/utils/helpers.dart';
+import '../../../../core/utils/input_formatters.dart';
 import '../../../../core/utils/validators.dart';
 import '../../../../shared/providers/auth_provider.dart';
 import '../../../../shared/widgets/app_button.dart';
@@ -123,6 +124,7 @@ class _SecurityPrivacyScreenState
                       controller: _passwordCtrl,
                       obscureText: true,
                       validator: Validators.password,
+                      inputFormatters: AppInputFormatters.password,
                       prefixIcon: const Icon(Icons.lock_outline_rounded),
                     ),
                     const Gap(14),
@@ -134,6 +136,7 @@ class _SecurityPrivacyScreenState
                         value,
                         _passwordCtrl.text,
                       ),
+                      inputFormatters: AppInputFormatters.password,
                       prefixIcon:
                           const Icon(Icons.verified_user_outlined),
                     ),

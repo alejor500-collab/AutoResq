@@ -8,6 +8,8 @@ import 'package:go_router/go_router.dart';
 import '../../../../core/constants/app_colors.dart';
 import '../../../../core/constants/app_constants.dart';
 import '../../../../core/utils/helpers.dart';
+import '../../../../core/utils/input_formatters.dart';
+import '../../../../core/utils/validators.dart';
 import '../../../../shared/providers/auth_provider.dart';
 import '../../../../shared/widgets/user_avatar.dart';
 import '../../../emergency/presentation/providers/emergency_provider.dart';
@@ -592,6 +594,9 @@ class _ChatInputBar extends StatelessWidget {
                   child: TextField(
                     controller: controller,
                     maxLines: null,
+                    inputFormatters: AppInputFormatters.limitedText(
+                      Validators.messageMaxLength,
+                    ),
                     textInputAction: TextInputAction.send,
                     onSubmitted: (_) => onSend(),
                     style: const TextStyle(

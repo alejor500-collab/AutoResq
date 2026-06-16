@@ -1,8 +1,9 @@
 import 'package:flutter/material.dart';
-import 'package:flutter/services.dart';
 import 'package:gap/gap.dart';
 import '../../../../core/constants/app_colors.dart';
 import '../../../../core/utils/helpers.dart';
+import '../../../../core/utils/input_formatters.dart';
+import '../../../../core/utils/validators.dart';
 import '../../../../shared/widgets/app_button.dart';
 import '../../../../shared/widgets/app_text_field.dart';
 
@@ -64,10 +65,11 @@ class _TechnicianOfferAmountSheetState
   }
 
   void _submit() {
+    final validation = Validators.amount(_amountController.text);
     final parsed = _parseAmount(_amountController.text);
-    if (parsed == null || parsed <= 0) {
+    if (validation != null || parsed == null) {
       setState(() {
-        _errorText = 'Ingresa un precio aproximado valido.';
+        _errorText = validation ?? 'Ingresa un precio aproximado valido.';
       });
       return;
     }
@@ -166,9 +168,7 @@ class _TechnicianOfferAmountSheetState
                   keyboardType: const TextInputType.numberWithOptions(
                     decimal: true,
                   ),
-                  inputFormatters: [
-                    FilteringTextInputFormatter.allow(RegExp(r'[0-9\.,]')),
-                  ],
+                  inputFormatters: AppInputFormatters.money,
                   prefixIcon: const Padding(
                     padding: EdgeInsets.only(left: 16, right: 6),
                     child: Icon(

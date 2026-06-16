@@ -5,6 +5,7 @@ import '../../../../core/constants/app_colors.dart';
 import '../../../../core/constants/app_constants.dart';
 import '../../../../core/constants/app_strings.dart';
 import '../../../../core/utils/helpers.dart';
+import '../../../../core/utils/input_formatters.dart';
 import '../../../../core/utils/navigation_utils.dart';
 import '../../../../core/utils/validators.dart';
 import '../../../../shared/providers/auth_provider.dart';
@@ -118,6 +119,7 @@ class _ForgotPasswordScreenState extends ConsumerState<ForgotPasswordScreen> {
             controller: _emailCtrl,
             keyboardType: TextInputType.emailAddress,
             validator: Validators.email,
+            inputFormatters: AppInputFormatters.email,
             prefixIcon: const Icon(Icons.email_outlined, size: 20),
           ),
         ),

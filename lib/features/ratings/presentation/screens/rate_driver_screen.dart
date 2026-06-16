@@ -6,6 +6,7 @@ import '../../../../core/constants/app_colors.dart';
 import '../../../../core/constants/app_constants.dart';
 import '../../../../core/router/app_router.dart';
 import '../../../../core/utils/helpers.dart';
+import '../../../../core/utils/validators.dart';
 import '../../../../shared/providers/auth_provider.dart';
 import '../../../../shared/widgets/app_button.dart';
 import '../../../../shared/widgets/app_text_field.dart';
@@ -257,6 +258,12 @@ class _RateDriverScreenState extends ConsumerState<RateDriverScreen> {
                             label: 'Reseña (opcional)',
                             controller: _reviewCtrl,
                             maxLines: 4,
+                            maxLength: Validators.reviewMaxLength,
+                            validator: (value) => Validators.optionalText(
+                              value,
+                              maxLength: Validators.reviewMaxLength,
+                              fieldName: 'La resena',
+                            ),
                             hint: 'Añade un comentario...',
                           ),
                         ],

@@ -1852,6 +1852,93 @@ class _FilterDropdown extends StatelessWidget {
     required this.onChanged,
   });
 
+  Future<void> _showOptions(BuildContext context) async {
+    final selection = await showModalBottomSheet<_FilterOptionSelection>(
+      context: context,
+      backgroundColor: AppColors.surfaceContainerLowest,
+      barrierColor: AppColors.onSurface.withValues(alpha: 0.42),
+      isScrollControlled: true,
+      useSafeArea: true,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(28)),
+      ),
+      builder: (context) {
+        final availableHeight = MediaQuery.sizeOf(context).height * 0.72;
+        return ConstrainedBox(
+          constraints: BoxConstraints(maxHeight: availableHeight),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Center(
+                child: Container(
+                  width: 42,
+                  height: 4,
+                  margin: const EdgeInsets.only(top: 12),
+                  decoration: BoxDecoration(
+                    color: AppColors.surfaceContainerHighest,
+                    borderRadius: BorderRadius.circular(999),
+                  ),
+                ),
+              ),
+              Padding(
+                padding: const EdgeInsets.fromLTRB(20, 18, 12, 10),
+                child: Row(
+                  children: [
+                    Expanded(
+                      child: Text(
+                        'Seleccionar $label',
+                        style: const TextStyle(
+                          fontSize: 18,
+                          fontWeight: FontWeight.w800,
+                          color: AppColors.textPrimary,
+                        ),
+                      ),
+                    ),
+                    IconButton(
+                      onPressed: () => Navigator.pop(context),
+                      tooltip: 'Cerrar',
+                      icon: const Icon(Icons.close_rounded),
+                    ),
+                  ],
+                ),
+              ),
+              const Divider(height: 1, color: AppColors.surfaceContainerHigh),
+              Flexible(
+                child: ListView(
+                  shrinkWrap: true,
+                  padding: const EdgeInsets.fromLTRB(12, 10, 12, 20),
+                  children: [
+                    _FilterOptionTile(
+                      label: 'Todos',
+                      selected: value == null,
+                      onTap: () => Navigator.pop(
+                        context,
+                        const _FilterOptionSelection(null),
+                      ),
+                    ),
+                    ...options.map(
+                      (option) => _FilterOptionTile(
+                        label: option,
+                        selected: value == option,
+                        onTap: () => Navigator.pop(
+                          context,
+                          _FilterOptionSelection(option),
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ],
+          ),
+        );
+      },
+    );
+
+    if (selection != null) onChanged(selection.value);
+  }
+
   @override
   Widget build(BuildContext context) {
     return Column(
@@ -1866,50 +1953,107 @@ class _FilterDropdown extends StatelessWidget {
           ),
         ),
         const Gap(8),
-        DropdownButtonFormField<String?>(
-          initialValue: value,
-          isExpanded: true,
-          menuMaxHeight: 360,
-          items: [
-            const DropdownMenuItem<String?>(
-              value: null,
-              child: Text('Todos'),
-            ),
-            ...options.map(
-              (option) => DropdownMenuItem<String?>(
-                value: option,
-                child: Text(
-                  option,
-                  maxLines: 2,
-                  overflow: TextOverflow.ellipsis,
+        Semantics(
+          button: true,
+          label: '$label: ${value ?? 'Todos'}',
+          child: InkWell(
+            onTap: () => _showOptions(context),
+            borderRadius: BorderRadius.circular(16),
+            child: ConstrainedBox(
+              constraints: const BoxConstraints(minHeight: 52),
+              child: Ink(
+                padding:
+                    const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+                decoration: BoxDecoration(
+                  color: AppColors.surfaceContainerLowest,
+                  borderRadius: BorderRadius.circular(16),
+                  border: Border.all(color: AppColors.surfaceContainerHigh),
+                ),
+                child: Row(
+                  children: [
+                    Expanded(
+                      child: Text(
+                        value ?? 'Todos',
+                        maxLines: 2,
+                        overflow: TextOverflow.ellipsis,
+                        style: const TextStyle(
+                          fontSize: 14,
+                          fontWeight: FontWeight.w600,
+                          color: AppColors.textPrimary,
+                        ),
+                      ),
+                    ),
+                    const Gap(10),
+                    const Icon(
+                      Icons.keyboard_arrow_down_rounded,
+                      color: AppColors.textSecondary,
+                    ),
+                  ],
                 ),
               ),
-            ),
-          ],
-          onChanged: onChanged,
-          decoration: InputDecoration(
-            filled: true,
-            fillColor: AppColors.surfaceContainerLowest,
-            contentPadding:
-                const EdgeInsets.symmetric(horizontal: 14, vertical: 14),
-            enabledBorder: OutlineInputBorder(
-              borderRadius: BorderRadius.circular(16),
-              borderSide:
-                  const BorderSide(color: AppColors.surfaceContainerHigh),
-            ),
-            focusedBorder: OutlineInputBorder(
-              borderRadius: BorderRadius.circular(16),
-              borderSide:
-                  const BorderSide(color: AppColors.primary, width: 1.5),
-            ),
-            border: OutlineInputBorder(
-              borderRadius: BorderRadius.circular(16),
-              borderSide:
-                  const BorderSide(color: AppColors.surfaceContainerHigh),
             ),
           ),
         ),
       ],
+    );
+  }
+}
+
+class _FilterOptionSelection {
+  final String? value;
+
+  const _FilterOptionSelection(this.value);
+}
+
+class _FilterOptionTile extends StatelessWidget {
+  final String label;
+  final bool selected;
+  final VoidCallback onTap;
+
+  const _FilterOptionTile({
+    required this.label,
+    required this.selected,
+    required this.onTap,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 6),
+      child: Material(
+        color: selected
+            ? AppColors.primaryFixed
+            : AppColors.surfaceContainerLowest,
+        borderRadius: BorderRadius.circular(16),
+        child: InkWell(
+          onTap: onTap,
+          borderRadius: BorderRadius.circular(16),
+          child: Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 14),
+            child: Row(
+              children: [
+                Expanded(
+                  child: Text(
+                    label,
+                    style: TextStyle(
+                      fontSize: 14,
+                      fontWeight:
+                          selected ? FontWeight.w700 : FontWeight.w500,
+                      color: AppColors.textPrimary,
+                    ),
+                  ),
+                ),
+                if (selected)
+                  const Icon(
+                    Icons.check_circle_rounded,
+                    color: AppColors.primary,
+                    size: 22,
+                  ),
+              ],
+            ),
+          ),
+        ),
+      ),
     );
   }
 }

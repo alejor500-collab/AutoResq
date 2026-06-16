@@ -7,6 +7,8 @@ import '../../../../core/constants/app_colors.dart';
 import '../../../../core/constants/app_constants.dart';
 import '../../../../core/router/app_router.dart';
 import '../../../../core/utils/helpers.dart';
+import '../../../../core/utils/input_formatters.dart';
+import '../../../../core/utils/validators.dart';
 import '../../../../shared/widgets/admin_bottom_nav.dart';
 import '../../../../shared/widgets/loading_overlay.dart';
 import '../../../../shared/widgets/user_avatar.dart';
@@ -102,6 +104,9 @@ class _UserManagementScreenState
               controller: reasonCtrl,
               minLines: 3,
               maxLines: 5,
+              inputFormatters: AppInputFormatters.limitedText(
+                Validators.longTextMaxLength,
+              ),
               decoration: InputDecoration(
                 hintText: 'Motivo de desactivacion...',
                 filled: true,
@@ -312,6 +317,7 @@ class _UserManagementScreenState
               children: [
                 TextField(
                   onChanged: (v) => setState(() => _searchQuery = v),
+                  inputFormatters: AppInputFormatters.limitedText(100),
                   decoration: InputDecoration(
                     hintText: 'Buscar usuario...',
                     prefixIcon: const Icon(Icons.search, size: 20),
@@ -1195,6 +1201,9 @@ class _ReactivationRequestSheetState
                     controller: _responseCtrl,
                     minLines: 3,
                     maxLines: 5,
+                    inputFormatters: AppInputFormatters.limitedText(
+                      Validators.longTextMaxLength,
+                    ),
                     decoration: InputDecoration(
                       hintText:
                           'Opcional al aprobar, obligatorio al rechazar...',

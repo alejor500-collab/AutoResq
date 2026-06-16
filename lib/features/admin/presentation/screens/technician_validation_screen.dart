@@ -7,6 +7,8 @@ import '../../../../core/constants/app_constants.dart';
 import '../../../../core/constants/technician_specialties.dart';
 import '../../../../core/router/app_router.dart';
 import '../../../../core/utils/helpers.dart';
+import '../../../../core/utils/input_formatters.dart';
+import '../../../../core/utils/validators.dart';
 import '../../../../shared/widgets/app_button.dart';
 import '../../../../shared/widgets/loading_overlay.dart';
 import '../../../../shared/widgets/user_avatar.dart';
@@ -1082,6 +1084,9 @@ class _RejectSheetState extends State<_RejectSheet> {
           TextField(
             controller: _noteCtrl,
             maxLines: 3,
+            inputFormatters: AppInputFormatters.limitedText(
+              Validators.reviewMaxLength,
+            ),
             style:
                 TextStyle(fontSize: 13, color: AppColors.textPrimary),
             decoration: InputDecoration(

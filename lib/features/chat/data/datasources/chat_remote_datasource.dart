@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:supabase_flutter/supabase_flutter.dart';
 import '../../../../core/constants/app_constants.dart';
 import '../../../../core/errors/exceptions.dart';
@@ -115,9 +117,22 @@ class ChatRemoteDataSourceImpl implements ChatRemoteDataSource {
           })
           .select('*, usuarios!remitente_id(nombre, avatar_url)')
           .single();
+      unawaited(_notifyMessagePush(data['id']?.toString()));
       return MessageModel.fromJson(data);
     } on PostgrestException catch (e) {
       throw ServerException(message: e.message);
+    }
+  }
+
+  Future<void> _notifyMessagePush(String? messageId) async {
+    if (messageId == null || messageId.isEmpty) return;
+    try {
+      await _client.functions.invoke(
+        'notify-chat-message',
+        body: {'message_id': messageId},
+      );
+    } catch (_) {
+      // El chat no debe fallar si el canal push aun no esta desplegado.
     }
   }
 

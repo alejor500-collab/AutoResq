@@ -7,6 +7,7 @@ import 'package:supabase_flutter/supabase_flutter.dart';
 import '../../core/constants/app_colors.dart';
 import '../../core/constants/app_constants.dart';
 import '../../core/constants/technician_specialties.dart';
+import '../../core/utils/input_formatters.dart';
 import '../../core/utils/validators.dart';
 import '../../features/auth/domain/entities/user_entity.dart';
 import '../providers/auth_provider.dart';
@@ -128,7 +129,6 @@ class _TechnicianRequestSheetState
     setState(() => _isSubmitting = true);
     try {
       final supabase = ref.read(supabaseClientProvider);
-      final name = _nameCtrl.text.trim();
       final phone = _phoneCtrl.text.trim();
       final specialty =
           _selectedSpecialtyCode ?? TechnicianSpecialties.generalAssistance;
@@ -151,7 +151,6 @@ class _TechnicianRequestSheetState
           supabase.storage.from(AppConstants.bucketAvatars).getPublicUrl(path);
 
       await supabase.from(AppConstants.tableUsuarios).update({
-        'nombre': name,
         'telefono': phone,
       }).eq('id', widget.userId);
 
@@ -169,7 +168,7 @@ class _TechnicianRequestSheetState
         final refreshed = AppUser(
           id: current.id,
           email: current.email,
-          name: name,
+          name: current.name,
           phone: phone,
           role: current.role,
           avatarUrl: current.avatarUrl,
@@ -260,16 +259,14 @@ class _TechnicianRequestSheetState
               const SizedBox(height: 24),
               AppTextField(
                 label: 'Nombre completo',
-                hint: 'Juan Perez',
                 controller: _nameCtrl,
-                validator: Validators.name,
+                readOnly: true,
                 prefixIcon: const Icon(Icons.person_outline, size: 20),
-                textInputAction: TextInputAction.next,
-                inputFormatters: [
-                  FilteringTextInputFormatter.allow(
-                    RegExp(r'[a-zA-ZáéíóúÁÉÍÓÚñÑüÜ\s]'),
-                  ),
-                ],
+                suffixIcon: const Icon(
+                  Icons.lock_outline,
+                  size: 16,
+                  color: AppColors.textHint,
+                ),
               ),
               const SizedBox(height: 16),
               AppTextField(
@@ -280,7 +277,7 @@ class _TechnicianRequestSheetState
                 validator: Validators.phone,
                 prefixIcon: const Icon(Icons.phone_outlined, size: 20),
                 textInputAction: TextInputAction.next,
-                inputFormatters: [FilteringTextInputFormatter.digitsOnly],
+                inputFormatters: AppInputFormatters.phone,
               ),
               const SizedBox(height: 16),
               TechnicianSpecialtyDropdownField(

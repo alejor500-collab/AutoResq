@@ -27,6 +27,21 @@ type AssignmentRow = {
   } | null;
 };
 
+type PushRecipient = {
+  userId: string;
+  title: string;
+  message: string;
+  type: string;
+};
+
+const supportedTypes = new Set([
+  'solicitud_aceptada',
+  'tecnico_en_ruta',
+  'servicio_finalizado',
+  'solicitud_cancelada',
+  'tecnico_cancelo',
+]);
+
 Deno.serve(async (req: Request) => {
   if (req.method === 'OPTIONS') {
     return new Response('ok', { headers: corsHeaders });
@@ -57,7 +72,7 @@ Deno.serve(async (req: Request) => {
   if (!emergencyId) {
     return jsonResponse({ error: 'Missing required field: emergency_id' }, 400);
   }
-  if (type !== 'solicitud_aceptada' && type !== 'servicio_finalizado') {
+  if (!type || !supportedTypes.has(type)) {
     return jsonResponse({ error: 'Unsupported notification type' }, 400);
   }
 
@@ -78,6 +93,8 @@ Deno.serve(async (req: Request) => {
 
   const assignmentStates = type === 'servicio_finalizado'
     ? ['finalizada']
+    : type === 'solicitud_cancelada' || type === 'tecnico_cancelo'
+    ? ['aceptada', 'en_ruta', 'atendiendo', 'rechazada', 'finalizada']
     : ['aceptada', 'en_ruta', 'atendiendo'];
 
   const { data: assignment, error: assignmentError } = await supabase
@@ -96,63 +113,108 @@ Deno.serve(async (req: Request) => {
     return jsonResponse({ error: 'Assignment not found' }, 404);
   }
 
-  const technicianName =
-    assignment.tecnicos?.usuarios?.nombre?.trim() || 'Tu tecnico';
-  const message = type === 'servicio_finalizado'
-    ? `${technicianName} marco el servicio como finalizado. Ya puedes calificar la atencion.`
-    : `${technicianName} acepto tu solicitud y ya puede ver tu servicio.`;
+  const recipients = buildRecipients({ type, emergency, assignment });
 
-  const { data: existingNotification } = await supabase
-    .from('notificaciones')
-    .select('id')
-    .eq('usuario_id', emergency.usuario_id)
-    .eq('tipo', type)
-    .eq('referencia_id', emergencyId)
-    .maybeSingle<{ id: string }>();
+  for (const recipient of recipients) {
+    const { data: existingNotification } = await supabase
+      .from('notificaciones')
+      .select('id')
+      .eq('usuario_id', recipient.userId)
+      .eq('tipo', recipient.type)
+      .eq('referencia_id', emergencyId)
+      .maybeSingle<{ id: string }>();
 
-  const { error: insertError } = existingNotification
-    ? { error: null }
-    : await supabase.from('notificaciones').insert({
-        usuario_id: emergency.usuario_id,
-        tipo: type,
-        mensaje: message,
+    if (!existingNotification) {
+      const { error: insertError } = await supabase.from('notificaciones').insert({
+        usuario_id: recipient.userId,
+        tipo: recipient.type,
+        mensaje: recipient.message,
         referencia_id: emergencyId,
       });
 
-  if (insertError) {
-    console.error('[notify-emergency-update] notification insert error:', insertError);
-    return jsonResponse({ error: 'Notification insert failed' }, 500);
+      if (insertError) {
+        console.error('[notify-emergency-update] notification insert error:', insertError);
+        return jsonResponse({ error: 'Notification insert failed' }, 500);
+      }
+    }
   }
 
   const pushResult = await sendPushNotification({
-    userIds: [emergency.usuario_id],
-    title: type === 'servicio_finalizado'
-      ? 'Servicio finalizado'
-      : 'Tu solicitud fue aceptada',
-    message,
+    recipients,
     emergencyId,
-    type,
   });
 
   return jsonResponse({ ok: true, push: pushResult }, 200);
 });
 
-async function sendPushNotification({
-  userIds,
-  title,
-  message,
-  emergencyId,
+function buildRecipients({
   type,
+  emergency,
+  assignment,
 }: {
-  userIds: string[];
-  title: string;
-  message: string;
-  emergencyId: string;
   type: string;
+  emergency: EmergencyRow;
+  assignment: AssignmentRow;
+}): PushRecipient[] {
+  const technicianName =
+    assignment.tecnicos?.usuarios?.nombre?.trim() || 'Tu tecnico';
+  const technicianUserId = assignment.tecnicos?.usuario_id;
+
+  switch (type) {
+    case 'solicitud_aceptada':
+      return [{
+        userId: emergency.usuario_id,
+        type,
+        title: 'Tu solicitud fue aceptada',
+        message: `${technicianName} acepto tu solicitud y ya puede ver tu servicio.`,
+      }];
+    case 'tecnico_en_ruta':
+      return [{
+        userId: emergency.usuario_id,
+        type,
+        title: 'Tecnico en camino',
+        message: `${technicianName} ya llego a tu ubicacion y comenzo la atencion.`,
+      }];
+    case 'servicio_finalizado':
+      return [{
+        userId: emergency.usuario_id,
+        type,
+        title: 'Servicio finalizado',
+        message:
+          `${technicianName} marco el servicio como finalizado. Ya puedes calificar la atencion.`,
+      }];
+    case 'tecnico_cancelo':
+      return [{
+        userId: emergency.usuario_id,
+        type,
+        title: 'El tecnico cancelo',
+        message:
+          'El tecnico tuvo que cancelar la atencion. Tu solicitud vuelve a estar disponible para que otro tecnico pueda ayudarte.',
+      }];
+    case 'solicitud_cancelada':
+      if (!technicianUserId) return [];
+      return [{
+        userId: technicianUserId,
+        type,
+        title: 'Solicitud cancelada',
+        message:
+          'El conductor cancelo la solicitud. Ya no es necesario atender este servicio.',
+      }];
+    default:
+      return [];
+  }
+}
+
+async function sendPushNotification({
+  recipients,
+  emergencyId,
+}: {
+  recipients: PushRecipient[];
+  emergencyId: string;
 }): Promise<'sent' | 'not_configured' | 'failed'> {
   const appId = Deno.env.get('ONESIGNAL_APP_ID');
   const restApiKey = Deno.env.get('ONESIGNAL_REST_API_KEY');
-  if (!appId || !restApiKey || userIds.length === 0) {
+  if (!appId || !restApiKey || recipients.length === 0) {
     return 'not_configured';
   }
 
@@ -161,32 +223,35 @@ async function sendPushNotification({
     : `Key ${restApiKey}`;
 
   try {
-    const response = await fetch('https://api.onesignal.com/notifications?c=push', {
-      method: 'POST',
-      headers: {
-        Authorization: authHeader,
-        'Content-Type': 'application/json',
-      },
-      body: JSON.stringify({
-        app_id: appId,
-        include_aliases: { external_id: userIds },
-        target_channel: 'push',
-        headings: { en: title, es: title },
-        contents: { en: message, es: message },
-        data: {
-          type,
-          emergency_id: emergencyId,
+    for (const recipient of recipients) {
+      const response = await fetch('https://api.onesignal.com/notifications?c=push', {
+        method: 'POST',
+        headers: {
+          Authorization: authHeader,
+          'Content-Type': 'application/json',
         },
-      }),
-    });
+        body: JSON.stringify({
+          app_id: appId,
+          include_aliases: { external_id: [recipient.userId] },
+          target_channel: 'push',
+          headings: { en: recipient.title, es: recipient.title },
+          contents: { en: recipient.message, es: recipient.message },
+          data: {
+            type: recipient.type,
+            emergency_id: emergencyId,
+            reference_id: emergencyId,
+          },
+        }),
+      });
 
-    if (!response.ok) {
-      console.error(
-        '[notify-emergency-update] OneSignal error:',
-        response.status,
-        await response.text(),
-      );
-      return 'failed';
+      if (!response.ok) {
+        console.error(
+          '[notify-emergency-update] OneSignal error:',
+          response.status,
+          await response.text(),
+        );
+        return 'failed';
+      }
     }
     return 'sent';
   } catch (error) {

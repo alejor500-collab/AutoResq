@@ -291,6 +291,7 @@ class _ActiveServiceBodyState extends ConsumerState<_ActiveServiceBody> {
             .from(AppConstants.tableEmergencias)
             .update({'estado': AppConstants.statusAttended})
             .eq('id', widget.emergency.id);
+        unawaited(_notifyDriverAboutArrival(widget.emergency.id));
       } catch (_) {}
     }
     if (!mounted) return;
@@ -298,6 +299,20 @@ class _ActiveServiceBodyState extends ConsumerState<_ActiveServiceBody> {
     ref.read(_activeSubstateProvider.notifier).state =
         AppConstants.assignAttending;
     _startAttendingTimer();
+  }
+
+  Future<void> _notifyDriverAboutArrival(String emergencyId) async {
+    try {
+      await ref.read(supabaseClientProvider).functions.invoke(
+        'notify-emergency-update',
+        body: {
+          'emergency_id': emergencyId,
+          'type': 'tecnico_en_ruta',
+        },
+      );
+    } catch (_) {
+      // La confirmacion de llegada no debe fallar si el canal push no responde.
+    }
   }
 
   Future<void> _cancelByTechnician() async {

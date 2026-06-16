@@ -1,5 +1,4 @@
 import 'package:flutter/material.dart';
-import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:gap/gap.dart';
 import 'package:go_router/go_router.dart';
@@ -12,6 +11,7 @@ import '../../../../core/constants/app_strings.dart';
 import '../../../../core/constants/technician_specialties.dart';
 import '../../../../core/network/dio_client.dart';
 import '../../../../core/utils/helpers.dart';
+import '../../../../core/utils/input_formatters.dart';
 import '../../../../core/utils/validators.dart';
 import '../../../../features/auth/domain/entities/user_entity.dart';
 import '../../../../shared/providers/auth_provider.dart';
@@ -219,7 +219,7 @@ class _EditProfileScreenState extends ConsumerState<EditProfileScreen> {
 
     final user = ref.read(authNotifierProvider).value!;
     final updated = user.copyWith(
-      name: _nameCtrl.text.trim(),
+      name: user.name,
       phone: _phoneCtrl.text.trim(),
       specialty: user.isTechnician ? _selectedSpecialtyCode : user.specialty,
     );
@@ -337,16 +337,20 @@ class _EditProfileScreenState extends ConsumerState<EditProfileScreen> {
               AppTextField(
                 label: AppStrings.name,
                 controller: _nameCtrl,
-                validator: Validators.name,
+                readOnly: true,
                 prefixIcon: const Icon(Icons.person_outline, size: 20),
-                textInputAction: TextInputAction.next,
+                suffixIcon: const Icon(
+                  Icons.lock_outline,
+                  size: 16,
+                  color: AppColors.textHint,
+                ),
               ),
               const Gap(14),
               AppTextField(
                 label: AppStrings.phone,
                 controller: _phoneCtrl,
                 keyboardType: TextInputType.phone,
-                inputFormatters: [FilteringTextInputFormatter.digitsOnly],
+                inputFormatters: AppInputFormatters.phone,
                 validator: Validators.phone,
                 prefixIcon: const Icon(Icons.phone_outlined, size: 20),
                 hint: '0991234567',

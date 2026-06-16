@@ -9,6 +9,7 @@ import '../../../../core/constants/app_constants.dart';
 import '../../../../core/constants/technician_specialties.dart';
 import '../../../../core/router/app_router.dart';
 import '../../../../core/utils/helpers.dart';
+import '../../../../core/utils/input_formatters.dart';
 import '../../../../core/utils/navigation_utils.dart';
 import '../../../../core/utils/validators.dart';
 import '../../../../shared/providers/auth_provider.dart';
@@ -431,10 +432,7 @@ class _RegisterScreenState extends ConsumerState<RegisterScreen> {
                       textInputAction: TextInputAction.next,
                       prefixIcon: const Icon(Icons.person_outline,
                           size: 20, color: AppColors.secondary),
-                      inputFormatters: [
-                        FilteringTextInputFormatter.allow(
-                            RegExp(r'[a-zA-ZáéíóúÁÉÍÓÚñÑüÜ\s]')),
-                      ],
+                      inputFormatters: AppInputFormatters.name,
                     ),
                     const SizedBox(height: 16),
 
@@ -445,6 +443,7 @@ class _RegisterScreenState extends ConsumerState<RegisterScreen> {
                       controller: _emailCtrl,
                       keyboardType: TextInputType.emailAddress,
                       validator: Validators.email,
+                      inputFormatters: AppInputFormatters.email,
                       textInputAction: TextInputAction.next,
                       prefixIcon: const Icon(Icons.email_outlined,
                           size: 20, color: AppColors.secondary),
@@ -461,7 +460,7 @@ class _RegisterScreenState extends ConsumerState<RegisterScreen> {
                       textInputAction: TextInputAction.next,
                       prefixIcon: const Icon(Icons.phone_outlined,
                           size: 20, color: AppColors.secondary),
-                      inputFormatters: [FilteringTextInputFormatter.digitsOnly],
+                      inputFormatters: AppInputFormatters.phone,
                     ),
                     const SizedBox(height: 16),
 
@@ -576,6 +575,7 @@ class _RegisterScreenState extends ConsumerState<RegisterScreen> {
                       controller: _passwordCtrl,
                       obscureText: true,
                       validator: Validators.password,
+                      inputFormatters: AppInputFormatters.password,
                       textInputAction: TextInputAction.next,
                     ),
                     const SizedBox(height: 16),
@@ -586,7 +586,11 @@ class _RegisterScreenState extends ConsumerState<RegisterScreen> {
                       hint: '••••••••',
                       controller: _confirmPassCtrl,
                       obscureText: true,
-                      validator: Validators.password,
+                      validator: (value) => Validators.confirmPassword(
+                        value,
+                        _passwordCtrl.text,
+                      ),
+                      inputFormatters: AppInputFormatters.password,
                       textInputAction: TextInputAction.done,
                     ),
                     const SizedBox(height: 32),

@@ -624,7 +624,6 @@ class AuthRemoteDataSourceImpl implements AuthRemoteDataSource {
   Future<UserModel> updateProfile(UserModel user) async {
     try {
       await _client.from(AppConstants.tableProfiles).update({
-        'nombre': user.name,
         'telefono': user.phone,
         'avatar_url': user.avatarUrl,
         'preferred_payment_method': user.preferredPaymentMethod,

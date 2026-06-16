@@ -10,6 +10,8 @@ import '../../../../core/constants/app_colors.dart';
 import '../../../../core/constants/app_constants.dart';
 import '../../../../core/router/app_router.dart';
 import '../../../../core/utils/helpers.dart';
+import '../../../../core/utils/input_formatters.dart';
+import '../../../../core/utils/validators.dart';
 import '../../../../shared/providers/auth_provider.dart';
 import '../../../../shared/widgets/app_button.dart';
 import '../../../../shared/widgets/app_text_field.dart';
@@ -216,6 +218,16 @@ class _AccountDisabledScreenState extends ConsumerState<AccountDisabledScreen> {
                 hint: 'Explica por que solicitas la reactivacion...',
                 controller: _reasonCtrl,
                 maxLines: 4,
+                maxLength: Validators.longTextMaxLength,
+                inputFormatters: AppInputFormatters.limitedText(
+                  Validators.longTextMaxLength,
+                ),
+                validator: (value) => Validators.textRange(
+                  value,
+                  minLength: 12,
+                  maxLength: Validators.longTextMaxLength,
+                  fieldName: 'La justificacion',
+                ),
                 readOnly: hasPendingRequest || _isSubmitting,
               ),
               const SizedBox(height: 14),

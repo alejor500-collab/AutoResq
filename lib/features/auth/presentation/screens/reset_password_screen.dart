@@ -6,6 +6,8 @@ import '../../../../core/constants/app_colors.dart';
 import '../../../../core/constants/app_constants.dart';
 import '../../../../core/router/app_router.dart';
 import '../../../../core/utils/helpers.dart';
+import '../../../../core/utils/input_formatters.dart';
+import '../../../../core/utils/validators.dart';
 import '../../../../shared/providers/auth_provider.dart';
 import '../../../../shared/widgets/app_button.dart';
 import '../../../../shared/widgets/app_text_field.dart';
@@ -34,15 +36,11 @@ class _ResetPasswordScreenState extends ConsumerState<ResetPasswordScreen> {
   }
 
   String? _validatePassword(String? v) {
-    if (v == null || v.isEmpty) return 'Ingresa una contraseña';
-    if (v.length < 8) return 'Mínimo 8 caracteres';
-    return null;
+    return Validators.password(v);
   }
 
   String? _validateConfirm(String? v) {
-    if (v == null || v.isEmpty) return 'Confirma la contraseña';
-    if (v != _passwordCtrl.text) return 'Las contraseñas no coinciden';
-    return null;
+    return Validators.confirmPassword(v, _passwordCtrl.text);
   }
 
   Future<void> _submit() async {
@@ -132,6 +130,7 @@ class _ResetPasswordScreenState extends ConsumerState<ResetPasswordScreen> {
                       controller: _passwordCtrl,
                       obscureText: _obscurePassword,
                       validator: _validatePassword,
+                      inputFormatters: AppInputFormatters.password,
                       prefixIcon:
                           const Icon(Icons.lock_outline, size: 20),
                       suffixIcon: IconButton(
@@ -153,6 +152,7 @@ class _ResetPasswordScreenState extends ConsumerState<ResetPasswordScreen> {
                       controller: _confirmCtrl,
                       obscureText: _obscureConfirm,
                       validator: _validateConfirm,
+                      inputFormatters: AppInputFormatters.password,
                       prefixIcon:
                           const Icon(Icons.lock_outline, size: 20),
                       suffixIcon: IconButton(

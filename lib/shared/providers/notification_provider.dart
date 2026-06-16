@@ -39,6 +39,7 @@ class AppNotification {
       'solicitud_cancelada' => 'Solicitud cancelada',
       'tecnico_cancelo' => 'Tecnico cancelado',
       'solicitud_aceptada' => 'Solicitud aceptada',
+      'tecnico_en_ruta' => 'Tecnico en tu ubicacion',
       'servicio_finalizado' => 'Servicio finalizado',
       _ => 'Notificacion',
     };

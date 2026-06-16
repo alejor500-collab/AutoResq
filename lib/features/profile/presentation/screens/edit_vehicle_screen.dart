@@ -1,10 +1,10 @@
 import 'package:flutter/material.dart';
-import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:gap/gap.dart';
 import '../../../../core/constants/app_colors.dart';
 import '../../../../core/utils/helpers.dart';
+import '../../../../core/utils/input_formatters.dart';
 import '../../../../core/utils/validators.dart';
 import '../../../../shared/widgets/app_button.dart';
 import '../../../../shared/widgets/app_text_field.dart';
@@ -178,9 +178,11 @@ class _EditVehicleScreenState extends ConsumerState<EditVehicleScreen> {
                 controller: _brandCtrl,
                 prefixIcon: const Icon(Icons.business, size: 20),
                 hint: 'Toyota, Chevrolet, Hyundai...',
-                validator: (v) => (v == null || v.trim().isEmpty)
-                    ? 'Ingresa la marca'
-                    : null,
+                validator: (value) => Validators.vehicleText(
+                  value,
+                  fieldName: 'la marca',
+                ),
+                inputFormatters: AppInputFormatters.vehicleText,
                 textInputAction: TextInputAction.next,
               ),
               const Gap(14),
@@ -192,9 +194,11 @@ class _EditVehicleScreenState extends ConsumerState<EditVehicleScreen> {
                 prefixIcon:
                     const Icon(Icons.directions_car_outlined, size: 20),
                 hint: 'Hilux, Aveo, Tucson...',
-                validator: (v) => (v == null || v.trim().isEmpty)
-                    ? 'Ingresa el modelo'
-                    : null,
+                validator: (value) => Validators.vehicleText(
+                  value,
+                  fieldName: 'el modelo',
+                ),
+                inputFormatters: AppInputFormatters.vehicleText,
                 textInputAction: TextInputAction.next,
               ),
               const Gap(14),
@@ -206,7 +210,7 @@ class _EditVehicleScreenState extends ConsumerState<EditVehicleScreen> {
                 prefixIcon: const Icon(Icons.calendar_today, size: 20),
                 hint: '2022',
                 keyboardType: TextInputType.number,
-                inputFormatters: [FilteringTextInputFormatter.digitsOnly],
+                inputFormatters: AppInputFormatters.year,
                 validator: Validators.year,
                 textInputAction: TextInputAction.next,
               ),
@@ -218,14 +222,7 @@ class _EditVehicleScreenState extends ConsumerState<EditVehicleScreen> {
                 controller: _plateCtrl,
                 prefixIcon: const Icon(Icons.pin, size: 20),
                 hint: 'ABC-1234',
-                inputFormatters: [
-                  TextInputFormatter.withFunction(
-                    (old, newValue) => newValue.copyWith(
-                      text: newValue.text.toUpperCase(),
-                      selection: newValue.selection,
-                    ),
-                  ),
-                ],
+                inputFormatters: AppInputFormatters.plate,
                 validator: Validators.plate,
                 textInputAction: TextInputAction.next,
               ),
@@ -237,9 +234,11 @@ class _EditVehicleScreenState extends ConsumerState<EditVehicleScreen> {
                 controller: _colorCtrl,
                 prefixIcon: const Icon(Icons.palette_outlined, size: 20),
                 hint: 'Blanco, Negro, Rojo...',
-                validator: (v) => (v == null || v.trim().isEmpty)
-                    ? 'Ingresa el color'
-                    : null,
+                validator: (value) => Validators.vehicleText(
+                  value,
+                  fieldName: 'el color',
+                ),
+                inputFormatters: AppInputFormatters.vehicleText,
                 textInputAction: TextInputAction.done,
               ),
               const Gap(32),

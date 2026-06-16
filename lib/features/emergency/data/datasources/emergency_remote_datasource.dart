@@ -323,6 +323,24 @@ class EmergencyRemoteDataSourceImpl implements EmergencyRemoteDataSource {
     }
   }
 
+  Future<void> _notifyEmergencyUpdatePush(
+    String? emergencyId,
+    String type,
+  ) async {
+    if (emergencyId == null || emergencyId.isEmpty) return;
+    try {
+      await _client.functions.invoke(
+        'notify-emergency-update',
+        body: {
+          'emergency_id': emergencyId,
+          'type': type,
+        },
+      );
+    } catch (_) {
+      // La accion principal no debe fallar si el canal push aun no esta desplegado.
+    }
+  }
+
   @override
   Future<EmergencyAiAnalysisModel> analyzeEmergency({
     required String description,
@@ -970,7 +988,11 @@ class EmergencyRemoteDataSourceImpl implements EmergencyRemoteDataSource {
           .eq('estado', AppConstants.statusPending)
           .select('id')
           .maybeSingle();
-      return updated != null;
+      final cancelled = updated != null;
+      if (cancelled) {
+        unawaited(_notifyEmergencyUpdatePush(id, 'solicitud_cancelada'));
+      }
+      return cancelled;
     } on PostgrestException catch (e) {
       throw ServerException(message: e.message);
     }
@@ -1037,6 +1059,7 @@ class EmergencyRemoteDataSourceImpl implements EmergencyRemoteDataSource {
         'technician_cancel_service',
         params: {'p_emergency_id': emergencyId},
       );
+      unawaited(_notifyEmergencyUpdatePush(emergencyId, 'tecnico_cancelo'));
     } on PostgrestException catch (e) {
       throw ServerException(message: e.message);
     }
