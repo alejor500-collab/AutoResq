@@ -69,7 +69,6 @@ class PushNotificationService {
       }
       await OneSignal.initialize(_appId);
       _attachListeners();
-      await requestPermission();
       _initialized = true;
     } catch (error) {
       debugPrint('[AutoResQ] OneSignal init skipped: $error');
@@ -79,8 +78,15 @@ class PushNotificationService {
   static Future<void> requestPermission() async {
     if (!isConfigured || _permissionRequested) return;
     try {
-      _permissionRequested = true;
-      await OneSignal.Notifications.requestPermission(true);
+      final granted = await OneSignal.Notifications.requestPermission(true);
+      final canRequestAgain = await OneSignal.Notifications.canRequest();
+      _permissionRequested = granted || !canRequestAgain;
+      if (kDebugMode) {
+        debugPrint(
+          '[AutoResQ] OneSignal notification permission: '
+          'granted=$granted canRequestAgain=$canRequestAgain',
+        );
+      }
     } catch (error) {
       debugPrint('[AutoResQ] OneSignal permission skipped: $error');
     }
@@ -102,6 +108,22 @@ class PushNotificationService {
     OneSignal.Notifications.addForegroundWillDisplayListener((event) {
       event.preventDefault();
       event.notification.display();
+    });
+
+    OneSignal.Notifications.addPermissionObserver((permission) {
+      if (kDebugMode) {
+        debugPrint('[AutoResQ] OneSignal permission changed: $permission');
+      }
+    });
+
+    OneSignal.User.pushSubscription.addObserver((state) {
+      if (kDebugMode) {
+        debugPrint(
+          '[AutoResQ] OneSignal push subscription: '
+          'id=${state.current.id} token=${state.current.token != null} '
+          'optedIn=${state.current.optedIn}',
+        );
+      }
     });
 
     OneSignal.Notifications.addClickListener((event) {
@@ -131,9 +153,11 @@ class PushNotificationService {
         return;
       }
 
-      if (_syncedUserId == user.id) return;
-      await OneSignal.login(user.id);
-      _syncedUserId = user.id;
+      if (_syncedUserId != user.id) {
+        await OneSignal.login(user.id);
+        _syncedUserId = user.id;
+      }
+      await OneSignal.User.pushSubscription.optIn();
       await requestPermission();
     } catch (error) {
       debugPrint('[AutoResQ] OneSignal user sync skipped: $error');

@@ -158,7 +158,7 @@ class _TechnicianHomeScreenState extends ConsumerState<TechnicianHomeScreen> {
     if (pending.isEmpty) return;
     WidgetsBinding.instance.addPostFrameCallback((_) {
       if (!mounted) return;
-      _showNewEmergencyBanner(pending);
+      _presentNewEmergencyRequests(pending);
     });
   }
 
@@ -263,6 +263,16 @@ class _TechnicianHomeScreenState extends ConsumerState<TechnicianHomeScreen> {
       final emergency =
           await ref.read(emergencyDataSourceProvider).getEmergency(emergencyId);
       if (!mounted) return;
+      if (!_isRequestAvailableForTechnician(emergency)) {
+        ref.invalidate(technicianPendingEmergenciesProvider);
+        setState(() => _navIndex = 1);
+        AppHelpers.showSnackBar(
+          context,
+          _unavailableRequestMessage(emergency),
+          isError: true,
+        );
+        return;
+      }
       final opened = await _showIncomingRequest(emergency);
       if (opened) return;
       setState(() => _navIndex = 1);
@@ -275,6 +285,25 @@ class _TechnicianHomeScreenState extends ConsumerState<TechnicianHomeScreen> {
         isError: true,
       );
     }
+  }
+
+  bool _isRequestAvailableForTechnician(Emergency emergency) {
+    return emergency.estado == AppConstants.statusPending &&
+        !emergency.hasTechnician &&
+        (emergency.asignacionEstado == null ||
+            emergency.asignacionEstado == AppConstants.assignRejected);
+  }
+
+  String _unavailableRequestMessage(Emergency emergency) {
+    return switch (emergency.estado) {
+      AppConstants.statusCompleted => 'Solicitud no disponible: ya finalizo.',
+      AppConstants.statusCancelled => 'Solicitud no disponible: fue cancelada.',
+      AppConstants.statusInProgress =>
+        'Solicitud no disponible: ya fue tomada por otro tecnico.',
+      AppConstants.statusAttended =>
+        'Solicitud no disponible: el servicio esta en atencion.',
+      _ => 'Solicitud no disponible.',
+    };
   }
 
   void _showActiveServiceDialog(
@@ -770,6 +799,7 @@ class _TechnicianHomeScreenState extends ConsumerState<TechnicianHomeScreen> {
   Future<bool> _showIncomingRequest(
     Emergency emergency, {
     bool auto = false,
+    bool showBannerAfterDismiss = false,
   }) async {
     final currentUser = ref.read(authNotifierProvider).value ??
         ref.read(authStateProvider).valueOrNull;
@@ -824,6 +854,10 @@ class _TechnicianHomeScreenState extends ConsumerState<TechnicianHomeScreen> {
       );
       if (!mounted) return true;
       if (result != IncomingRequestSheetResult.responded) {
+        if (showBannerAfterDismiss) {
+          _showNewEmergencyBanner([freshEmergency]);
+          return true;
+        }
         AppHelpers.showSnackBar(
           context,
           'Solicitud oculta. Puedes retomarla desde la pestaña Solicitudes.',
@@ -854,7 +888,7 @@ class _TechnicianHomeScreenState extends ConsumerState<TechnicianHomeScreen> {
       if (emergencies.isNotEmpty && isAvailable) {
         WidgetsBinding.instance.addPostFrameCallback((_) {
           if (!mounted) return;
-          _showNewEmergencyBanner(emergencies);
+          _presentNewEmergencyRequests(emergencies);
         });
       }
       return;
@@ -870,7 +904,7 @@ class _TechnicianHomeScreenState extends ConsumerState<TechnicianHomeScreen> {
     if (newEmergencies.isEmpty || !isAvailable) return;
     WidgetsBinding.instance.addPostFrameCallback((_) {
       if (!mounted) return;
-      _showNewEmergencyBanner(newEmergencies);
+      _presentNewEmergencyRequests(newEmergencies);
     });
   }
 
@@ -889,7 +923,6 @@ class _TechnicianHomeScreenState extends ConsumerState<TechnicianHomeScreen> {
         setState(() => _bannerEmergencies = const []);
       }
     });
-    unawaited(_tryAutoOpenIncomingRequest(emergencies));
   }
 
   void _openBannerEmergency() {
@@ -902,12 +935,36 @@ class _TechnicianHomeScreenState extends ConsumerState<TechnicianHomeScreen> {
 
   Future<void> _tryAutoOpenIncomingRequest(List<Emergency> emergencies) async {
     if (emergencies.isEmpty || _isShowingIncomingRequest) return;
-    final opened = await _showIncomingRequest(emergencies.first, auto: true);
-    if (!mounted || !opened) return;
+    final first = emergencies.first;
+    final opened = await _showIncomingRequest(
+      first,
+      auto: true,
+      showBannerAfterDismiss: true,
+    );
+    if (!mounted) return;
+    if (!opened) {
+      _showNewEmergencyBanner(emergencies);
+      return;
+    }
     final remaining = emergencies
-        .where((emergency) => emergency.id != emergencies.first.id)
+        .where((emergency) => emergency.id != first.id)
         .toList(growable: false);
-    setState(() => _bannerEmergencies = remaining);
+    if (remaining.isNotEmpty && _bannerEmergencies.isEmpty) {
+      _showNewEmergencyBanner(remaining);
+    }
+  }
+
+  void _presentNewEmergencyRequests(List<Emergency> emergencies) {
+    if (!mounted || emergencies.isEmpty) return;
+    if (ref.read(activeTechnicianEmergencyProvider).valueOrNull != null ||
+        ref.read(emergencyNotifierProvider).activeEmergency != null) {
+      return;
+    }
+    if (_isShowingIncomingRequest) {
+      _showNewEmergencyBanner(emergencies);
+      return;
+    }
+    unawaited(_tryAutoOpenIncomingRequest(emergencies));
   }
 
   void _openRequestsTabFromBanner() {

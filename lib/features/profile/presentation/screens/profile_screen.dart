@@ -13,6 +13,7 @@ import '../../../../shared/providers/role_provider.dart';
 import '../../../../shared/providers/tecnico_status_provider.dart';
 import '../../../../shared/widgets/app_drawer.dart';
 import '../../../../shared/widgets/bottom_nav_bar.dart';
+import '../../../../shared/widgets/notification_center_sheet.dart';
 import '../../../../shared/widgets/technician_request_sheet.dart';
 import '../../../chat/presentation/providers/chat_provider.dart';
 import '../providers/vehicle_provider.dart';
@@ -453,23 +454,6 @@ class _ProfileHero extends StatelessWidget {
             fontWeight: FontWeight.w800,
             color: AppColors.onSurface,
             letterSpacing: 0,
-          ),
-        ),
-        const Gap(8),
-        Container(
-          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
-          decoration: BoxDecoration(
-            color: AppColors.primaryFixed,
-            borderRadius: BorderRadius.circular(9999),
-          ),
-          child: Text(
-            'Premium Member',
-            style: TextStyle(
-              fontSize: 11,
-              fontWeight: FontWeight.w700,
-              letterSpacing: 1.5,
-              color: AppColors.onSurface.withValues(alpha: 0.7),
-            ),
           ),
         ),
       ],
@@ -936,9 +920,58 @@ class _AccountSettings extends ConsumerWidget {
         _SettingsItem(
           icon: Icons.notifications,
           label: 'Notificaciones',
-          onTap: () {},
+          onTap: () => _openNotifications(context, ref),
         ),
       ],
+    );
+  }
+
+  Future<void> _openNotifications(BuildContext context, WidgetRef ref) async {
+    await showNotificationCenterSheet(
+      context: context,
+      ref: ref,
+      onNotificationTap: (notification) async {
+        if (!context.mounted) return;
+        final referenceId = notification.referenceId;
+        final activeRole = ref.read(activeRoleProvider) ?? user.role;
+        final isTechnicianMode = activeRole == AppConstants.roleTechnician &&
+            user.isTechnician &&
+            user.isApproved;
+
+        switch (notification.type) {
+          case 'nuevo_mensaje':
+            if (referenceId?.isEmpty != false) return;
+            context.push(
+              isTechnicianMode
+                  ? AppRoutes.technicianChat
+                  : AppRoutes.driverChat,
+              extra: referenceId,
+            );
+            return;
+          case 'nueva_solicitud':
+          case 'solicitud_cancelada':
+            context.go(
+              isTechnicianMode ? AppRoutes.technicianHome : AppRoutes.driverHome,
+              extra: isTechnicianMode ? 1 : null,
+            );
+            return;
+          case 'solicitud_aceptada':
+          case 'tecnico_en_ruta':
+          case 'servicio_finalizado':
+          case 'tecnico_cancelo':
+            if (referenceId?.isEmpty != false) return;
+            context.push(AppRoutes.emergencyStatus, extra: referenceId);
+            return;
+          default:
+            if (referenceId?.isEmpty != false) return;
+            context.push(
+              isTechnicianMode
+                  ? AppRoutes.activeService
+                  : AppRoutes.emergencyStatus,
+              extra: referenceId,
+            );
+        }
+      },
     );
   }
 }

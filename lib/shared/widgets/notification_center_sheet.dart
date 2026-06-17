@@ -118,7 +118,9 @@ class _NotificationTile extends StatelessWidget {
     final color = switch (notification.type) {
       'solicitud_cancelada' || 'tecnico_cancelo' => AppColors.error,
       'nuevo_mensaje' => AppColors.primary,
-      'nueva_solicitud' => AppColors.success,
+      'nueva_solicitud' => notification.isActionable
+          ? AppColors.success
+          : AppColors.secondary,
       'servicio_finalizado' => AppColors.success,
       'tecnico_en_ruta' => AppColors.success,
       'solicitud_aceptada' => AppColors.warning,
@@ -165,7 +167,7 @@ class _NotificationTile extends StatelessWidget {
                       children: [
                         Expanded(
                           child: Text(
-                            notification.title,
+                            notification.displayTitle,
                             style: const TextStyle(
                               fontSize: 14,
                               fontWeight: FontWeight.w900,
@@ -196,7 +198,7 @@ class _NotificationTile extends StatelessWidget {
                     ),
                     const Gap(4),
                     Text(
-                      notification.message,
+                      notification.displayMessage,
                       maxLines: 3,
                       overflow: TextOverflow.ellipsis,
                       style: const TextStyle(
@@ -205,9 +207,29 @@ class _NotificationTile extends StatelessWidget {
                         height: 1.3,
                       ),
                     ),
+                    if (notification.statusLabel != null) ...[
+                      const Gap(8),
+                      Wrap(
+                        spacing: 8,
+                        runSpacing: 6,
+                        children: [
+                          _NotificationMetaChip(
+                            label: notification.statusLabel!,
+                            color: notification.isActionable
+                                ? AppColors.success
+                                : AppColors.secondary,
+                          ),
+                          if (notification.requestTimeLabel != null)
+                            _NotificationMetaChip(
+                              label: notification.requestTimeLabel!,
+                              color: AppColors.primary,
+                            ),
+                        ],
+                      ),
+                    ],
                     const Gap(6),
                     Text(
-                      notification.timeLabel,
+                      'Notificacion: ${notification.timeLabel}',
                       style: const TextStyle(
                         fontSize: 11,
                         color: AppColors.secondary,
@@ -218,6 +240,36 @@ class _NotificationTile extends StatelessWidget {
               ),
             ],
           ),
+        ),
+      ),
+    );
+  }
+}
+
+class _NotificationMetaChip extends StatelessWidget {
+  final String label;
+  final Color color;
+
+  const _NotificationMetaChip({
+    required this.label,
+    required this.color,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+      decoration: BoxDecoration(
+        color: color.withValues(alpha: 0.10),
+        borderRadius: BorderRadius.circular(999),
+        border: Border.all(color: color.withValues(alpha: 0.16)),
+      ),
+      child: Text(
+        label,
+        style: TextStyle(
+          fontSize: 10,
+          fontWeight: FontWeight.w800,
+          color: color,
         ),
       ),
     );
