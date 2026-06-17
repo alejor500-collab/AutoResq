@@ -9,8 +9,10 @@ class AppMapWidget extends StatelessWidget {
   final double lng;
   final double zoom;
   final List<MapMarker> markers;
+  final List<MapPolyline> polylines;
   final MapController? controller;
   final bool interactiveMap;
+  final bool fitBounds;
 
   const AppMapWidget({
     super.key,
@@ -18,17 +20,30 @@ class AppMapWidget extends StatelessWidget {
     this.lng = AppConstants.defaultLng,
     this.zoom = AppConstants.defaultZoom,
     this.markers = const [],
+    this.polylines = const [],
     this.controller,
     this.interactiveMap = true,
+    this.fitBounds = false,
   });
 
   @override
   Widget build(BuildContext context) {
+    final boundsPoints = <LatLng>[
+      ...markers.map((marker) => LatLng(marker.lat, marker.lng)),
+      ...polylines.expand((polyline) => polyline.points),
+    ];
+
     return FlutterMap(
       mapController: controller,
       options: MapOptions(
         initialCenter: LatLng(lat, lng),
         initialZoom: zoom,
+        initialCameraFit: fitBounds && boundsPoints.length >= 2
+            ? CameraFit.bounds(
+                bounds: LatLngBounds.fromPoints(boundsPoints),
+                padding: const EdgeInsets.all(56),
+              )
+            : null,
         interactionOptions: InteractionOptions(
           flags: interactiveMap
               ? InteractiveFlag.all
@@ -41,6 +56,19 @@ class AppMapWidget extends StatelessWidget {
           userAgentPackageName: 'com.autoresq.app',
           tileProvider: NetworkTileProvider(),
         ),
+        if (polylines.isNotEmpty)
+          PolylineLayer(
+            polylines: polylines
+                .where((polyline) => polyline.points.length >= 2)
+                .map(
+                  (polyline) => Polyline(
+                    points: polyline.points,
+                    color: polyline.color,
+                    strokeWidth: polyline.strokeWidth,
+                  ),
+                )
+                .toList(),
+          ),
         MarkerLayer(
           markers: markers.map((m) => _buildMarker(m)).toList(),
         ),
@@ -60,6 +88,18 @@ class AppMapWidget extends StatelessWidget {
       ),
     );
   }
+}
+
+class MapPolyline {
+  final List<LatLng> points;
+  final Color color;
+  final double strokeWidth;
+
+  const MapPolyline({
+    required this.points,
+    required this.color,
+    this.strokeWidth = 3,
+  });
 }
 
 class MapMarker {

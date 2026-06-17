@@ -99,6 +99,11 @@ class PushNotificationService {
   static void _attachListeners() {
     if (_listenersAttached) return;
 
+    OneSignal.Notifications.addForegroundWillDisplayListener((event) {
+      event.preventDefault();
+      event.notification.display();
+    });
+
     OneSignal.Notifications.addClickListener((event) {
       final route = PushNotificationRoute.fromNotification(event.notification);
       if (route == null) return;
@@ -120,14 +125,14 @@ class PushNotificationService {
     try {
       if (user == null) {
         if (_syncedUserId != null) {
-          OneSignal.logout();
+          await OneSignal.logout();
           _syncedUserId = null;
         }
         return;
       }
 
       if (_syncedUserId == user.id) return;
-      OneSignal.login(user.id);
+      await OneSignal.login(user.id);
       _syncedUserId = user.id;
       await requestPermission();
     } catch (error) {

@@ -138,6 +138,8 @@ async function sendPushNotification({
         app_id: appId,
         include_aliases: { external_id: [userId] },
         target_channel: 'push',
+        priority: 10,
+        android_visibility: 1,
         headings: { en: title, es: title },
         contents: { en: message, es: message },
         data: {

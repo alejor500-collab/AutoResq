@@ -4,6 +4,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:geolocator/geolocator.dart';
 import 'package:go_router/go_router.dart';
 import 'package:gap/gap.dart';
+import 'package:latlong2/latlong.dart';
 import 'package:url_launcher/url_launcher.dart';
 import '../../../../core/constants/app_colors.dart';
 import '../../../../core/constants/app_constants.dart';
@@ -101,6 +102,7 @@ class _ActiveServiceBodyState extends ConsumerState<_ActiveServiceBody> {
   StreamSubscription<Position>? _positionSub;
   ProviderSubscription<AsyncValue<int>>? _unreadChatSubscription;
   DateTime? _arrivalStartedAt;
+  Position? _currentPosition;
   int _lastUnreadChatCount = 0;
   int _attendingSeconds = 0;
   bool _isDrawerOpen = false;
@@ -236,6 +238,9 @@ class _ActiveServiceBodyState extends ConsumerState<_ActiveServiceBody> {
   Future<void> _publishLiveLocation(Position position) async {
     final technicianId = widget.emergency.tecnicoId;
     if (technicianId == null || technicianId.isEmpty) return;
+    if (mounted) {
+      setState(() => _currentPosition = position);
+    }
     try {
       await ref.read(supabaseClientProvider).from(
         AppConstants.tableUbicacionesTecnico,
@@ -383,11 +388,54 @@ class _ActiveServiceBodyState extends ConsumerState<_ActiveServiceBody> {
     final lng = emergency.lng ?? AppConstants.defaultLng;
     final towDestinationLat = _snapshotDouble(emergency, 'destination_lat');
     final towDestinationLng = _snapshotDouble(emergency, 'destination_lng');
+    final currentPosition = _currentPosition;
+    final routeEstimate = currentPosition == null
+        ? null
+        : ref.watch(
+            technicianRouteEstimateProvider(
+              (
+                originLat: currentPosition.latitude,
+                originLng: currentPosition.longitude,
+                destinationLat: lat,
+                destinationLng: lng,
+              ),
+            ),
+          );
+    final routePoints = routeEstimate?.valueOrNull?.points ??
+        (currentPosition == null
+            ? <LatLng>[]
+            : [
+                LatLng(currentPosition.latitude, currentPosition.longitude),
+                LatLng(lat, lng),
+              ]);
+    final hasTowDestination = _isTowEmergency(emergency) &&
+        towDestinationLat != null &&
+        towDestinationLng != null;
+    final towRouteEstimate = hasTowDestination
+        ? ref.watch(
+            technicianRouteEstimateProvider(
+              (
+                originLat: lat,
+                originLng: lng,
+                destinationLat: towDestinationLat,
+                destinationLng: towDestinationLng,
+              ),
+            ),
+          )
+        : null;
+    final towRoutePoints = towRouteEstimate?.valueOrNull?.points ??
+        (hasTowDestination
+            ? [LatLng(lat, lng), LatLng(towDestinationLat, towDestinationLng)]
+            : <LatLng>[]);
     final markers = [
+      if (currentPosition != null)
+        technicianMarker(
+          currentPosition.latitude,
+          currentPosition.longitude,
+          name: 'Tú',
+        ),
       emergencyMarker(lat, lng),
-      if (_isTowEmergency(emergency) &&
-          towDestinationLat != null &&
-          towDestinationLng != null)
+      if (hasTowDestination)
         MapMarker(
           lat: towDestinationLat,
           lng: towDestinationLng,
@@ -419,8 +467,23 @@ class _ActiveServiceBodyState extends ConsumerState<_ActiveServiceBody> {
                   child: AppMapWidget(
                     lat: lat,
                     lng: lng,
-                    zoom: 15,
+                    zoom: currentPosition == null ? 15 : 13,
                     markers: markers,
+                    polylines: [
+                      if (routePoints.length >= 2)
+                        MapPolyline(
+                          points: routePoints,
+                          color: AppColors.primary.withValues(alpha: 0.62),
+                          strokeWidth: 4,
+                        ),
+                      if (towRoutePoints.length >= 2)
+                        MapPolyline(
+                          points: towRoutePoints,
+                          color: AppColors.emergency.withValues(alpha: 0.62),
+                          strokeWidth: 3,
+                        ),
+                    ],
+                    fitBounds: currentPosition != null || hasTowDestination,
                   ),
                 ),
                 SafeArea(
