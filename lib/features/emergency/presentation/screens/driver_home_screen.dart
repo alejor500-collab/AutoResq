@@ -7,6 +7,7 @@ import 'package:latlong2/latlong.dart';
 import '../../../../core/constants/app_colors.dart';
 import '../../../../core/constants/app_constants.dart';
 import '../../../../core/router/app_router.dart';
+import '../../../../core/utils/helpers.dart';
 import '../../../../shared/providers/auth_provider.dart';
 import '../../../../shared/widgets/animated_pressable.dart';
 import '../../../../shared/widgets/app_drawer.dart';
@@ -115,11 +116,42 @@ class _DriverHomeScreenState extends ConsumerState<DriverHomeScreen> {
           context.push(AppRoutes.driverChat, extra: referenceId);
           return;
         }
+        if (notification.type == 'servicio_finalizado' &&
+            referenceId?.isNotEmpty == true) {
+          await _openCompletedServiceFromNotification(referenceId!);
+          return;
+        }
         if (referenceId?.isNotEmpty == true) {
           context.push(AppRoutes.emergencyStatus, extra: referenceId);
         }
       },
     );
+  }
+
+  Future<void> _openCompletedServiceFromNotification(String emergencyId) async {
+    final user = ref.read(authNotifierProvider).value ??
+        ref.read(authStateProvider).valueOrNull;
+    if (user == null) return;
+
+    final existing = await ref
+        .read(supabaseClientProvider)
+        .from(AppConstants.tableCalificaciones)
+        .select('id')
+        .eq('emergencia_id', emergencyId)
+        .eq('calificador_id', user.id)
+        .eq('rater_role', 'driver')
+        .maybeSingle();
+
+    if (!mounted) return;
+    if (existing != null) {
+      AppHelpers.showSnackBar(
+        context,
+        'Solicitud no disponible. Este servicio ya fue calificado.',
+        isError: true,
+      );
+      return;
+    }
+    context.push(AppRoutes.emergencyStatus, extra: emergencyId);
   }
 
   Future<void> _restoreActiveEmergency() async {

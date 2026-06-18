@@ -86,7 +86,7 @@ final profileServiceStatsProvider = FutureProvider.autoDispose
     }
 
     return ProfileServiceStats(
-      total: attended + completed,
+      total: pending + attended + completed,
       attended: attended,
       completed: completed,
       pending: pending,
@@ -235,10 +235,8 @@ class ProfileScreen extends ConsumerWidget {
                 children: [
                   // Profile Hero
                   _ProfileHero(user: user, activeRole: effectiveRole),
-                  const Gap(40),
-
-                  // Stats Grid (Bento)
-                  _StatsGrid(
+                  const Gap(24),
+                  _ProfileStatsEntry(
                     user: user,
                     isTechnicianMode: isTechnicianMode,
                   ),
@@ -461,13 +459,13 @@ class _ProfileHero extends StatelessWidget {
   }
 }
 
-// ─── Stats Grid ───────────────────────────────────────────────────────────────
+// ─── Profile Stats ────────────────────────────────────────────────────────────
 
-class _StatsGrid extends ConsumerWidget {
+class _ProfileStatsEntry extends ConsumerWidget {
   final AppUser user;
   final bool isTechnicianMode;
 
-  const _StatsGrid({
+  const _ProfileStatsEntry({
     required this.user,
     required this.isTechnicianMode,
   });
@@ -480,155 +478,341 @@ class _StatsGrid extends ConsumerWidget {
       ),
     );
 
-    return statsAsync.when(
-      data: (stats) => _StatsCards(
-        stats: stats,
-        isTechnicianMode: isTechnicianMode,
+    return GestureDetector(
+      onTap: () => _showProfileStatsSheet(
+        context,
+        statsAsync.valueOrNull ?? ProfileServiceStats.empty,
+        isTechnicianMode,
       ),
-      loading: () => _StatsCards(
-        stats: ProfileServiceStats.empty,
-        isTechnicianMode: isTechnicianMode,
-      ),
-      error: (_, __) => _StatsCards(
-        stats: ProfileServiceStats.empty,
-        isTechnicianMode: isTechnicianMode,
+      child: Container(
+        width: double.infinity,
+        padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 16),
+        decoration: BoxDecoration(
+          color: AppColors.surfaceContainerLowest,
+          borderRadius: BorderRadius.circular(18),
+          border: Border.all(
+            color: AppColors.outlineVariant.withValues(alpha: 0.35),
+          ),
+          boxShadow: [
+            BoxShadow(
+              color: AppColors.onSurface.withValues(alpha: 0.04),
+              blurRadius: 24,
+              offset: const Offset(0, 12),
+            ),
+          ],
+        ),
+        child: Row(
+          children: [
+            Container(
+              width: 42,
+              height: 42,
+              decoration: BoxDecoration(
+                color: AppColors.primary.withValues(alpha: 0.12),
+                borderRadius: BorderRadius.circular(12),
+              ),
+              child: const Icon(
+                Icons.bar_chart_rounded,
+                color: AppColors.primary,
+              ),
+            ),
+            const Gap(14),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  const Text(
+                    'Estadísticas',
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: TextStyle(
+                      fontSize: 15,
+                      fontWeight: FontWeight.w800,
+                      color: AppColors.onSurface,
+                    ),
+                  ),
+                  const Gap(3),
+                  Text(
+                    statsAsync.isLoading
+                        ? 'Actualizando resumen...'
+                        : isTechnicianMode
+                            ? 'Servicios, actividad y estados'
+                            : 'Solicitudes, actividad y estados',
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: const TextStyle(
+                      fontSize: 12,
+                      fontWeight: FontWeight.w600,
+                      color: AppColors.onSurfaceVariant,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+            const Gap(12),
+            if (statsAsync.isLoading)
+              const SizedBox(
+                width: 18,
+                height: 18,
+                child: CircularProgressIndicator(
+                  strokeWidth: 2,
+                  color: AppColors.primary,
+                ),
+              )
+            else
+              const Icon(
+                Icons.chevron_right_rounded,
+                color: AppColors.onSurfaceVariant,
+              ),
+          ],
+        ),
       ),
     );
   }
 }
 
-class _StatsCards extends StatelessWidget {
+Future<void> _showProfileStatsSheet(
+  BuildContext context,
+  ProfileServiceStats stats,
+  bool isTechnicianMode,
+) {
+  return showModalBottomSheet<void>(
+    context: context,
+    isScrollControlled: true,
+    showDragHandle: true,
+    backgroundColor: AppColors.surfaceContainerLowest,
+    builder: (context) => _ProfileStatsSheet(
+      stats: stats,
+      isTechnicianMode: isTechnicianMode,
+    ),
+  );
+}
+
+class _ProfileStatsSheet extends StatelessWidget {
   final ProfileServiceStats stats;
   final bool isTechnicianMode;
 
-  const _StatsCards({
+  const _ProfileStatsSheet({
     required this.stats,
     required this.isTechnicianMode,
   });
 
   @override
   Widget build(BuildContext context) {
-    final items = isTechnicianMode
-        ? [
-            (
-              label: 'Total',
-              value: stats.total,
-              color: AppColors.surfaceContainerLow,
-              textColor: AppColors.onSurface,
-            ),
-            (
-              label: 'Atendidas',
-              value: stats.attended,
-              color: AppColors.success.withValues(alpha: 0.10),
-              textColor: AppColors.success,
-            ),
-            (
-              label: 'Completas',
-              value: stats.completed,
-              color: AppColors.tertiaryFixed,
-              textColor: AppColors.onSurface,
-            ),
-            (
-              label: 'Pendientes',
-              value: stats.pending,
-              color: AppColors.primaryFixed,
-              textColor: AppColors.onSurface,
-            ),
-          ]
-        : [
-            (
-              label: 'Pendientes',
-              value: stats.pending,
-              color: AppColors.primaryFixed,
-              textColor: AppColors.onSurface,
-            ),
-            (
-              label: 'Completas',
-              value: stats.completed,
-              color: AppColors.tertiaryFixed,
-              textColor: AppColors.onSurface,
-            ),
-            (
-              label: 'Total',
-              value: stats.total,
-              color: AppColors.surfaceContainerLow,
-              textColor: AppColors.onSurface,
-            ),
-          ];
+    final metricRows = [
+      (
+        icon: Icons.receipt_long_rounded,
+        label: 'Total registrado',
+        value: stats.total,
+        description: isTechnicianMode
+            ? 'Servicios aceptados en tu historial.'
+            : 'Solicitudes creadas desde tu cuenta.',
+        color: AppColors.primary,
+      ),
+      (
+        icon: Icons.pending_actions_rounded,
+        label: 'Pendientes',
+        value: stats.pending,
+        description: 'Casos activos, en espera o en progreso.',
+        color: AppColors.warning,
+      ),
+      (
+        icon: Icons.handyman_rounded,
+        label: 'Atendidas',
+        value: stats.attended,
+        description: isTechnicianMode
+            ? 'Servicios actualmente marcados como atendidos.'
+            : 'Solicitudes atendidas que aun no se cierran.',
+        color: AppColors.info,
+      ),
+      (
+        icon: Icons.check_circle_rounded,
+        label: 'Completadas',
+        value: stats.completed,
+        description: 'Servicios finalizados correctamente.',
+        color: AppColors.success,
+      ),
+    ];
+    final completionRate =
+        stats.total == 0 ? 0.0 : (stats.completed / stats.total).clamp(0.0, 1.0);
 
-    return LayoutBuilder(
-      builder: (context, constraints) {
-        final columns = constraints.maxWidth < 680
-            ? 2
-            : isTechnicianMode
-                ? 4
-                : 3;
-        return GridView.builder(
-          itemCount: items.length,
-          shrinkWrap: true,
-          physics: const NeverScrollableScrollPhysics(),
-          gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
-            crossAxisCount: columns,
-            mainAxisExtent: 98,
-            crossAxisSpacing: 14,
-            mainAxisSpacing: 14,
+    return SafeArea(
+      child: Padding(
+        padding: EdgeInsets.fromLTRB(
+          24,
+          0,
+          24,
+          24 + MediaQuery.of(context).viewInsets.bottom,
+        ),
+        child: SingleChildScrollView(
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              const Text(
+                'Estadísticas',
+                style: TextStyle(
+                  fontSize: 24,
+                  fontWeight: FontWeight.w900,
+                  color: AppColors.onSurface,
+                  letterSpacing: 0,
+                ),
+              ),
+              const Gap(6),
+              Text(
+                isTechnicianMode
+                    ? 'Resumen de tu actividad como técnico.'
+                    : 'Resumen de tus solicitudes como conductor.',
+                style: const TextStyle(
+                  fontSize: 14,
+                  fontWeight: FontWeight.w600,
+                  color: AppColors.onSurfaceVariant,
+                ),
+              ),
+              const Gap(22),
+              Container(
+                width: double.infinity,
+                padding: const EdgeInsets.all(18),
+                decoration: BoxDecoration(
+                  color: AppColors.surfaceContainerLow,
+                  borderRadius: BorderRadius.circular(18),
+                ),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Row(
+                      children: [
+                        const Expanded(
+                          child: Text(
+                            'Cierre de servicios',
+                            style: TextStyle(
+                              fontSize: 14,
+                              fontWeight: FontWeight.w800,
+                              color: AppColors.onSurface,
+                            ),
+                          ),
+                        ),
+                        Text(
+                          '${(completionRate * 100).round()}%',
+                          style: const TextStyle(
+                            fontSize: 20,
+                            fontWeight: FontWeight.w900,
+                            color: AppColors.primary,
+                          ),
+                        ),
+                      ],
+                    ),
+                    const Gap(12),
+                    ClipRRect(
+                      borderRadius: BorderRadius.circular(99),
+                      child: LinearProgressIndicator(
+                        value: completionRate,
+                        minHeight: 9,
+                        backgroundColor:
+                            AppColors.outlineVariant.withValues(alpha: 0.28),
+                        valueColor: const AlwaysStoppedAnimation<Color>(
+                          AppColors.primary,
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+              const Gap(16),
+              ...metricRows.map(
+                (metric) => Padding(
+                  padding: const EdgeInsets.only(bottom: 10),
+                  child: _StatsMetricRow(
+                    icon: metric.icon,
+                    label: metric.label,
+                    value: metric.value,
+                    description: metric.description,
+                    color: metric.color,
+                  ),
+                ),
+              ),
+            ],
           ),
-          itemBuilder: (context, index) {
-            final item = items[index];
-            return _StatCard(
-              label: item.label,
-              value: item.value,
-              color: item.color,
-              textColor: item.textColor,
-            );
-          },
-        );
-      },
+        ),
+      ),
     );
   }
 }
 
-class _StatCard extends StatelessWidget {
+class _StatsMetricRow extends StatelessWidget {
+  final IconData icon;
   final String label;
   final int value;
+  final String description;
   final Color color;
-  final Color textColor;
 
-  const _StatCard({
+  const _StatsMetricRow({
+    required this.icon,
     required this.label,
     required this.value,
+    required this.description,
     required this.color,
-    required this.textColor,
   });
 
   @override
   Widget build(BuildContext context) {
     return Container(
-      padding: const EdgeInsets.symmetric(vertical: 18, horizontal: 12),
+      width: double.infinity,
+      padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
-        color: color,
+        color: AppColors.surface,
         borderRadius: BorderRadius.circular(16),
+        border: Border.all(
+          color: AppColors.outlineVariant.withValues(alpha: 0.28),
+        ),
       ),
-      child: Column(
-        mainAxisAlignment: MainAxisAlignment.center,
+      child: Row(
         children: [
-          Text(
-            label,
-            maxLines: 1,
-            overflow: TextOverflow.ellipsis,
-            style: TextStyle(
-              fontSize: 11,
-              fontWeight: FontWeight.w700,
-              color: textColor.withValues(alpha: 0.76),
+          Container(
+            width: 44,
+            height: 44,
+            decoration: BoxDecoration(
+              color: color.withValues(alpha: 0.12),
+              borderRadius: BorderRadius.circular(14),
+            ),
+            child: Icon(icon, color: color),
+          ),
+          const Gap(14),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  label,
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: const TextStyle(
+                    fontSize: 14,
+                    fontWeight: FontWeight.w800,
+                    color: AppColors.onSurface,
+                  ),
+                ),
+                const Gap(3),
+                Text(
+                  description,
+                  maxLines: 2,
+                  overflow: TextOverflow.ellipsis,
+                  style: const TextStyle(
+                    fontSize: 12,
+                    fontWeight: FontWeight.w600,
+                    color: AppColors.onSurfaceVariant,
+                  ),
+                ),
+              ],
             ),
           ),
-          const Gap(5),
+          const Gap(12),
           Text(
             '$value',
-            style: TextStyle(
+            style: const TextStyle(
               fontSize: 24,
               fontWeight: FontWeight.w900,
-              color: textColor,
+              color: AppColors.onSurface,
+              letterSpacing: 0,
             ),
           ),
         ],
@@ -960,6 +1144,13 @@ class _AccountSettings extends ConsumerWidget {
           case 'servicio_finalizado':
           case 'tecnico_cancelo':
             if (referenceId?.isEmpty != false) return;
+            if (notification.type == 'servicio_finalizado' &&
+                !isTechnicianMode) {
+              final opened =
+                  await _openCompletedServiceFromNotification(context, ref, referenceId!);
+              if (!opened) return;
+            }
+            if (!context.mounted) return;
             context.push(AppRoutes.emergencyStatus, extra: referenceId);
             return;
           default:
@@ -973,6 +1164,32 @@ class _AccountSettings extends ConsumerWidget {
         }
       },
     );
+  }
+
+  Future<bool> _openCompletedServiceFromNotification(
+    BuildContext context,
+    WidgetRef ref,
+    String emergencyId,
+  ) async {
+    final existing = await ref
+        .read(supabaseClientProvider)
+        .from(AppConstants.tableCalificaciones)
+        .select('id')
+        .eq('emergencia_id', emergencyId)
+        .eq('calificador_id', user.id)
+        .eq('rater_role', 'driver')
+        .maybeSingle();
+
+    if (!context.mounted) return false;
+    if (existing != null) {
+      AppHelpers.showSnackBar(
+        context,
+        'Solicitud no disponible. Este servicio ya fue calificado.',
+        isError: true,
+      );
+      return false;
+    }
+    return true;
   }
 }
 

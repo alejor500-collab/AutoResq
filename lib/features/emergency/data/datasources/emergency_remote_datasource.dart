@@ -1073,7 +1073,7 @@ class EmergencyRemoteDataSourceImpl implements EmergencyRemoteDataSource {
     try {
       final technician = await _client
           .from(AppConstants.tableTecnicos)
-          .select('id')
+          .select('id, disponible')
           .eq('usuario_id', technicianUserId)
           .eq('estado_verificacion', 'aprobado')
           .single();
@@ -1082,6 +1082,11 @@ class EmergencyRemoteDataSourceImpl implements EmergencyRemoteDataSource {
       if (technicianProfileId == null || technicianProfileId.isEmpty) {
         throw const ServerException(
           message: 'No se encontro un perfil tecnico aprobado.',
+        );
+      }
+      if (technician['disponible'] != true) {
+        throw const ServerException(
+          message: 'Este tecnico ya no esta disponible.',
         );
       }
 
@@ -1110,6 +1115,10 @@ class EmergencyRemoteDataSourceImpl implements EmergencyRemoteDataSource {
       // Update emergency status
       await _client.from(AppConstants.tableEmergencias).update(
           {'estado': AppConstants.statusInProgress}).eq('id', emergencyId);
+
+      await _client
+          .from(AppConstants.tableTecnicos)
+          .update({'disponible': false}).eq('id', technicianProfileId);
 
       unawaited(_notifyDriverAboutAcceptedEmergency(emergencyId));
     } on PostgrestException catch (e) {

@@ -13,12 +13,30 @@ import '../../../../core/constants/technician_specialties.dart';
 import '../../../../core/router/app_router.dart';
 import '../../../../core/utils/helpers.dart';
 import '../../../chat/presentation/widgets/chat_notification_bell.dart';
+import '../../../../shared/providers/auth_provider.dart';
 import '../../../../shared/utils/app_responsive.dart';
 import '../../../../shared/widgets/bottom_nav_bar.dart';
 import '../../../../shared/widgets/app_motion.dart';
 import '../../../../shared/widgets/notification_center_sheet.dart';
 import '../providers/emergency_provider.dart';
 import '../../domain/entities/emergency_entity.dart';
+
+final _driverCanRateEmergencyProvider =
+    FutureProvider.autoDispose.family<bool, String>((ref, emergencyId) async {
+  final user = ref.watch(authNotifierProvider).value ??
+      ref.watch(authStateProvider).valueOrNull;
+  if (user == null || emergencyId.isEmpty) return false;
+
+  final existing = await ref
+      .read(supabaseClientProvider)
+      .from(AppConstants.tableCalificaciones)
+      .select('id')
+      .eq('emergencia_id', emergencyId)
+      .eq('calificador_id', user.id)
+      .eq('rater_role', 'driver')
+      .maybeSingle();
+  return existing == null;
+});
 
 class EmergencyStatusScreen extends ConsumerWidget {
   final String emergencyId;
@@ -131,6 +149,11 @@ class _StatusBodyState extends ConsumerState<_StatusBody> {
           context.push(AppRoutes.driverChat, extra: referenceId);
           return;
         }
+        if (notification.type == 'servicio_finalizado' &&
+            referenceId?.isNotEmpty == true) {
+          await _openCompletedServiceFromNotification(referenceId!);
+          return;
+        }
         if (referenceId?.isNotEmpty == true) {
           context.go(AppRoutes.emergencyStatus, extra: referenceId);
         } else if (emergency.asignacionId?.isNotEmpty == true) {
@@ -140,12 +163,30 @@ class _StatusBodyState extends ConsumerState<_StatusBody> {
     );
   }
 
+  Future<void> _openCompletedServiceFromNotification(String emergencyId) async {
+    final canRate =
+        await ref.read(_driverCanRateEmergencyProvider(emergencyId).future);
+    if (!mounted) return;
+    if (!canRate) {
+      AppHelpers.showSnackBar(
+        context,
+        'Solicitud no disponible. Este servicio ya fue calificado.',
+        isError: true,
+      );
+      return;
+    }
+    context.go(AppRoutes.emergencyStatus, extra: emergencyId);
+  }
+
   void _showDriverRatingDialog(Emergency emergency) {
     if (_ratingDialogShown) return;
     _ratingDialogShown = true;
 
-    WidgetsBinding.instance.addPostFrameCallback((_) {
+    WidgetsBinding.instance.addPostFrameCallback((_) async {
       if (!mounted) return;
+      final canRate = await ref
+          .read(_driverCanRateEmergencyProvider(emergency.id).future);
+      if (!mounted || !canRate) return;
       final technicianName = emergency.tecnicoNombre?.trim().isNotEmpty == true
           ? emergency.tecnicoNombre!.trim()
           : 'tu tecnico';
@@ -317,6 +358,9 @@ class _StatusBodyState extends ConsumerState<_StatusBody> {
         : null;
     final isCompleted = emergency.estado == AppConstants.statusCompleted ||
         emergency.asignacionEstado == AppConstants.assignFinished;
+    final canRateAsync = isCompleted
+        ? ref.watch(_driverCanRateEmergencyProvider(emergency.id))
+        : const AsyncValue<bool>.data(false);
     if (isCompleted) {
       _showDriverRatingDialog(emergency);
     }
@@ -471,7 +515,7 @@ class _StatusBodyState extends ConsumerState<_StatusBody> {
                     ),
                   const Gap(24),
 
-                  if (isCompleted) ...[
+                  if (isCompleted && canRateAsync.valueOrNull == true) ...[
                     _DriverRatingPrompt(emergency: emergency),
                     const Gap(24),
                   ],
