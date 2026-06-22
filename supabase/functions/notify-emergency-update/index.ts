@@ -236,6 +236,9 @@ async function sendPushNotification({
           target_channel: 'push',
           priority: 10,
           android_visibility: 1,
+          existing_android_channel_id: 'autoresq_alerts',
+          android_sound: 'default',
+          android_accent_color: 'BB020F',
           headings: { en: recipient.title, es: recipient.title },
           contents: { en: recipient.message, es: recipient.message },
           data: {

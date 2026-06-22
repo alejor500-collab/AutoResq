@@ -46,22 +46,90 @@ class DioClient {
           'lon': lng,
           'format': 'jsonv2',
           'accept-language': 'es',
+          'addressdetails': 1,
+          'zoom': 18,
+          'email': 'autoresq@espoch.edu.ec',
         },
         options: Options(
           headers: {
-            'User-Agent': 'AutoResQ/1.0 (autoresq@example.com)',
+            'User-Agent': 'AutoResQ/1.0 (autoresq@espoch.edu.ec)',
           },
         ),
       );
-      final data = response.data as Map<String, dynamic>;
+      final data = response.data;
+      if (data is! Map<String, dynamic>) {
+        return formatCoordinates(lat, lng);
+      }
       final displayName = (data['display_name'] as String?)?.trim();
       if (displayName != null && displayName.isNotEmpty) {
         return displayName;
+      }
+      final address = _formatAddressFromParts(data['address']);
+      if (address != null) {
+        return address;
       }
       return formatCoordinates(lat, lng);
     } catch (_) {
       return formatCoordinates(lat, lng);
     }
+  }
+
+  String? _formatAddressFromParts(Object? rawAddress) {
+    if (rawAddress is! Map) return null;
+
+    final address = rawAddress.cast<String, dynamic>();
+    final parts = <String>[
+      _firstAddressValue(address, const [
+            'road',
+            'pedestrian',
+            'footway',
+            'path',
+            'residential',
+          ]) ??
+          _firstAddressValue(address, const [
+            'neighbourhood',
+            'suburb',
+            'quarter',
+          ]) ??
+          '',
+      _firstAddressValue(address, const [
+            'neighbourhood',
+            'suburb',
+            'quarter',
+            'city',
+            'town',
+            'village',
+          ]) ??
+          '',
+      _firstAddressValue(address, const [
+            'city',
+            'town',
+            'village',
+            'county',
+            'state',
+          ]) ??
+          '',
+      _firstAddressValue(address, const ['country']) ?? '',
+    ];
+
+    final seen = <String>{};
+    final cleaned = parts
+        .map((part) => part.trim())
+        .where((part) => part.isNotEmpty && seen.add(part.toLowerCase()))
+        .toList();
+    if (cleaned.isEmpty) return null;
+    return cleaned.join(', ');
+  }
+
+  String? _firstAddressValue(
+    Map<String, dynamic> address,
+    List<String> keys,
+  ) {
+    for (final key in keys) {
+      final value = address[key]?.toString().trim();
+      if (value != null && value.isNotEmpty) return value;
+    }
+    return null;
   }
 
   Future<List<Map<String, dynamic>>> queryNearbyServices(

@@ -1,0 +1,46 @@
+{
+  "project_info": {
+    "project_number": "362021637892",
+    "project_id": "autoresqv1",
+    "storage_bucket": "autoresqv1.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:362021637892:android:8482c26dd3210305bdca51",
+        "android_client_info": {
+          "package_name": "com.autoresq.app"
+        }
+      },
+      "oauth_client": [
+        {
+          "client_id": "362021637892-ta4rii3kafr7l8p2en8khst5f9ipeik4.apps.googleusercontent.com",
+          "client_type": 3
+        }
+      ],
+      "api_key": [
+        {
+          "current_key": "AIzaSyACrFmsr86ByPlFvNGgPTusmUaO1euQQJU"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": [
+            {
+              "client_id": "362021637892-ta4rii3kafr7l8p2en8khst5f9ipeik4.apps.googleusercontent.com",
+              "client_type": 3
+            },
+            {
+              "client_id": "362021637892-8dmhifk1ka13489n98fbqt6c7vk2tsbb.apps.googleusercontent.com",
+              "client_type": 2,
+              "ios_info": {
+                "bundle_id": "com.example.autoresq"
+              }
+            }
+          ]
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}
